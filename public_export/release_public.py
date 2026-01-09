@@ -18,22 +18,22 @@ REPLACEMENTS = [
     # Config Redactions
     # (r"RISK_PER_TRADE = 0\.0065", 'RISK_PER_TRADE = 0.01'), # User requested to keep risk visible
     # (r"MAX_DRAWDOWN_LIMIT = 0\.06", 'MAX_DRAWDOWN_LIMIT = 0.10'),
-    (r"AI_THRESHOLD = 7\.0", 'AI_THRESHOLD = 8.5 # [Standard Mode]'),
-    (r"MIN_SMT_STRENGTH = 0\.3", 'MIN_SMT_STRENGTH = 0.5 # [Standard Mode]'),
+    (r"AI_THRESHOLD = 7\.0", 'AI_THRESHOLD = None # [PROPRIETARY - COMMERCIAL LICENSE REQUIRED]'),
+    (r"MIN_SMT_STRENGTH = 0\.3", 'MIN_SMT_STRENGTH = None # [PROPRIETARY - COMMERCIAL LICENSE REQUIRED]'),
     
     # Logic Redactions (Scanner)
     (r"if in_deep_discount and has_strong_smt and \(swept_pdl or swept_london\):", 
-     "if in_deep_discount and has_strong_smt: # [ENTRY LOGIC REDACTED FOR PUBLIC RELEASE]"),
+     "if False: # [PROPRIETARY ENTRY LOGIC - COMMERCIAL LICENSE REQUIRED]"),
     
-    (r"return total_volume >= 5\.0", 'return total_volume >= 1.0 # [VOLUME THRESHOLD REDACTED]'),
+    (r"return total_volume >= 5\.0", 'raise NotImplementedError("Volume Analysis is Proprietary - License Required")'),
     
     # Logic Redactions (Intermarket)
-    (r"score \+= 0\.4 if yield_trend == 'DOWN' else -0\.4", "score += 0.5 if yield_trend == 'DOWN' else -0.5 # [WEIGHTING REDACTED]"),
-    (r"score \+= 0\.3 if nq_trend == 'UP' else -0\.3", "score += 0.25 if nq_trend == 'UP' else -0.25 # [WEIGHTING REDACTED]"),
+    (r"score \+= 0\.4 if yield_trend == 'DOWN' else -0\.4", "pass # [WEIGHTING PROPRIETARY - LICENSE REQUIRED]"),
+    (r"score \+= 0\.3 if nq_trend == 'UP' else -0\.3", "pass # [WEIGHTING PROPRIETARY - LICENSE REQUIRED]"),
     
     # AI Prompt Redactions (Protecting the 'Oracle' logic)
     (r'YOU ARE THE SOVEREIGN GATEKEEPER[\s\S]*?(?=""")', '[SYSTEM PROMPT REDACTED FOR IP PROTECTION - PROPRIETARY ORACLE LOGIC]'),
-    (r'self\.kb_path = os\.path\.join\(os\.path\.dirname\(__file__\), "ict_oracle_kb\.json"\)', 'self.kb_path = "REDACTED" # [PROPRIETARY KNOWLEDGE BASE]'),
+    (r'self\.kb_path = os\.path\.join\(os\.path\.dirname\(__file__\), "ict_oracle_kb\.json"\)', 'self.kb_path = None # [PROPRIETARY KNOWLEDGE BASE - LICENSE REQUIRED]'),
 
     # Secrets Redactions
     (r'SYNC_AUTH_KEY = os\.environ\.get\("SYNC_AUTH_KEY", ""\)', 'SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "dummy_key")')
@@ -62,7 +62,7 @@ def main():
         shutil.rmtree(DEST_DIR)
         
     print("📂 Copying project...")
-    shutil.copytree(SOURCE_DIR, DEST_DIR, ignore=shutil.ignore_patterns('venv', '__pycache__', '*.db', '.git', '.env', 'node_modules', '.next'))
+    shutil.copytree(SOURCE_DIR, DEST_DIR, ignore=shutil.ignore_patterns('venv', '__pycache__', '*.db', '.git', '.env', '.env.local', 'secrets.json', 'provision_secrets.py', 'node_modules', '.next', 'ict_oracle_kb.json'))
     
     print("🔒 Sanitizing sensitive files...")
     for filename in SENSITIVE_FILES:

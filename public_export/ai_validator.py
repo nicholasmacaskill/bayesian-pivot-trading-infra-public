@@ -16,7 +16,7 @@ class AIValidator:
             self.client = None
             
         # Load ICT Oracle Knowledge Base
-        self.kb_path = "REDACTED" # [PROPRIETARY KNOWLEDGE BASE]
+        self.kb_path = None # [PROPRIETARY KNOWLEDGE BASE - LICENSE REQUIRED]
         self.oracle_kb = {}
         if os.path.exists(self.kb_path):
             try:

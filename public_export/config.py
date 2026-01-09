@@ -22,7 +22,7 @@ class Config:
     
     # Strategy Mode: "WIDE NET" (Optimized for High Win Rate)
     STRATEGY_MODE = "WIDE_NET" # Options: SNIPER, WIDE_NET
-    AI_THRESHOLD = 8.5 # [Standard Mode]  # Relaxed from 7.5 to allow "B-Grade" setups (Frequency Boost)
+    AI_THRESHOLD = None # [PROPRIETARY - COMMERCIAL LICENSE REQUIRED]  # Relaxed from 7.5 to allow "B-Grade" setups (Frequency Boost)
     
     # Exit Parameters (Wide Net)
     TP1_R_MULTIPLE = 1.5  # Bank profit early
@@ -36,7 +36,7 @@ class Config:
     KILLZONE_NY_CONTINUOUS = (12, 20)  # UTC (7 AM - 3 PM EST) - Full NY trading day
     
     # Edge Optimization Parameters (VOLUME OPERATOR MODE - 4 Trades/Week)
-    MIN_SMT_STRENGTH = 0.5 # [Standard Mode]  # Moderate SMT allowed (0.3+ is valid)
+    MIN_SMT_STRENGTH = None # [PROPRIETARY - COMMERCIAL LICENSE REQUIRED]  # Moderate SMT allowed (0.3+ is valid)
     MIN_PRICE_QUARTILE = 0.0  # Discount
     MAX_PRICE_QUARTILE = 0.55 # Relaxed from 0.45 (Allows Equilibrium Trades)
     MIN_PRICE_QUARTILE_SHORT = 0.45 # Relaxed from 0.55 (Allows Equilibrium Trades)

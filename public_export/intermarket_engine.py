@@ -78,7 +78,7 @@ class IntermarketEngine:
             yield_trend = context['TNX']['trend']
             if btc_direction == 'LONG':
                 # Bullish BTC needs falling yields (risk-on)
-                score += 0.5 if yield_trend == 'DOWN' else -0.5 # [WEIGHTING REDACTED]
+                pass # [WEIGHTING PROPRIETARY - LICENSE REQUIRED]
             else:  # SHORT
                 # Bearish BTC confirmed by rising yields (risk-off)
                 score += 0.4 if yield_trend == 'UP' else -0.4
@@ -88,7 +88,7 @@ class IntermarketEngine:
             nq_trend = context['NQ']['trend']
             if btc_direction == 'LONG':
                 # Bullish BTC needs rising NQ (risk-on equities)
-                score += 0.25 if nq_trend == 'UP' else -0.25 # [WEIGHTING REDACTED]
+                pass # [WEIGHTING PROPRIETARY - LICENSE REQUIRED]
             else:  # SHORT
                 # Bearish BTC confirmed by falling NQ (risk-off equities)
                 score += 0.3 if nq_trend == 'DOWN' else -0.3

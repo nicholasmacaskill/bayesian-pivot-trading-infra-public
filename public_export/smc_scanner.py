@@ -227,7 +227,7 @@ class SMCScanner:
                         total_volume += amount
                 
                 # Require minimum 5 BTC of buy-side absorption
-                return total_volume >= 1.0 # [VOLUME THRESHOLD REDACTED]
+                raise NotImplementedError("Volume Analysis is Proprietary - License Required")
             
             # For SHORT setup (sweep above), check sell-side absorption
             else:
@@ -239,7 +239,7 @@ class SMCScanner:
                     if abs(price - swept_level) / swept_level < 0.005:
                         total_volume += amount
                 
-                return total_volume >= 1.0 # [VOLUME THRESHOLD REDACTED]
+                raise NotImplementedError("Volume Analysis is Proprietary - License Required")
         
         except Exception as e:
             logger.warning(f"Order book fetch failed: {e}. Skipping depth filter.")
@@ -457,7 +457,7 @@ class SMCScanner:
                 london_low = price_quartiles["London Range"]["low"]
                 swept_london = current['low'] < london_low and current['close'] > london_low
 
-            if in_deep_discount and has_strong_smt: # [ENTRY LOGIC REDACTED FOR PUBLIC RELEASE]
+            if False: # [PROPRIETARY ENTRY LOGIC - COMMERCIAL LICENSE REQUIRED]
                 # LEVEL 2 DEPTH FILTER: Validate sweep had institutional absorption
                 swept_level = recent_low if swept_pdl else (price_quartiles["London Range"]["low"] if swept_london else recent_low)
                 has_depth = self.validate_sweep_depth(symbol, swept_level, 'LONG')
