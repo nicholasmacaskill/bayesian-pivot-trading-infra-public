@@ -1,39 +1,35 @@
-# SMC Alpha Architecture 🧠💎
+# SovereignSMC Architecture 🧠💎
 
-SMC Alpha is a bespoke, institutional-grade automated trading system. It synthesizes Inner Circle Trader (ICT) concepts with advanced AI validation and a stealth architecture to identify and vet high-probability setups in the crypto and forex markets.
+SovereignSMC is a bespoke, institutional-grade automated trading system. It synthesizes Inner Circle Trader (ICT) concepts with advanced AI validation and a stealth architecture to identify and vet high-probability setups in the crypto and forex markets.
 
-## 📈 Volume Operator Strategy (Current)
+## 📈 System Architecture & Objectives
 
-**Target:** 3.1% Monthly Return | **Frequency:** 3-4 Trades/Week | **Risk:** 0.75% per trade (capped at 70% position)
+**Target:** Consistent Monthly Growth | **Frequency:** Adaptive (Configurable) | **Risk:** Dynamic Position Sizing
 
-This strategy has been backtested with **tick-level replay verification** over 12 months of historical data, achieving a **2.38% monthly return** at 0.5% risk. Operating at 0.75% risk with a **70% position cap** (for drawdown protection), the system targets **3.1% monthly** with a 6% maximum drawdown limit.
+This system features a modular architecture designed for **tick-level replay verification** and real-time execution. It combines rigorous technical screening with AI-driven "soft quality" assessment to filter out lower-probability setups that rigid algorithms typically miss.
 
-**Multi-Account Support:** System aggregates equity from 2 TradeLocker accounts (~$100k total) and calculates position sizing across combined capital.
+**Multi-Account Support:** System aggregates equity from multiple TradeLocker accounts and calculates position sizing across combined capital.
 
-### Performance Metrics (Verified)
-- **Backtest Period:** 12 months (Jan 2025 - Jan 2026)
-- **Trade Frequency:** 336 trades (3.1/week average)
-- **Monthly Return:** 2.38% (at 0.5% risk baseline)
-- **Projected Return:** 3.1% monthly (at 0.75% risk with 70% cap)
-- **Best Month:** +13.88% | **Worst Month:** -3.90%
-- **Win Rate:** 60.46% (tick-level verified)
-- **Expected R:R:** 3.0+ (SD 1.0 targeting)
-- **Position Cap:** 70% of total equity (protects drawdown, maintains 30% buffer)
+### Core Capabilities
+- **Backtest Engine:** Tick-level verification against historical data.
+- **Trade Frequency:** Adaptive based on volatility and session rules.
+- **Risk Management:** Automated position sizing with drawdown protection limits.
+- **Equity Protection:** Circuit breakers for daily loss and maximum drawdown.
 
-## 🛡️ The Proprietary Edge
+## 🛡️ The Sovereign Edge
 
 This system is a one-of-one build featuring:
 
 ### 1. Double Quartile Alignment (Time & Price)
 Unlike retail indicators that only look at price, this bot enforces "Institutional Synchronicity":
-- **Time Quartiles**: Every 6-hour session is mathematically divided into 90-minute segments. The bot prioritizes the **Manipulation (Q2) / Judas Window**.
-- **Price Quartiles**: The bot automatically maps the **Asian Range** and **London Range** into quadrants. Longs are validated in **Discount (0-45%)**, and shorts in **Premium (55-100%)**.
+- **Time Quartiles**: Configurable session segmentation. The bot prioritizes the **Manipulation (Q2) / Judas Window**.
+- **Price Quartiles**: The bot automatically maps the **Asian Range** and **London Range** into quadrants. Longs are validated in **Discount**, and shorts in **Premium** based on configurable thresholds.
 
 ### 2. AI Logic Synthesis (The Sovereign Gatekeeper)
 Every technical setup is passed through a **Large Language Model (Gemini)** acting as the **Sovereign Gatekeeper**. It interprets:
 - **Liquidity Inducement**: Is the move a fake-out or a real institutional sweep?
 - **Global Confluence**: Cross-referencing whale movements, news sentiment (CryptoPanic), and market fear (Fear & Greed).
-- **Hard Score Filtering**: Only setups scoring **7.5/10** or higher are sent to your Telegram.
+- **Hard Score Filtering**: Only setups scoring above a high confidence threshold (e.g., **7.5/10**) are sent to your Telegram.
 - **Discipline Enforcement**: AI monitors drawdown status and warns against strategy drift.
 
 ### 3. Stealth Architecture (Security & Performance)
@@ -107,10 +103,10 @@ Run this on your home computer to keep the cloud updated securely:
 python local_sync.py
 ```
 
-## 🛡️ Risk Rules (Hard-Coded)
-- **Max Drawdown**: 6% (System halts trading).
-- **Daily Limit**: 2 Trades Max.
-- **Risk Per Trade**: 0.75% (Volume Operator mode).
+## 🛡️ Risk Rules (Configurable)
+- **Max Drawdown**: System halts trading if breached.
+- **Daily Limit**: Configurable max trades per day.
+- **Risk Per Trade**: Adjustable percentage (e.g., 0.5% - 1.0%).
 - **Safety Toggle**: Set `USE_TRADELOCKER_API = False` in `config.py` to disable real-time account sync if you have compliance concerns.
 
 ## 🕵️‍♂️ The Glass Auditor (AI Journal)
@@ -124,23 +120,23 @@ Every trade you take is now automatically audited locally from your Home IP:
 The system follows a strict hierarchical evaluation flow before sending any signal:
 
 ### 1. Technical Scanner Logic (Tier 1 Filters)
-- **Hard Time Gate**: Continuous NY Session (12:00-20:00 UTC). Outside this, the bot sleeps.
-- **Price Quartiles (Volume Operator Mode)**:
-    - **Longs**: Valid in **Discount** (0 - 0.45).
-    - **Shorts**: Valid in **Premium** (0.55 - 1.0).
+- **Hard Time Gate**: Continuous NY Session (UTC Adjusted). Outside this, the bot sleeps.
+- **Price Quartiles**:
+    - **Longs**: Valid in **Discount** zones.
+    - **Shorts**: Valid in **Premium** zones.
 - **Structure & Confluence**:
-    - **SMT Divergence**: Strength must be **≥ 0.3** (DXY-based institutional sponsorship).
+    - **SMT Divergence**: Checks for DXY-based institutional sponsorship.
     - **Liquidity Sweep**: Detects sweeps of Asian/London Range or Previous Day High/Low.
-    - **Standard Deviation Targeting**: Profit targets set at SD 1.0 of session range (minimum 3R).
+    - **Standard Deviation Targeting**: Profit targets set dynamic SD multiples of session range.
 
 ### 2. Institutional Confluence (External Data)
 - **Whale Flow**: Integrates Whale Alert API to detect large exchange inflows/outflows that could precede a move.
-- **Sentiment Engine**: Pulls the "Fear & Greed Index" to avoid trading "dumb money" extremes or catching falling knives.
+- **Sentiment Engine**: Pulls the "Fear & Greed Index" to avoid trading "dumb money" extremes.
 - **News Pulse**: Correlates technical setups with live CryptoPanic news feeds to ensure institutional sponsorship.
 
 ### 3. AI Mentor Validation (The Sovereign Gatekeeper)
 The Gemini AI applies the final "Professional Grade" (Score 0.0-10.0):
-- **Score < 7.5**: Discarded. Reasoning: Likely "Inducement" or low-quality liquidity.
-- **Score ≥ 7.5**: Verified. Precision trade entry calculations (Entry, SL, Position Size in BTC and USD) are triggered and sent to Telegram.
+- **Low Score**: Discarded. Reasoning: Likely "Inducement" or low-quality liquidity.
+- **High Score**: Verified. Precision trade entry calculations (Entry, SL, Position Size) are triggered and sent to Telegram.
 
 *Built by Antigravity.*
