@@ -1,0 +1,13 @@
+modal
+numpy
+pandas
+ccxt
+smartmoneyconcepts
+google-genai
+python-telegram-bot
+python-dotenv
+requests
+fastapi
+uvicorn
+mplfinance
+Pillow

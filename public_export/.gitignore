@@ -1,0 +1,27 @@
+# Credentials
+.env
+.env.local
+.env.*.local
+secrets.json
+
+# Database
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env/
+
+# Dashboard / Node
+node_modules/
+.next/
+out/
+build/
+.DS_Store
+
+# Modal
+.modal/
