@@ -89,17 +89,17 @@ Sovereign SMC is an event-driven algorithmic trading system designed to capture 
 3.  **Institutional Intermarket Analysis:** Real-time correlation engine monitoring DXY (Dollar Index), Yields (TNX), and Equities (NQ/ES) to filter low-probability conditions.
 4.  **Dynamic Volatility Adjustment:** Automatically shifts targeting logic based on real-time ATR (Average True Range) regimes.
 
-## 🎯 Target Performance (Volume Operator Model)
+## 🎯 Target Performance (Asymmetric Alpha Model)
 
-The system is engineered for consistency rather than volatility. These metrics represent the baseline targets for the live production environment:
+The system is engineered for **Calculated Aggression**: accepting frequency risk to capture high-R outliers.
 
-*   **Monthly Target:** 3.0% - 4.0%
-*   **Risk Per Trade:** 0.65% (Fixed)
-*   **Max Drawdown:** < 6.0% (Hard Limit)
-*   **Trade Frequency:** 3-4 High-Quality Setups / Week
-*   **Objective:** Sustainable capital preservation and steady growth.
+*   **Primary Objective:** Maximize Geometric Growth via Asymmetric Returns (3R+ Targets).
+*   **Risk Profile:** Aggressive Entry Validation (0.65% Risk) with Tight Invalidation Points.
+*   **Win Rate Philosophy:** Low Win Rate / High R:R acceptance (The "Sniper" Mindset).
+*   **Drawdown:** < 6.0% Hard Limit (Optimization constraint, not fear).
+*   **Edge:** Exploiting institutional liquidity sweeps before expansion phases.
 
-> **Note:** These are target definitions based on the "Volume Operator" risk profile, designed for long-term Prop Firm scalability.
+> **Note:** These are target definitions based on the risk profile designed for rapid scaling.
 
 ## ⚡ Tech Stack
 
