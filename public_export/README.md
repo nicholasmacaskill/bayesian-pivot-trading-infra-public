@@ -4,6 +4,12 @@
 
 > *Note: This repository is a sanitized release of a live production system. Proprietary alpha parameters, specific entry logic, and Oracle Knowledge Base prompts have been redacted to protect intellectual property.*
 
+## 📦 Open Source Modules
+
+This project contains standalone packages developed for the community:
+
+*   **[tradelocker-python](./tradelocker-python)**: An unofficial Python client for automating TradeLocker accounts (Auth, Headers, Multi-Account Aggregation).
+
 ## 🦅 System Overview
 
 Sovereign SMC is an event-driven algorithmic trading system designed to capture institutional liquidity sweeps during the New York Session. It moves beyond simple "indicator" logic by integrating:

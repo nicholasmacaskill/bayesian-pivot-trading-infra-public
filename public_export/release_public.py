@@ -63,6 +63,59 @@ def main():
         
     print("📂 Copying project...")
     shutil.copytree(SOURCE_DIR, DEST_DIR, ignore=shutil.ignore_patterns('venv', '__pycache__', '*.db', '.git', '.env', '.env.local', 'secrets.json', 'provision_secrets.py', 'node_modules', '.next', 'ict_oracle_kb.json'))
+
+    # Manually copy .github workflows if they exist in source (or ensure they persist if we just created them in DEST_DIR)
+    # Since we nuked DEST_DIR, we need to make sure we don't lose the workflow we just created if it wasn't in source yet.
+    # actually, the workflow was created in public_export/.github... deleting public_export deletes it.
+    # Refactoring: We should create the workflow file *after* the copy step in this script to be safe.
+    
+    os.makedirs(os.path.join(DEST_DIR, ".github", "workflows"), exist_ok=True)
+    with open(os.path.join(DEST_DIR, ".github", "workflows", "publish-package.yml"), "w") as f:
+        f.write("""name: Publish Python Package
+
+on:
+  release:
+    types: [published]
+  push:
+    branches:
+      - main
+    paths:
+      - 'tradelocker-python/**'
+
+jobs:
+  publish-gh-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build Package
+        run: |
+          cd tradelocker-python
+          python -m build
+
+      - name: Publish to GitHub Packages
+        env:
+          TWINE_USERNAME: ${{ github.actor }}
+          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TWINE_REPOSITORY_URL: https://npm.pkg.github.com/
+        run: |
+          cd tradelocker-python
+          python -m twine upload dist/* --registry-url https://npm.pkg.github.com/ --skip-existing
+""")
     
     print("🔒 Sanitizing sensitive files...")
     for filename in SENSITIVE_FILES:
@@ -79,6 +132,12 @@ def main():
 **A Cloud-Native Quantitative Trading Engine with Multi-Modal AI Validation.**
 
 > *Note: This repository is a sanitized release of a live production system. Proprietary alpha parameters, specific entry logic, and Oracle Knowledge Base prompts have been redacted to protect intellectual property.*
+
+## 📦 Open Source Modules
+
+This project contains standalone packages developed for the community:
+
+*   **[tradelocker-python](./tradelocker-python)**: An unofficial Python client for automating TradeLocker accounts (Auth, Headers, Multi-Account Aggregation).
 
 ## 🦅 System Overview
 
