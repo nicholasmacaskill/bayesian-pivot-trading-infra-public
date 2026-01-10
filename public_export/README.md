@@ -9,6 +9,7 @@
 This project contains standalone packages developed for the community:
 
 *   **[tradelocker-python](./tradelocker-python)**: An unofficial Python client for automating TradeLocker accounts (Auth, Headers, Multi-Account Aggregation).
+*   **Package Status:** [![GitHub Package](https://img.shields.io/badge/GitHub-Package-blue.svg)](https://github.com/nicholasmacaskill?tab=packages) (Hosted on GitHub Container Registry)
 
 ## 🦅 System Overview
 

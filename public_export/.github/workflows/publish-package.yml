@@ -1,38 +1,53 @@
-name: Publish Python Package
+name: Publish Package (Container)
 
 on:
-  workflow_dispatch: # Manual trigger from Actions tab
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/tradelocker-python
 
 jobs:
-  publish-gh-package:
+  build-and-push-image:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
         with:
-          python-version: '3.10'
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=v0.1.0
 
-      - name: Build Package
-        run: |
-          cd tradelocker-python
-          python -m build
-
-      - name: Publish to GitHub Packages
-        env:
-          TWINE_USERNAME: ${{ github.actor }}
-          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          TWINE_REPOSITORY_URL: https://npm.pkg.github.com/
+      # Create a simple Dockerfile on the fly if it doesn't exist
+      - name: Create Dockerfile
         run: |
           cd tradelocker-python
-          python -m twine upload dist/* --registry-url https://npm.pkg.github.com/ --skip-existing
+          echo "FROM python:3.10-slim" > Dockerfile
+          echo "WORKDIR /app" >> Dockerfile
+          echo "COPY . ." >> Dockerfile
+          echo "RUN pip install ." >> Dockerfile
+          echo "CMD [\"python\"]" >> Dockerfile
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./tradelocker-python
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
