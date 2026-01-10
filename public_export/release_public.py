@@ -65,22 +65,13 @@ def main():
     shutil.copytree(SOURCE_DIR, DEST_DIR, ignore=shutil.ignore_patterns('venv', '__pycache__', '*.db', '.git', '.env', '.env.local', 'secrets.json', 'provision_secrets.py', 'node_modules', '.next', 'ict_oracle_kb.json'))
 
     # Manually copy .github workflows if they exist in source (or ensure they persist if we just created them in DEST_DIR)
-    # Since we nuked DEST_DIR, we need to make sure we don't lose the workflow we just created if it wasn't in source yet.
-    # actually, the workflow was created in public_export/.github... deleting public_export deletes it.
-    # Refactoring: We should create the workflow file *after* the copy step in this script to be safe.
     
     os.makedirs(os.path.join(DEST_DIR, ".github", "workflows"), exist_ok=True)
     with open(os.path.join(DEST_DIR, ".github", "workflows", "publish-package.yml"), "w") as f:
         f.write("""name: Publish Python Package
 
 on:
-  release:
-    types: [published]
-  push:
-    branches:
-      - main
-    paths:
-      - 'tradelocker-python/**'
+  workflow_dispatch: # Manual trigger from Actions tab
 
 jobs:
   publish-gh-package:

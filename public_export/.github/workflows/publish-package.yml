@@ -1,13 +1,7 @@
 name: Publish Python Package
 
 on:
-  release:
-    types: [published]
-  push:
-    branches:
-      - main
-    paths:
-      - 'tradelocker-python/**'
+  workflow_dispatch: # Manual trigger from Actions tab
 
 jobs:
   publish-gh-package:
