@@ -91,13 +91,15 @@ Sovereign SMC is an event-driven algorithmic trading system designed to capture 
 
 ## 📊 Proven Performance (Tick-Level Backtest)
 
-The following metrics are derived from a 12-month tick-level replay (Jan 2025 - Jan 2026), not theoretical assertions.
+The following metrics are derived from a 12-month tick-level replay (Jan 2025 - Jan 2026), utilizing **full equity compounding** (profits reinvested).
 
 *   **Total Return:** +619.16%
 *   **Monthly Average:** +15.38%
 *   **Max Drawdown:** -3.94% (Surviving 6% hard limit)
 *   **Win Rate:** 32.86% (High R:R Asymmetric Compounding)
 *   **Best Month:** +38.5%
+
+> **Note:** High returns are driven by geometric compounding. Linear (static risk) returns would be lower.
 
 ## ⚡ Tech Stack
 
