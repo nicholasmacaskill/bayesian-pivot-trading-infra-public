@@ -1,0 +1,6 @@
+dashboard/**/* linguist-vendored
+tools/**/* linguist-vendored
+*.js linguist-detectable=false
+*.ts linguist-detectable=false
+*.tsx linguist-detectable=false
+*.py linguist-detectable=true

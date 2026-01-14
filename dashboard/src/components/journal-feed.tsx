@@ -11,8 +11,9 @@ export interface JournalEntry {
     pnl: number;
     ai_grade: number;
     mentor_feedback: string;
-    deviations: string[];
+    deviations: string[] | null;
     timestamp: string;
+    status?: string; // Added status field
 }
 
 export function JournalFeed({ entries, isZenMode }: { entries: JournalEntry[], isZenMode?: boolean }) {
@@ -35,15 +36,30 @@ export function JournalFeed({ entries, isZenMode }: { entries: JournalEntry[], i
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                     >
-                        <GlassCard className={`p-4 rounded-xl border border-white/5 bg-white/[0.02] flex flex-col md:flex-row gap-4 justify-between items-start md:items-center transition-all hover:bg-white/[0.04] ${isZenMode ? "hover:border-emerald-500/20" : "hover:border-blue-500/20"}`}>
+                        <GlassCard className={`p-4 rounded-xl border flex flex-col md:flex-row gap-4 justify-between items-start md:items-center transition-all hover:bg-white/[0.04] 
+                            ${trade.status === 'OPEN'
+                                ? "border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_15px_-5px_rgba(16,185,129,0.3)]"
+                                : isZenMode ? "border-white/5 bg-white/[0.02] hover:border-emerald-500/20" : "border-white/5 bg-white/[0.02] hover:border-blue-500/20"
+                            }`}>
+
                             <div className="flex gap-4 items-center">
                                 <div className={`p-3 rounded-lg ${trade.side === "BUY" ? "bg-emerald-500/10" : "bg-rose-500/10"}`}>
                                     <ArrowUpRight className={`w-5 h-5 ${trade.side === "BUY" ? "text-emerald-400" : "text-rose-400"} ${trade.side === "SELL" ? "rotate-90" : ""}`} />
                                 </div>
                                 <div>
-                                    <div className="text-sm font-bold text-white">{trade.symbol}</div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-bold text-white">{trade.symbol}</div>
+                                        {trade.status === 'OPEN' && (
+                                            <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-black text-[9px] font-bold uppercase animate-pulse">
+                                                LIVE
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="text-[10px] font-mono text-white/40 uppercase">
-                                        {new Date(trade.timestamp).toLocaleDateString()} // {trade.side}
+                                        {(() => {
+                                            const ts = Number(trade.timestamp);
+                                            return !isNaN(ts) ? new Date(ts).toLocaleDateString() : new Date(trade.timestamp).toLocaleDateString();
+                                        })()} // {trade.side}
                                     </div>
                                 </div>
                             </div>
@@ -53,7 +69,7 @@ export function JournalFeed({ entries, isZenMode }: { entries: JournalEntry[], i
                                     "{trade.mentor_feedback}"
                                 </div>
                                 <div className="flex gap-2 mt-2">
-                                    {trade.deviations.map((d, i) => (
+                                    {trade.deviations?.map((d, i) => (
                                         <span key={i} className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-tighter flex items-center gap-1 ${d === "None" ? "bg-emerald-500/10 text-emerald-400/50" : "bg-rose-500/10 text-rose-400"}`}>
                                             {d !== "None" && <AlertCircle className="w-2.5 h-2.5" />}
                                             {d}
@@ -70,10 +86,14 @@ export function JournalFeed({ entries, isZenMode }: { entries: JournalEntry[], i
 
                             <div className="flex items-center gap-6 min-w-fit border-l border-white/5 pl-6">
                                 <div className="text-right">
-                                    <div className={`text-sm font-bold ${isZenMode ? "text-white/20 select-none blur-[2px]" : (trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}`}>
-                                        {isZenMode ? "$0,000.00" : (trade.pnl >= 0 ? `+${trade.pnl.toFixed(2)}` : trade.pnl.toFixed(2))}
+                                    <div className={`text-sm font-bold ${(isZenMode && trade.status !== 'OPEN') ? "text-white/20 select-none blur-[2px]" : (trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}`}>
+                                        {(isZenMode && trade.status !== 'OPEN') ? "$0,000.00" : (trade.pnl >= 0 ? `+${trade.pnl.toFixed(2)}` : trade.pnl.toFixed(2))}
                                     </div>
-                                    <div className="text-[10px] font-mono text-white/20 uppercase tracking-tighter">Outcome</div>
+                                    <div className="text-[10px] font-mono text-white/20 uppercase tracking-tighter">
+                                        {trade.status === 'OPEN' ? (
+                                            <span>Floating PnL <span className="text-[8px] opacity-50 block leading-tight normal-case font-sans mt-0.5">Updated every minute</span></span>
+                                        ) : "Outcome"}
+                                    </div>
                                 </div>
 
                                 <div className="text-center px-4 border-l border-white/10">

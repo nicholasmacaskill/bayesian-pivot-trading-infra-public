@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-from visualizer import generate_ict_chart
-from ai_validator import AIValidator
+from src.engines.visualizer import generate_ict_chart
+from src.engines.ai_validator import AIValidator
 import os
 from datetime import datetime
 

@@ -1,6 +1,6 @@
 import os
 import logging
-from tradelocker_client import TradeLockerClient
+from tl_client import TradeLockerClient
 
 # Setup logging to see what's happening
 logging.basicConfig(level=logging.INFO)

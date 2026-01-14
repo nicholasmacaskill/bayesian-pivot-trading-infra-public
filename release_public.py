@@ -2,113 +2,95 @@ import os
 import shutil
 import re
 
-# CONFIGURATION
-# CONFIGURATION
 SOURCE_DIR = os.getcwd()
-DEST_DIR = os.path.join(SOURCE_DIR, "public_export")
+EXPORT_DIR = os.path.join(SOURCE_DIR, "public_export")
+IGNORE_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".gemini", "public_export"}
+SENSITIVE_FILES = ["config.py", "smc_scanner.py", "strategies/strategy_1_smc_alpha.md"]
 
-SENSITIVE_FILES = [
-    "config.py",
-    "smc_scanner.py",
-    "intermarket_engine.py",
-    "ai_validator.py"
-]
-
-REPLACEMENTS = [
-    # Config Redactions
-    # (r"RISK_PER_TRADE = 0\.0065", 'RISK_PER_TRADE = 0.01'), # User requested to keep risk visible
-    # (r"MAX_DRAWDOWN_LIMIT = 0\.06", 'MAX_DRAWDOWN_LIMIT = 0.10'),
-    (r"AI_THRESHOLD = 7\.0", 'AI_THRESHOLD = 8.5 # [Standard Mode]'),
-    (r"MIN_SMT_STRENGTH = 0\.3", 'MIN_SMT_STRENGTH = 0.5 # [Standard Mode]'),
+def setup_export_dir():
+    if os.path.exists(EXPORT_DIR):
+        shutil.rmtree(EXPORT_DIR)
     
-    # Logic Redactions (Scanner)
-    (r"if in_deep_discount and has_strong_smt and \(swept_pdl or swept_london\):", 
-     "if in_deep_discount and has_strong_smt: # [ENTRY LOGIC REDACTED FOR PUBLIC RELEASE]"),
+    print(f"📂 Copying files to {EXPORT_DIR}...")
     
-    (r"return total_volume >= 5\.0", 'return total_volume >= 1.0 # [VOLUME THRESHOLD REDACTED]'),
-    
-    # Logic Redactions (Intermarket)
-    (r"score \+= 0\.4 if yield_trend == 'DOWN' else -0\.4", "score += 0.5 if yield_trend == 'DOWN' else -0.5 # [WEIGHTING REDACTED]"),
-    (r"score \+= 0\.3 if nq_trend == 'UP' else -0\.3", "score += 0.25 if nq_trend == 'UP' else -0.25 # [WEIGHTING REDACTED]"),
-    
-    # AI Prompt Redactions (Protecting the 'Oracle' logic)
-    (r'YOU ARE THE SOVEREIGN GATEKEEPER[\s\S]*?(?=""")', '[SYSTEM PROMPT REDACTED FOR IP PROTECTION - PROPRIETARY ORACLE LOGIC]'),
-    (r'self\.kb_path = os\.path\.join\(os\.path\.dirname\(__file__\), "ict_oracle_kb\.json"\)', 'self.kb_path = "REDACTED" # [PROPRIETARY KNOWLEDGE BASE]'),
-
-    # Secrets Redactions
-    (r'SYNC_AUTH_KEY = os\.environ\.get\("SYNC_AUTH_KEY", ""\)', 'SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "dummy_key")')
-]
-
-def sanitize_file(filepath):
-    """Reads a file, applies regex replacements, and overwrites it."""
-    with open(filepath, 'r') as f:
-        content = f.read()
-    
-    for pattern, replacement in REPLACEMENTS:
-        content = re.sub(pattern, replacement, content)
+    # Copy all files except hidden/ignored
+    for root, dirs, files in os.walk(SOURCE_DIR):
+        # Filter directories
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
         
-    # Generic "Header" addition
-    header = "# [PUBLIC PORTFOLIO VERSION]\n# NOTE: Core proprietary logic and parameters have been redacted/standardized.\n# This repository demonstrates architecture, not live trading alpha.\n\n"
-    content = header + content
-    
-    with open(filepath, 'w') as f:
-        f.write(content)
-
-def main():
-    print(f"🚀 Preparing Public Release in: {DEST_DIR}")
-    
-    if os.path.exists(DEST_DIR):
-        print(f"⚠️ Removing existing directory: {DEST_DIR}")
-        shutil.rmtree(DEST_DIR)
+        # Calculate relative path
+        rel_path = os.path.relpath(root, SOURCE_DIR)
         
-    print("📂 Copying project...")
-    shutil.copytree(SOURCE_DIR, DEST_DIR, ignore=shutil.ignore_patterns('venv', '__pycache__', '*.db', '.git', '.env', '.env.local', 'secrets.json', 'provision_secrets.py', 'node_modules', '.next'))
-    
-    print("🔒 Sanitizing sensitive files...")
-    for filename in SENSITIVE_FILES:
-        filepath = os.path.join(DEST_DIR, filename)
-        if os.path.exists(filepath):
-            print(f"   - Sanitizing {filename}...")
-            sanitize_file(filepath)
+        # Skip if within export_dir (should be handled by IGNORE_DIRS but just in case)
+        if "public_export" in rel_path: continue
+        
+        target_dir = os.path.join(EXPORT_DIR, rel_path)
+        os.makedirs(target_dir, exist_ok=True)
+        
+        for file in files:
+            if file == "release_public.py": continue
+            if file.startswith("."): continue
             
-    # Create a nice public README
-    readme_path = os.path.join(DEST_DIR, "README.md")
-    with open(readme_path, 'w') as f:
-        f.write("""# Sovereign SMC (Public Portfolio Edition)
+            src_file = os.path.join(root, file)
+            dst_file = os.path.join(target_dir, file)
+            shutil.copy2(src_file, dst_file)
 
-**A Cloud-Native Quantitative Trading Engine with Multi-Modal AI Validation.**
+def redact_config(filepath):
+    """Redacts sensitive API keys and parameters in config.py"""
+    print("🔒 Redacting Config...")
+    with open(filepath, 'r') as f: content = f.read()
+    
+    # Redact Specific Values
+    content = re.sub(r'API_KEY = ".*?"', 'API_KEY = "REDACTED"', content)
+    content = re.sub(r'TELEGRAM_.* = ".*?"', 'TELEGRAM_TOKEN = "REDACTED"', content)
+    
+    # Redact Numeric Parameters (e.g., STOP_LOSS_ATR_MULTIPLIER = 2.5 -> = <HIDDEN>)
+    # But Python needs valid syntax. So replace with standard defaults or 0.0
+    content = re.sub(r'(STOP_LOSS_ATR_MULTIPLIER)\s*=\s*[\d\.]+', r'\1 = 2.0  # Proprietary Parameter (Default)', content)
+    content = re.sub(r'(TP1_R_MULTIPLE)\s*=\s*[\d\.]+', r'\1 = 1.0  # Proprietary Parameter (Default)', content)
+    
+    with open(filepath, 'w') as f: f.write(content)
 
-> *Note: This repository is a sanitized release of a live production system. Proprietary alpha parameters, specific entry logic, and Oracle Knowledge Base prompts have been redacted to protect intellectual property.*
-
-## 🦅 System Overview
-
-Sovereign SMC is an event-driven algorithmic trading system designed to capture institutional liquidity sweeps during the New York Session. It moves beyond simple "indicator" logic by integrating:
-
-1.  **Statistical Arbitrage:** Relies on structural market inefficiencies (Liquidity Pools) with >50,000 Monte Carlo simulations backing the risk profile.
-2.  **Multi-Modal AI Validation:** Utilizes Google Gemini 2.0 Flash (Vision + Text) to visually inspect chart structure and validate "smart money" footprints against a proprietary knowledge base.
-3.  **Institutional Intermarket Analysis:** Real-time correlation engine monitoring DXY (Dollar Index), Yields (TNX), and Equities (NQ/ES) to filter low-probability conditions.
-4.  **Dynamic Volatility Adjustment:** Automatically shifts targeting logic based on real-time ATR (Average True Range) regimes.
-
-## ⚡ Tech Stack
-
-*   **Core Logic:** Python 3.10 (Pandas, NumPy, CCXT)
-*   **Infrastructure:** Modal (Serverless Cloud Architecture)
-*   **AI Layer:** Google Vertex AI / Gemini Pro Vision
-*   **Execution:** TradeLocker API (Webhook-based limit orders)
-*   **Notification:** Telegram Bot with Real-Time Rich Alerts
-
-## 🛡️ Risk Management (The Fortress)
-
-The system operates on a "Survival First" boolean logic:
-*   **Hard Drawdown Limit:** Fixed circuit breakers at 6% global drawdown.
-*   **News Filtering:** Automated calendar parsing to avoid High-Impact news events (CPI, FOMC).
-*   **Correlation Guard:** Trading is suspended if safe-haven assets and risk assets decouple (Correlation Collapse protection).
-
-## ⚠️ Disclaimer
-
-This code is provided for educational and portfolio demonstration purposes only. The "Alpha" (profit-generating logic) has been removed. Running this unmodified will not result in profitable trades.""")
+def redact_scanner(filepath):
+    """Redacts proprietary math in smc_scanner.py"""
+    print("🔒 Redacting SMC Scanner...")
+    with open(filepath, 'r') as f: lines = f.readlines()
+    
+    new_lines = []
+    in_redacted_block = False
+    
+    for line in lines:
+        # Example redaction: Logic inside specific methods
+        if "def get_detailed_bias" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        Calculates Multi-Factor Bias using proprietary signal inputs.\n        Returns: Bias String (BULLISH/BEARISH/NEUTRAL)\n        """\n')
+            new_lines.append('        # [REDACTED] Proprietary Geometric Logic\n')
+            new_lines.append('        # Tracks: 4H Trend, Daily Structure, Momentum, Intermarket Flows\n')
+            new_lines.append('        return "NEUTRAL"  # Placeholder for public repo\n')
+            in_redacted_block = True
+            continue
+            
+        if in_redacted_block:
+            # Check if we exited the function (dedent)
+            # Simple check: if line starts with '    def' or class def, we are out.
+            # But indented logic continues.
+            if line.strip().startswith("def "):
+                in_redacted_block = False
+                new_lines.append(line) # Add the new function def
+            continue # Skip lines inside redacted function
+            
+        new_lines.append(line)
         
-    print("✅ Public Release Ready!")
+    with open(filepath, 'w') as f: f.writelines(new_lines)
 
 if __name__ == "__main__":
-    main()
+    setup_export_dir()
+    
+    # Redact Config
+    redact_config(os.path.join(EXPORT_DIR, "src", "core", "config.py"))
+    
+    # Redact Scanner Logic
+    redact_scanner(os.path.join(EXPORT_DIR, "src", "engines", "smc_scanner.py"))
+            
+    print("✅ Public Export Ready in /public_export")
+    print("👉 To push: cd public_export && git init && git remote add origin ... && git push --force")
