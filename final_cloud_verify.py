@@ -7,7 +7,7 @@ image = (
     .pip_install_from_requirements("requirements.txt")
     .pip_install("yfinance", "pytz")
     .add_local_python_source("config")
-    .add_local_python_source("tradelocker_client")
+    .add_local_python_source("tl_client")
 )
 
 app = modal.App("smc-alpha-final-verify")
@@ -17,7 +17,7 @@ app = modal.App("smc-alpha-final-verify")
     secrets=Config.get_modal_secrets()
 )
 def final_verify():
-    from tradelocker_client import TradeLockerClient
+    from tl_client import TradeLockerClient
     tl = TradeLockerClient()
     equity = tl.get_total_equity()
     trades = tl.get_daily_trades_count()

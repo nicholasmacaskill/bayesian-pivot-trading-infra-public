@@ -87,7 +87,7 @@ Create or edit the `.env.local` file in the root directory. This file stores you
 ### 4. Deploy Backend
 ```bash
 cd smc-alpha
-modal deploy modal_app.py
+modal deploy deployment/modal_app.py
 ```
 
 ### 5. Run Dashboard (Local)

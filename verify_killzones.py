@@ -1,4 +1,4 @@
-from smc_scanner import SMCScanner
+from src.engines.smc_scanner import SMCScanner
 from config import Config
 from datetime import datetime
 

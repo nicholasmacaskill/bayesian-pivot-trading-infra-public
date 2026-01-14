@@ -11,6 +11,7 @@ interface Signal {
     pattern: string;
     aiScore: number;
     timestamp: string;
+    action?: string; // Optional if not always present
 }
 
 export function SignalFeed({ signals }: { signals: Signal[] }) {
@@ -45,8 +46,12 @@ export function SignalFeed({ signals }: { signals: Signal[] }) {
                                     </div>
                                 </div>
 
-                                <h3 className="text-lg font-bold text-white mb-1">{signal.pattern}</h3>
-                                <div className="text-2xl font-mono font-bold text-white/90">{signal.symbol}</div>
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white mb-1">{signal.pattern}</h3>
+                                        <div className="text-2xl font-mono font-bold text-white/90">{signal.symbol}</div>
+                                    </div>
+                                </div>
                             </div>
                         </GlassCard>
                     </motion.div>

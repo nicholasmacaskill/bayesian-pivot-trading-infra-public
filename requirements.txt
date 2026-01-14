@@ -2,7 +2,7 @@ modal
 numpy
 pandas
 ccxt
-smartmoneyconcepts
+# smartmoneyconcepts  <-- Removed unused
 google-genai
 python-telegram-bot
 python-dotenv

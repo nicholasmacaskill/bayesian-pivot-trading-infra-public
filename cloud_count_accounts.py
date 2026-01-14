@@ -8,7 +8,7 @@ image = (
     .pip_install_from_requirements("requirements.txt")
     .pip_install("yfinance", "pytz")
     .add_local_python_source("config")
-    .add_local_python_source("tradelocker_client")
+    .add_local_python_source("tl_client")
 )
 
 app = modal.App("smc-alpha-count-accounts")
@@ -18,7 +18,7 @@ app = modal.App("smc-alpha-count-accounts")
     secrets=Config.get_modal_secrets()
 )
 def count_accounts():
-    from tradelocker_client import TradeLockerClient
+    from tl_client import TradeLockerClient
     tl = TradeLockerClient()
     count = len(tl.helpers)
     emails = [h.email for h in tl.helpers]
