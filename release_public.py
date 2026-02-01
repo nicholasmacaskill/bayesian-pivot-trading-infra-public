@@ -69,11 +69,37 @@ def redact_scanner(filepath):
             new_lines.append('        return "NEUTRAL"  # Placeholder for public repo\n')
             in_redacted_block = True
             continue
+
+        if "def scan_pattern" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        Main Scanning Function.\n        [REDACTED] Core Logic Hidden for Public Release.\n        """\n')
+            new_lines.append('        return None\n')
+            in_redacted_block = True
+            continue
+
+        if "def scan_order_flow" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Institutional Order Flow Logic.\n        """\n')
+            new_lines.append('        return None\n')
+            in_redacted_block = True
+            continue
+
+        if "def detect_mss" in line:
+            new_lines.append(line)
+            new_lines.append('        # [REDACTED] Proprietary Market Structure Shift Detection\n')
+            new_lines.append('        return None\n')
+            in_redacted_block = True
+            continue
+            
+        if "def find_order_block" in line:
+            new_lines.append(line)
+            new_lines.append('        # [REDACTED] Proprietary Order Block Identification\n')
+            new_lines.append('        return None\n')
+            in_redacted_block = True
+            continue 
             
         if in_redacted_block:
             # Check if we exited the function (dedent)
-            # Simple check: if line starts with '    def' or class def, we are out.
-            # But indented logic continues.
             if line.strip().startswith("def "):
                 in_redacted_block = False
                 new_lines.append(line) # Add the new function def
@@ -91,6 +117,12 @@ if __name__ == "__main__":
     
     # Redact Scanner Logic
     redact_scanner(os.path.join(EXPORT_DIR, "src", "engines", "smc_scanner.py"))
+    
+    # Remove All Sensitive Strategy Docs
+    strategies_dir = os.path.join(EXPORT_DIR, "strategies")
+    if os.path.exists(strategies_dir):
+        shutil.rmtree(strategies_dir)
+        print(f"🔒 Removed Sensitive Strategies Folder: {strategies_dir}")
             
     print("✅ Public Export Ready in /public_export")
     print("👉 To push: cd public_export && git init && git remote add origin ... && git push --force")

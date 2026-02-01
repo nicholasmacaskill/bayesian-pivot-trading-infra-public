@@ -23,28 +23,32 @@ class PropGuardian:
                 "Accept-Language": "en-US,en;q=0.5",
                 "Connection": "keep-alive",
             }
-            res = requests.get(url, headers=headers, timeout=10)
+            res = requests.get(url, headers=headers, timeout=15) # Increased timeout
             res.raise_for_status()
             
             html = res.text
             
-            # Simple Link Extraction (Regex for speed/independence)
-            # Look for <a href="..."> that might be relevant
-            links = re.findall(r'<a[^>]+href=["\'](.*?)["\']', html, flags=re.IGNORECASE)
+            # Extract links specifically from <a> and buttons that might have href/onclick
+            links = re.findall(r'href=["\'](.*?)["\']', html, flags=re.IGNORECASE)
             
-            # Cleaning Text
+            # Aggressive Text Cleaning for LLM tokens
             clean = re.sub(r'<script.*?>.*?</script>', '', html, flags=re.DOTALL)
             clean = re.sub(r'<style.*?>.*?</style>', '', clean, flags=re.DOTALL)
+            clean = re.sub(r'<header.*?>.*?</header>', '', clean, flags=re.DOTALL)
+            clean = re.sub(r'<footer.*?>.*?</footer>', '', clean, flags=re.DOTALL)
+            clean = re.sub(r'<nav.*?>.*?</nav>', '', clean, flags=re.DOTALL)
             clean = re.sub(r'<!--.*?-->', '', clean, flags=re.DOTALL)
             
+            # Extract text from semantic tags
             text_content = []
-            for tag in ['p', 'h1', 'h2', 'h3', 'li', 'div', 'span']:
+            for tag in ['p', 'h1', 'h2', 'h3', 'li', 'article', 'section']:
                 matches = re.findall(f'<{tag}[^>]*>(.*?)</{tag}>', clean, flags=re.DOTALL)
-                text_content.extend(matches)
+                for m in matches:
+                    mtext = re.sub(r'<[^>]+>', ' ', m)
+                    text_content.append(mtext)
             
             raw_text = " ".join(text_content)
-            clean_text = re.sub(r'<[^>]+>', ' ', raw_text)
-            clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+            clean_text = re.sub(r'\s+', ' ', raw_text).strip()
             
             return {"url": url, "text": clean_text, "links": links}
         except Exception as e:
@@ -53,47 +57,59 @@ class PropGuardian:
 
     def fetch_rules_content(self, start_url: str) -> str:
         """
-        Smart Spider: Fetches the URL + crawls relevant sub-links.
+        Deep Spider: Fetches the URL + crawls critical FAQ/Legal/Rules links.
         """
         from urllib.parse import urljoin, urlparse
 
         # 1. Fetch Seed Page
         seed_data = self._fetch_single_page(start_url)
-        full_content = f"--- SOURCE: {start_url} (MAIN PAGE) ---\n{seed_data['text'][:15000]}\n\n"
+        full_content = f"--- SOURCE: {start_url} (ENTRY POINT) ---\n{seed_data['text'][:20000]}\n\n"
         
-        # 2. Identify Relevant Sub-Links
+        # 2. Extract and Filter Relevant Sub-Links
         parsed_start = urlparse(start_url)
         base_domain = parsed_start.netloc
-        # Allow subdomains (e.g. help.firm.com if start is firm.com)
-        # Handle "www." prefix strip for comparison
         root_domain = base_domain.replace("www.", "")
         
-        keywords = ["rule", "faq", "terms", "condition", "objectiv", "prohibit", "restrict", "scaling", "general", "drawdown", "instrument", "spec", "help", "support"]
+        # High-Value Keywords for Rule Detection
+        keywords = [
+            "rule", "faq", "terms", "condition", "objectiv", "prohibit", 
+            "restrict", "scaling", "drawdown", "consistency", "news", 
+            "payout", "leverage", "contract", "instrument", "legal"
+        ]
         
         candidates = []
         seen_links = {start_url}
         
         for link in seed_data['links']:
             # Normalize Link
-            full_link = urljoin(start_url, link)
-            link_parsed = urlparse(full_link)
-            link_domain = link_parsed.netloc.replace("www.", "")
-            
-            # Filter: Must share root domain (allow subdomains)
-            if (link_domain == root_domain or link_domain.endswith("." + root_domain)) and full_link not in seen_links:
-                if any(k in full_link.lower() for k in keywords):
-                    candidates.append(full_link)
-                    seen_links.add(full_link)
+            try:
+                full_link = urljoin(start_url, link)
+                link_parsed = urlparse(full_link)
+                link_domain = link_parsed.netloc.replace("www.", "")
+                
+                # Stay within root domain or trusted subdomains
+                if (link_domain == root_domain or link_domain.endswith("." + root_domain)) and full_link not in seen_links:
+                    if any(k in full_link.lower() for k in keywords):
+                        candidates.append(full_link)
+                        seen_links.add(full_link)
+            except: continue
 
-        # Prioritize most relevant links (heuristic: contains 'terms' or 'rules' is high value)
-        # Limit to top 3 sub-pages to save time/bandwidth
-        priority_links = sorted(list(set(candidates)), key=lambda l: 0 if 'rules' in l else 1)[:3]
+        # Prioritize and limit (Rules/Terms are highest priority)
+        # Sort by relevance score
+        def score_link(l):
+            l_low = l.lower()
+            if "rule" in l_low or "terms" in l_low: return 0
+            if "faq" in l_low: return 1
+            if "drawdown" in l_low: return 2
+            return 3
+
+        priority_links = sorted(list(set(candidates)), key=score_link)[:5] # Increased to 5 sub-pages
         
-        # 3. Fetch Sub-Pages
+        # 3. Fetch Sub-Pages and aggregate
         for sub_url in priority_links:
             data = self._fetch_single_page(sub_url)
-            if len(data['text']) > 500: # Only add if meaningful content
-                full_content += f"--- SOURCE: {sub_url} (SUB-PAGE) ---\n{data['text'][:10000]}\n\n"
+            if len(data['text']) > 300:
+                full_content += f"--- SOURCE: {sub_url} (MANDATORY READING) ---\n{data['text'][:15000]}\n\n"
         
         return full_content
 
@@ -107,43 +123,50 @@ class PropGuardian:
             
         if not self.client:
             return {
-                "score": 0,
+                "risk_score": 0,
                 "traps": [{"title": "API Key Missing", "detail": "Cannot analyze without Gemini API Key."}],
-                "verdict": "Unknown"
+                "verdict": "Unknown",
+                "firm_name": "Unknown"
             }
 
         prompt = f"""
-        You are a Senior Trading Systems Engineer and Consumer Advocate. 
-        Your job is to protect a trader from "Adversarial Design" in Prop Firm Rules.
+        You are a Proprietary Trading Risk Auditor specializing in Adversarial Design. 
+        Your goal is to perform a forensic audit of the following prop firm's rules and documentation.
         
-        Analyze the following text (Prop Firm Rules/FAQ source) and identify "Traps":
-        1. **Lot Size/Contract Tricks:** (e.g. 1 Lot != 1 Unit, Micro-lots).
-        2. **Fee/Commission Drag:** High fees that eat expectancy.
-        3. **Drawdown Mechanics:** Equity-based vs Balance-based trailing (Adversarial).
-        4. **Restriction Traps:** News trading bans, consistency rules, IP flagging.
+        Look for "Adversarial Loops" designed to trigger failure:
+        1. **Drawdown Reset Mechanics**: Does drawdown trail balance or equity? Is it calculated at the end of the day or live (High Risk)?
+        2. **Consistency Traps**: Are there hidden rules about lot size variance (e.g. no trade can exceed 2x the average)?
+        3. **Hidden Fees**: Are commissions baked into the spread or charged as external drag?
+        4. **Execution Bans**: Are news trades allowed? Is holding over weekends restricted? Are VPNs/IPs flagged?
+        5. **Scalability Illusions**: Does the Scaling Plan have impossible hurdles?
 
         INPUT TEXT:
-        {content[:15000]}
+        {content[:40000]}
 
         Output valid JSON only:
         {{
-            "risk_score": (1-10, 10=Highly Predatory),
-            "firm_name": "Inferred Name",
+            "risk_score": (1-10, 1=Fair/Transparent, 10=Predatory/Adversarial),
+            "firm_name": "Full Name of Firm",
             "traps": [
                 {{
-                    "category": "Structure" | "Fees" | "Rules" | "Tech",
+                    "category": "Structure" | "Fees" | "Rules" | "Execution" | "Payout",
                     "severity": "High" | "Medium" | "Low",
-                    "title": "Short Warning Title",
-                    "description": "Detailed explanation of the trap and how to avoid it."
+                    "title": "Concise Trap Name",
+                    "description": "Short, sharp technical explanation of why this is a trap."
                 }}
             ],
-            "verdict": "Summary of the firm's alignment with professional trading.",
-            "recommendation": "Actionable advice (e.g., 'Use Risk Calculator', 'Avoid News')."
+            "verdict": "One sentence summary of who this firm is for (Beginners, Pros, or Avoid).",
+            "recommendation": "Technical advice for the trader to survive this environment."
         }}
         """
 
-        # Try multiple models in case of 404/Deprecation
-        models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
+        models_to_try = [
+            "gemini-2.0-flash-exp", 
+            "gemini-3-flash-preview",
+            "gemini-2.5-flash-lite",
+            "gemini-1.5-pro", 
+            "gemini-1.5-flash"
+        ]
         
         last_error = None
         for model_name in models_to_try:
@@ -156,21 +179,39 @@ class PropGuardian:
                 return json.loads(response.text)
             except Exception as e:
                 last_error = e
-                # If 404, continue to next model. If other error (Auth), simple fail.
                 if "404" not in str(e) and "NOT_FOUND" not in str(e):
-                    break # Don't retry auth errors
+                    break 
         
-        # If loop finishes without return
-        import traceback
         return {
             "risk_score": 0,
-            "firm_name": "Error",
+            "firm_name": "Audit Error",
             "traps": [{
                 "category": "System",
                 "severity": "High",
-                "title": "Analysis Failed",
-                "description": f"All models failed. Last Error: {str(last_error)}"
+                "title": "Audit Failed",
+                "description": f"Auditor system failure: {str(last_error)}"
             }],
-            "verdict": "System Error",
-            "recommendation": "Check API Key or try pasting text manually."
+            "verdict": "Inconclusive",
+            "recommendation": "Retry scan or check manual docs."
         }
+
+    def batch_audit(self, override_firms=None):
+        """Runs audit on all configured firms and returns results."""
+        from src.core.config import Config
+        from src.core.database import log_prop_audit
+        
+        firms = override_firms or Config.PROP_FIRMS
+        results = []
+        
+        for key, info in firms.items():
+            try:
+                print(f"--- COMMENCING AUDIT: {info['name']} ---")
+                audit = self.analyze_rules(info['url'])
+                # Ensure firm_name is correct
+                audit['firm_name'] = info['name']
+                log_prop_audit(audit)
+                results.append(audit)
+            except Exception as e:
+                print(f"Error auditing {info['name']}: {e}")
+                
+        return results

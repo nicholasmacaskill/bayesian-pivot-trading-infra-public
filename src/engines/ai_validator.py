@@ -421,12 +421,31 @@ class AIValidator:
                 img = Image.open(image_path)
                 contents.append(img)
 
-            response = self.client.models.generate_content(
-                model='gemini-2.0-flash', 
-                contents=contents
-            )
+            # NEXT-GEN MULTI-TRY LOGIC
+            models_to_try = [
+                'gemini-2.0-flash', 
+                'gemini-3-flash-preview', 
+                'gemini-2.5-flash-lite', 
+                'gemini-1.5-flash'
+            ]
             
-            text = response.text
+            text = None
+            last_err = None
+            for model_name in models_to_try:
+                try:
+                    response = self.client.models.generate_content(
+                        model=model_name, 
+                        contents=contents
+                    )
+                    text = response.text
+                    break
+                except Exception as e:
+                    last_err = e
+                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
+                        break
+            
+            if not text:
+                raise last_err or Exception("All Gemini models failed")
             
             # Extract JSON from response
             start = text.find('{')
@@ -476,12 +495,26 @@ class AIValidator:
             from PIL import Image
             img = Image.open(image_path)
             
-            response = self.client.models.generate_content(
-                model='gemini-2.0-flash', 
-                contents=[prompt, img]
-            )
+            # NEXT-GEN MULTI-TRY LOGIC (VISION)
+            models_to_try = [
+                'gemini-2.0-flash', 
+                'gemini-3-flash-preview', 
+                'gemini-2.5-flash-lite', 
+                'gemini-1.5-flash'
+            ]
             
-            verdict = response.text.upper().strip()
+            verdict = "NEUTRAL"
+            for model_name in models_to_try:
+                try:
+                    response = self.client.models.generate_content(
+                        model=model_name, 
+                        contents=[prompt, img]
+                    )
+                    verdict = response.text.upper().strip()
+                    break
+                except Exception as e:
+                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
+                        break
             
             if "BULLISH" in verdict: return 1
             if "BEARISH" in verdict: return -1
