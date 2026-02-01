@@ -1,8 +1,12 @@
 import modal
-from config import Config
-from database import get_db_connection
+from src.core.config import Config
+from src.core.database import get_db_connection
 
-image = modal.Image.debian_slim().pip_install("sqlite3")
+image = (
+    modal.Image.debian_slim()
+    # .pip_install("sqlite3")  <-- Removed, standard library
+    .add_local_dir("src", remote_path="/root/src")
+)
 stub = modal.App("check-scans")
 volume = modal.Volume.from_name("smc-alpha-storage")
 

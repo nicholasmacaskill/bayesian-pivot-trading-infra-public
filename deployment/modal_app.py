@@ -5,7 +5,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 from src.core.config import Config
-from src.core.database import init_db, log_scan, update_sync_state, get_sync_state, get_db_connection
+from src.core.database import init_db, log_scan, update_sync_state, get_sync_state, get_db_connection, log_prop_audit, get_latest_prop_audits
 from src.engines.smc_scanner import SMCScanner
 from src.clients.tl_client import TradeLockerClient
 from src.engines.ai_validator import AIValidator, validate_setup
@@ -198,250 +198,234 @@ def equity_watchdog():
     image=image,
     schedule=modal.Cron("*/5 * * * *"),
     secrets=Config.get_modal_secrets(),
-    volumes={"/data": volume}
+    volumes={"/data": volume},
+    timeout=900,
+    max_containers=1
 )
 def run_scanner_job():
-    print("🚀 Starting SMC Alpha Scan (Autonomous Mode)...")
+    from src.core.database import init_db, get_sync_state, log_system_event, log_scan, update_sync_state
+    from src.clients.telegram_notifier import send_system_error
     
-    # 1. Initialize DB & Fetch Last State
-    init_db()
-    sync = get_sync_state()
-    last_equity = float(sync.get('total_equity', 0.0))
-    trades_today = sync.get('trades_today', 0)
-    
-    # 2. Automatic Equity Sync (Cloud -> TradeLocker)
-    total_equity = last_equity
     try:
-        print("🔗 Syncing real-time equity from TradeLocker...")
-        tl = TradeLockerClient()
-        live_equity = tl.get_total_equity()
-        if live_equity > 0:
-            total_equity = live_equity
-            # Update DB for dashboard consistency
-            update_sync_state(total_equity, int(trades_today))
-            print(f"✅ Live Sync Successful: ${total_equity:,.2f}")
-    except Exception as e:
-        print(f"⚠️ Live Sync Failed (using fallback): {e}")
-
-    print(f"📊 Status: Equity ${total_equity:,.2f} | Trades Today: {int(trades_today)}")
-    
-    # 3. Load Cached Context (Asynchronous Intelligence)
-    cached_context = None
-    try:
-        cache_path = "/data/context_cache.json"
-        if os.path.exists(cache_path):
-            with open(cache_path, 'r') as f:
-                cached_context = json.load(f)
-            print(f"🧠 Using pre-warmed context from {cached_context.get('timestamp', 'unknown')}")
-        else:
-            print("⚠️ No context cache found, will use live API calls")
-    except Exception as e:
-        print(f"⚠️ Failed to load context cache: {e}")
-    
-    # 4. Initialize Engines
-    scanner = SMCScanner()
-    sentiment_engine = SentimentEngine()
-    
-    # 4. Risk Check: Daily Limit
-    if int(trades_today) >= Config.DAILY_TRADE_LIMIT:
-        print(f"🛑 Daily Trade Limit Reached ({trades_today}/{Config.DAILY_TRADE_LIMIT}). Skipping.")
-        return
-    
-    # Combined Scan List (Majors + High Alpha Alts)
-    scan_list = Config.SYMBOLS + Config.ALT_SYMBOLS
-    
-    for symbol in scan_list:
-        is_alt = symbol in Config.ALT_SYMBOLS
-        print(f"🔎 Scanning {symbol} {'(Altcoin Mode)' if is_alt else ''}...")
+        print("🚀 Starting SMC Alpha Scan (Autonomous Mode)...")
+        # 1. Initialize DB & Fetch Last State
+        init_db()
+        sync = get_sync_state()
+        last_equity = float(sync.get('total_equity', 0.0))
+        trades_today = sync.get('trades_today', 0)
         
-        # STRATEGY 1: SMC ALPHA
-        result = scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_context)
-        
-        # STRATEGY 3: ORDER FLOW (Fallback if no SMC Alpha setup)
-        if not result:
-             setup_flow = scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME)
-             if setup_flow:
-                 # Standardize result format: (setup, df)
-                 # scan_order_flow only returns setup, so we assume df is implicitly handled or not needed for validation here
-                 # If we need DF, we might need scan_order_flow to return it. 
-                 # For now, let's wrap it.
-                 # Actually, let's update scan_pattern signature usage.
-                 # scan_order_flow uses internal fetch_data, returning just setup.
-                 result = setup_flow
+        # 2. Automatic Equity Sync (Cloud -> TradeLocker)
+        total_equity = last_equity
+        try:
+            print("🔗 Syncing real-time equity from TradeLocker...")
+            tl = TradeLockerClient()
+            live_equity = tl.get_total_equity()
+            if live_equity > 0:
+                total_equity = live_equity
+                # Update DB for dashboard consistency
+                update_sync_state(total_equity, int(trades_today))
+                print(f"✅ Live Sync Successful: ${total_equity:,.2f}")
+        except Exception as e:
+            print(f"⚠️ Live Sync Failed (using fallback): {e}")
 
-        
-        if result:
-            try:
-                setup, df = result
-            except ValueError:
-                print(f"⚠️ Unexpected result format for {symbol}: {result}")
-                continue
-                
-            if not setup:
-                continue
-
-            # ALTCOIN FILTER: Only accept "HIGH" quality (Judas Sweeps)
-            # We skip "Medium" (FVG Pullbacks) for Alts to reduce noise.
-            if is_alt and setup.get('quality') != 'HIGH':
-                print(f"📉 Skipping {symbol} {setup.get('pattern')} (Medium Alpha). Alts require High Alpha.")
-                continue
-                
-            # Add Tag for Notifier
-            if is_alt:
-                setup['tag'] = "💎 ALT GEM"
-            
-            print(f"✅ Pattern Found on {symbol}: {setup.get('pattern', 'Unknown')}")
-            
-            # 5. Get Market Context (Use Cache or Fallback to Live)
-            if cached_context:
-                market_data = cached_context['sentiment']
-                whale_flow = cached_context['whales']
-                print("⚡ Using cached sentiment (zero latency)")
+        print(f"📊 Status: Equity ${total_equity:,.2f} | Trades Today: {int(trades_today)}")
+    
+        # 3. Load Cached Context (Asynchronous Intelligence)
+        cached_context = None
+        try:
+            import os
+            import json
+            cache_path = "/data/context_cache.json"
+            if os.path.exists(cache_path):
+                with open(cache_path, 'r') as f:
+                    cached_context = json.load(f)
+                print(f"🧠 Using pre-warmed context from {cached_context.get('timestamp', 'unknown')}")
             else:
-                market_data = sentiment_engine.get_market_sentiment(symbol)
-                whale_flow = sentiment_engine.get_whale_confluence()
-                print("🔄 Fetching live sentiment (fallback)")
+                print("⚠️ No context cache found, will use live API calls")
+        except Exception as e:
+            print(f"⚠️ Failed to load context cache: {e}")
+    
+        # 4. Initialize Engines
+        from src.engines.smc_scanner import SMCScanner
+        from src.engines.sentiment_engine import SentimentEngine
+        from src.clients.tl_client import TradeLockerClient
+        
+        scanner = SMCScanner()
+        sentiment_engine = SentimentEngine()
+        
+        # 5. Risk Check: Daily Limit
+        if int(trades_today) >= Config.DAILY_TRADE_LIMIT:
+            print(f"🛑 Daily Trade Limit Reached ({trades_today}/{Config.DAILY_TRADE_LIMIT}). Skipping.")
+            return
+    
+        # Combined Scan List (Majors + High Alpha Alts)
+        scan_list = Config.SYMBOLS + Config.ALT_SYMBOLS
+        
+        setups_found = 0
+        for symbol in scan_list:
+            is_alt = symbol in Config.ALT_SYMBOLS
+            print(f"🔎 Scanning {symbol} {'(Altcoin Mode)' if is_alt else ''}...")
             
-            # 6. Automated Visualization (The "Glass Eye")
-            from src.engines.visualizer import generate_ict_chart
-            chart_path = f"/tmp/{symbol.replace('/', '_')}_setup.png"
-            generate_ict_chart(df, setup, output_path=chart_path)
+            # STRATEGY 1: SMC ALPHA
+            result = scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_context)
             
-            # 7. AI Validation with Context (Vision Informed + Dual-Track)
-            # Pass df and scanner.exchange for regime detection and slippage estimation
-            ai_result = validate_setup(
-                setup, 
-                market_data, 
-                whale_flow, 
-                image_path=chart_path,
-                df=df,
-                exchange=scanner.exchange
-            )
-            
-            # Extract dual-track results (with backward compatibility)
-            live = ai_result.get('live_execution', ai_result)  # Fallback to old format
-            shadow = ai_result.get('shadow_optimizer', {})
-            
-            print(f"🤖 AI Score: {live.get('score', ai_result.get('score', 0))}/10")
-            if shadow:
-                print(f"🔬 Shadow: {shadow.get('regime_classification', 'N/A')} | Risk Multiplier: {shadow.get('suggested_risk_multiplier', 1.0)}x")
+            # STRATEGY 3: ORDER FLOW (Fallback if no SMC Alpha setup)
+            if not result:
+                result = scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME)
 
-            # 8. Log Result (Fail-Safe) - Store both tracks
-            try:
-                # For backward compatibility, log live_execution as main result
-                log_data = {
-                    **setup,
-                    'ai_score': live.get('score', ai_result.get('score', 0)),
-                    'ai_reasoning': live.get('reasoning', ai_result.get('reasoning', '')),
-                    'verdict': live.get('verdict', ai_result.get('verdict', 'N/A')),
-                    'shadow_regime': shadow.get('regime_classification', 'N/A'),
-                    'shadow_multiplier': shadow.get('suggested_risk_multiplier', 1.0)
-                }
-                scan_id = log_scan(log_data, live)
-                # PERSIST TO MODAL VOLUME (after each log for safety)
-                try: volume.commit()
-                except: pass
-            except Exception as e:
-                print(f"⚠️ Database logging failed (skipping): {e}")
-                scan_id = None
-            
-            # 9. Alert if High Probability (use live_execution score)
-            live_score = live.get('score', ai_result.get('score', 0))
-            if live_score >= Config.AI_THRESHOLD:
-                # Calculate Position Size (Target 0.75% risk, allowing for Fees)
-                risk_amt = total_equity * Config.RISK_PER_TRADE
-                distance = abs(setup['entry'] - setup['stop_loss'])
-                
-                # Load Firm Profile
-                firm_profile = Config.PROP_FIRMS[Config.ACTIVE_FIRM]
-                c_size = firm_profile['contract_size']
-                c_rate = firm_profile['commission_rate']
-                
-                # Standard Sizing (Risk / Stop Distance)
-                # We ignore fee allocation per User Request (Step 591), focusing purely on Lot Conversion.
-                raw_units = risk_amt / distance if distance > 0 else 0
-
-                # ---------------------------------------------------------
-                # "SENIOR CALIBRATION" THROTTLE (Disabled)
-                # ---------------------------------------------------------
-                # User requested to ignore fee efficiency caps for now.
-                efficiency_alert = ""
-                # ---------------------------------------------------------
-
-                # Cap position at 70% of equity (protects drawdown)
-                position_value = raw_units * setup['entry']
-                max_position_value = total_equity * 0.70
-                
-                if position_value > max_position_value:
-                    raw_units = max_position_value / setup['entry']
-                    print(f"⚠️ Position capped at 70%: ${position_value:,.2f} → ${max_position_value:,.2f}")
-
-                # Convert to Lots (The "Prop Firm Tax")
-                lots = raw_units / c_size if c_size > 0 else 0
-                
-                # Actual Risk (Stop Loss Only) for Logging
-                actual_risk_sl = raw_units * distance
-                # Actual Fees
-                actual_fees = raw_units * setup['entry'] * c_rate
-                
-                risk_calc = {
-                    "entry": setup['entry'],
-                    "stop_loss": setup['stop_loss'],
-                    "take_profit": setup['target'],
-                    "position_size": round(lots, 2), # Display Lots to User
-                    "raw_units": round(raw_units, 4), # Internal BTC amount
-                    "contract_size": c_size,
-                    "firm": Config.ACTIVE_FIRM,
-                    "equity_basis": total_equity,
-                    "is_ip_safe": True,
-                    "sentiment": market_data["fear_and_greed"],
-                    "efficiency_note": efficiency_alert 
-                }
-                
-                print(f"⚖️ Sizing ({Config.ACTIVE_FIRM}): {raw_units:.4f} BTC -> {lots:.2f} Lots (Fees: ${actual_fees:.2f}) {efficiency_alert}")
-                
-                # 10. Add One-Tap Execution Buttons
-                execute_url = f"https://nicholasmacaskill--smc-alpha-scanner-execute-trade.modal.run?id={scan_id}"
-                
-                buttons = [[
-                    {"text": f"⚡ EXECUTE ({lots:.2f} Lots)", "url": execute_url},
-                    {"text": "❌ DISMISS", "url": "https://t.me/SovereignSMCAuditBot"}
-                ]]
-
-                send_alert(
-                    symbol=symbol, 
-                    timeframe=Config.TIMEFRAME,
-                    pattern=setup['pattern'],
-                    ai_score=live_score,
-                    reasoning=live.get('reasoning', ai_result.get('reasoning', '')),
-                    verdict=live.get('verdict', ai_result.get('verdict', 'N/A')),
-                    risk_calc=risk_calc,
-                    buttons=buttons,
-                    shadow_insights=shadow  # Pass shadow track for enhanced alerts
-                )
-                print("📨 Alert Sent to Telegram with Dual-Track Insights.")
-        else:
-            # HEARTBEAT LOGGING: Ensure dashboard shows activity even when no setups are found
-            # Only log a heartbeat every 30 minutes per symbol to avoid database bloat
-            if datetime.now().minute % 30 == 0:
+            if result:
                 try:
-                    hb_data = {
-                        'timestamp': datetime.now().isoformat(),
-                        'symbol': symbol,
-                        'pattern': 'Searching...',
-                        'bias': scanner.get_4h_bias(symbol),
-                        'ai_score': 0.0,
-                        'ai_reasoning': 'No institutional setups found in the current session context.',
-                        'verdict': 'SCAN_HEARTBEAT',
-                        'shadow_regime': 'N/A',
-                        'shadow_multiplier': 1.0
+                    # Both scan_pattern and scan_order_flow now return (setup, df)
+                    setup, df = result
+                except (ValueError, TypeError):
+                    print(f"⚠️ Unexpected result format for {symbol}: {result}")
+                    continue
+                    
+                if not setup:
+                    continue
+
+                # ALTCOIN FILTER: Only accept "HIGH" quality (Judas Sweeps)
+                if is_alt and setup.get('quality') != 'HIGH':
+                    print(f"📉 Skipping {symbol} {setup.get('pattern')} (Medium Alpha). Alts require High Alpha.")
+                    continue
+                
+                # Add Tag for Notifier
+                if is_alt:
+                    setup['tag'] = "💎 ALT GEM"
+                
+                print(f"✅ Pattern Found on {symbol}: {setup.get('pattern', 'Unknown')}")
+                
+                # Get Market Context (Use Cache or Fallback to Live)
+                if cached_context:
+                    market_data = cached_context['sentiment']
+                    whale_flow = cached_context['whales']
+                    print("⚡ Using cached sentiment (zero latency)")
+                else:
+                    market_data = sentiment_engine.get_market_sentiment(symbol)
+                    whale_flow = sentiment_engine.get_whale_confluence()
+                    print("🔄 Fetching live sentiment (fallback)")
+                
+                # Automated Visualization (The "Glass Eye")
+                from src.engines.visualizer import generate_ict_chart
+                chart_path = f"/tmp/{symbol.replace('/', '_')}_setup.png"
+                generate_ict_chart(df, setup, output_path=chart_path)
+                
+                # 7. AI Validation with Context (Vision Informed + Dual-Track)
+                ai_result = validate_setup(
+                    setup, 
+                    market_data, 
+                    whale_flow, 
+                    image_path=chart_path,
+                    df=df,
+                    exchange=scanner.exchange
+                )
+                
+                # Extract dual-track results
+                live = ai_result.get('live_execution', ai_result)
+                shadow = ai_result.get('shadow_optimizer', {})
+                
+                print(f"🤖 AI Score: {live.get('score', ai_result.get('score', 0))}/10")
+                if shadow:
+                    print(f"🔬 Shadow: {shadow.get('regime_classification', 'N/A')} | Risk Multiplier: {shadow.get('suggested_risk_multiplier', 1.0)}x")
+
+                # 8. Log Result (Fail-Safe)
+                try:
+                    log_data = {
+                        **setup,
+                        'ai_score': live.get('score', ai_result.get('score', 0)),
+                        'ai_reasoning': live.get('reasoning', ai_result.get('reasoning', '')),
+                        'verdict': live.get('verdict', ai_result.get('verdict', 'N/A')),
+                        'shadow_regime': shadow.get('regime_classification', 'N/A'),
+                        'shadow_multiplier': shadow.get('suggested_risk_multiplier', 1.0)
                     }
-                    log_scan(hb_data, {'score': 0, 'reasoning': 'N/A'})
+                    scan_id = log_scan(log_data, live)
                     volume.commit()
                 except Exception as e:
-                    print(f"⚠️ Heartbeat log failed: {e}")
+                    print(f"⚠️ Database logging failed: {e}")
+                    scan_id = None
+                
+                # 9. Alert if High Probability
+                live_score = live.get('score', ai_result.get('score', 0))
+                if live_score >= Config.AI_THRESHOLD:
+                    setups_found += 1
+                    risk_amt = total_equity * Config.RISK_PER_TRADE
+                    distance = abs(setup['entry'] - setup['stop_loss'])
+                    
+                    firm_profile = Config.PROP_FIRMS[Config.ACTIVE_FIRM]
+                    c_size = firm_profile['contract_size']
+                    c_rate = firm_profile['commission_rate']
+                    
+                    raw_units = risk_amt / distance if distance > 0 else 0
+                    
+                    # Cap position at 70% of equity
+                    position_value = raw_units * setup['entry']
+                    max_position_value = total_equity * 0.70
+                    if position_value > max_position_value:
+                        raw_units = max_position_value / setup['entry']
+                    
+                    lots = raw_units / c_size if c_size > 0 else 0
+                    
+                    risk_calc = {
+                        "entry": setup['entry'],
+                        "stop_loss": setup['stop_loss'],
+                        "take_profit": setup['target'],
+                        "position_size": round(lots, 2),
+                        "raw_units": round(raw_units, 4),
+                        "contract_size": c_size,
+                        "firm": Config.ACTIVE_FIRM,
+                        "equity_basis": total_equity,
+                        "sentiment": market_data["fear_and_greed"]
+                    }
+                    
+                    execute_url = f"https://nicholasmacaskill--smc-alpha-scanner-execute-trade.modal.run?id={scan_id}"
+                    buttons = [[
+                        {"text": f"⚡ EXECUTE ({lots:.2f} Lots)", "url": execute_url},
+                        {"text": "❌ DISMISS", "url": "https://t.me/SovereignSMCAuditBot"}
+                    ]]
 
-            print(f"No setup on {symbol}.")
+                    send_alert(
+                        symbol=symbol, 
+                        timeframe=Config.TIMEFRAME,
+                        pattern=setup['pattern'],
+                        ai_score=live_score,
+                        reasoning=live.get('reasoning', ai_result.get('reasoning', '')),
+                        verdict=live.get('verdict', ai_result.get('verdict', 'N/A')),
+                        risk_calc=risk_calc,
+                        buttons=buttons,
+                        shadow_insights=shadow
+                    )
+            else:
+                # Hearbeat logging (optional, every 30 mins)
+                if datetime.now().minute % 30 == 0:
+                    try:
+                        hb_data = {
+                            'timestamp': datetime.now().isoformat(),
+                            'symbol': symbol,
+                            'pattern': 'Searching...',
+                            'bias': scanner.get_4h_bias(symbol),
+                            'ai_score': 0.0,
+                            'ai_reasoning': 'N/A',
+                            'verdict': 'SCAN_HEARTBEAT',
+                            'shadow_regime': 'N/A',
+                            'shadow_multiplier': 1.0
+                        }
+                        log_scan(hb_data, {'score': 0, 'reasoning': 'N/A'})
+                        volume.commit()
+                    except: pass
+                print(f"No setup on {symbol}.")
+
+        if setups_found == 0:
+            print("💤 No setups found this cycle.")
+            
+    except Exception as e:
+        import traceback
+        err_msg = f"Scanner Job CRASH: {str(e)}\n{traceback.format_exc()}"
+        print(err_msg)
+        try:
+            log_system_event("run_scanner_job", err_msg, level="CRITICAL")
+            send_system_error("Scanner Job", str(e))
+        except:
+            print("🚨 Failed to log error to DB or Telegram")
 
 @app.function(
     image=image,
@@ -492,11 +476,12 @@ async def log_audit(request: Request):
     feedback = data.get("feedback")
     deviations = json.dumps(data.get("deviations", []))
     is_lucky = 1 if data.get("is_lucky_failure") else 0
+    strategy = data.get("strategy", "ROGUE")
     
     if trade_id:
         from src.core.database import log_journal_entry
-        log_journal_entry(trade_id, symbol, side, pnl, score, feedback, deviations, is_lucky)
-        return {"status": "success", "message": f"Audit logged: {trade_id}"}
+        log_journal_entry(trade_id, symbol, side, pnl, score, feedback, deviations, is_lucky, strategy)
+        return {"status": "success", "message": f"Audit logged: {trade_id} ({strategy})"}
     
     return {"status": "error", "message": "Missing trade_id"}
 
@@ -509,7 +494,7 @@ async def log_audit(request: Request):
 def get_dashboard_state():
     """Consolidated API for Dashboard Data (Saves Endpoints)"""
     volume.reload()
-    from src.core.database import get_db_connection, get_sync_state
+    from src.core.database import get_db_connection, get_sync_state, get_latest_prop_audits
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -550,7 +535,8 @@ def get_dashboard_state():
             actual_risk = Config.RISK_PER_TRADE * 100
             shadow_risk = actual_risk * multiplier
             
-            actual_ret = (pnl / equity) * 100
+            # ZeroDivision Check
+            actual_ret = (pnl / equity) * 100 if equity > 0 else 0.0
             shadow_ret = actual_ret * multiplier
             
             # Use j.get('id', 0) to avoid KeyError if id missing (fallback)
@@ -565,7 +551,9 @@ def get_dashboard_state():
                 "actual_risk": actual_risk,
                 "shadow_risk": round(shadow_risk, 2),
                 "regime": regime,
-                "shadow_multiplier": multiplier
+                "shadow_multiplier": multiplier,
+                "notes": j.get('notes', ''),
+                "strategy": j.get('strategy', 'ROGUE')
             })
             
     conn.close()
@@ -576,7 +564,8 @@ def get_dashboard_state():
         "equity": equity,
         "trades_today": trades_today,
         "journal_entries": journals,
-        "alpha_delta": {"comparisons": alpha_results}
+        "alpha_delta": {"comparisons": alpha_results},
+        "prop_audits": get_latest_prop_audits()
     }
 
 @app.function(
@@ -614,6 +603,20 @@ def get_backtest_reports():
         rows = []
     conn.close()
     return {"status": "success", "reports": rows}
+
+@app.function(
+    image=image,
+    secrets=Config.get_modal_secrets(),
+    volumes={"/data": volume},
+    timeout=1200
+)
+@modal.fastapi_endpoint(docs=True, method="POST")
+def audit_prop_firms():
+    """Trigger a forensic audit across all configured prop firms"""
+    from src.engines.prop_guardian import PropGuardian
+    guardian = PropGuardian()
+    results = guardian.batch_audit()
+    return {"status": "success", "audits": results}
 
 @app.function(
     image=image,
@@ -663,21 +666,22 @@ def execute_trade(id: int):
     volumes={"/data": volume}
 )
 @modal.fastapi_endpoint(method="POST")
-async def analyze_firm_rules(request: Request):
-    """
-    AI Guard: Analyzes prop firm rules for traps.
-    """
+async def update_trade_notes(request: Request):
+    """Updates personal notes for a trade"""
     data = await request.json()
-    rules_text = data.get("rules", "")
+    trade_id = data.get("trade_id")
+    notes = data.get("notes")
     
-    if not rules_text:
-        return {"status": "error", "message": "No rules text provided"}
-
-    from src.engines.prop_guardian import PropGuardian
-    guardian = PropGuardian()
-    report = guardian.analyze_rules(rules_text)
+    if not trade_id:
+        return {"status": "error", "message": "Missing trade_id"}
+        
+    from src.core.database import update_journal_notes
+    success = update_journal_notes(trade_id, notes)
     
-    return {"status": "success", "report": report}
+    if success:
+        return {"status": "success", "message": "Notes updated"}
+    else:
+        return {"status": "error", "message": "Failed to update notes"}
 
 @app.function(
     image=image,

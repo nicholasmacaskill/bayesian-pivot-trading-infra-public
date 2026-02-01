@@ -16,6 +16,23 @@ class TradeLockerHelper:
         self.account_id = None
         self.acc_num = None # New Field for 'accNum' header
         
+    def resolve_symbol(self, instrument_id):
+        """Maps internal IDs to human-readable symbols."""
+        # Definitive fallbacks based on Modal DB audit and TradeLocker standards
+        mapping = {
+            "206": "BTC/USDT",
+            "207": "ETH/USDT",
+            "214": "ETH/USDT",
+            "208": "SOL/USDT",
+            "1": "EUR/USD",
+            "2": "GBP/USD"
+        }
+        symbol = mapping.get(str(instrument_id))
+        if not symbol:
+            logger.warning(f"Unknown instrument ID: {instrument_id}")
+            return str(instrument_id)
+        return symbol
+
     def _get_headers(self, auth=False):
         """Standard stealth headers combined with user-required logic."""
         headers = {
@@ -116,7 +133,7 @@ class TradeLockerHelper:
                             # Upcomers List Format
                             trades.append({
                                 'id': str(p[0]),
-                                'symbol': str(p[1]), 
+                                'symbol': self.resolve_symbol(p[1]), 
                                 'side': 'BUY' if str(p[3]).lower() == 'buy' else 'SELL',
                                 'pnl': float(p[9] or 0.0),
                                 'entry_time': str(p[8]),
@@ -129,7 +146,7 @@ class TradeLockerHelper:
                     else:
                         trades.append({
                             'id': p.get('id'),
-                            'symbol': p.get('instrumentId'),
+                            'symbol': self.resolve_symbol(p.get('instrumentId')),
                             'side': 'BUY' if p.get('side') == 'buy' else 'SELL',
                             'pnl': float(p.get('floatingProfit') or p.get('profit') or 0.0), 
                             'entry_time': p.get('openDate') or p.get('created'),
@@ -175,7 +192,7 @@ class TradeLockerHelper:
                     # Basic parsing
                     trades.append({
                         'id': p.get('id'),
-                        'symbol': p.get('instrumentId'), # map to valid symbol later
+                        'symbol': self.resolve_symbol(p.get('instrumentId')), # map to valid symbol
                         'side': 'BUY' if p.get('side') == 'buy' else 'SELL',
                         'pnl': float(p.get('profit') or 0.0),
                         'close_time': close_time_str,

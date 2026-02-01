@@ -114,7 +114,11 @@ class Config:
     # Secrets (Loaded from Modal Environment)
     @staticmethod
     def get_modal_secrets():
-        return [Secret.from_name("smc-secrets")]
+        return [
+            Secret.from_name("smc-secrets"), 
+            Secret.from_name("gemini-secret"),
+            Secret.from_name("supabase-secret")
+        ]
 
 
     # Database Path (Modal Volume)

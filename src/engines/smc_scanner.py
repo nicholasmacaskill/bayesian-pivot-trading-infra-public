@@ -14,8 +14,42 @@ from src.engines.visualizer import generate_bias_chart
 from src.engines.ai_validator import AIValidator
 import logging
 import os
+import functools
+from src.core.database import log_system_event
 
 logger = logging.getLogger(__name__)
+
+def ensure_data(default_return=None):
+    """Decorator to ensure df is valid before running analysis"""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, df, *args, **kwargs):
+            if df is None or len(df) < 5:
+                return default_return
+            try:
+                return func(self, df, *args, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in {func.__name__}: {e}")
+                return default_return
+        return wrapper
+    return decorator
+
+def safe_scan(component):
+    """Decorator to catch and log errors in high-level scanning methods"""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            try:
+                return func(self, *args, **kwargs)
+            except Exception as e:
+                import traceback
+                symbol = args[0] if args else "Unknown"
+                err_msg = f"{component} error ({symbol}): {str(e)}\n{traceback.format_exc()}"
+                logger.error(err_msg)
+                log_system_event(component, err_msg, level="ERROR")
+                return None
+        return wrapper
+    return decorator
 
 class SMCScanner:
     def __init__(self):
@@ -32,6 +66,7 @@ class SMCScanner:
         self.news = NewsFilter()
         self.order_book_enabled = True  # Can be disabled if exchange doesn't support
         
+    @ensure_data(default_return=pd.Series(dtype=float))
     def calculate_atr(self, df, period=14):
         high_low = df['high'] - df['low']
         high_close = abs(df['high'] - df['close'].shift())
@@ -40,6 +75,7 @@ class SMCScanner:
         true_range = ranges.max(axis=1)
         return true_range.rolling(period).mean()
 
+    @ensure_data(default_return=pd.Series(dtype=float))
     def calculate_rsi(self, df, period=14):
         """Standard RSI Calculation"""
         delta = df['close'].diff()
@@ -96,12 +132,16 @@ class SMCScanner:
             if df['timestamp'].dt.tz is not None:
                 df['timestamp'] = df['timestamp'].dt.tz_localize(None)
             
+            # Remove duplicate columns (Fix for ValueError: Cannot set a DataFrame with multiple columns)
+            df = df.loc[:, ~df.columns.duplicated()]
+            
             return df
 
         except Exception as e:
             logger.error(f"Error fetching data via yfinance for {symbol}: {e}")
             return None
 
+    @ensure_data(default_return=(pd.Series(dtype=bool), pd.Series(dtype=bool)))
     def detect_fractals(self, df, window=2):
         """
         Vectorized fractal detection using NumPy.
@@ -239,6 +279,7 @@ class SMCScanner:
             "minutes_in": minutes_into_session
         }
 
+    @ensure_data(default_return=None)
     def get_price_quartiles(self, symbol):
         """
         Calculates Asian Range and CBDR High/Low and their Quartiles (SDs).
@@ -247,7 +288,7 @@ class SMCScanner:
         """
         # Fetch 24h of data to find ranges
         df_range = self.fetch_data(symbol, '15m', limit=100)
-        if df_range is None: return None
+        if df_range is None or df_range.empty: return None
         
         # Filter for Asian Range (00:00-05:00 UTC)
         asian_df = df_range[(df_range['timestamp'].dt.hour >= 0) & (df_range['timestamp'].dt.hour < 5)]
@@ -494,15 +535,11 @@ class SMCScanner:
                         
         return False
 
+    @safe_scan("Scanner.scan_pattern")
     def scan_pattern(self, symbol, timeframe='5m', cached_context=None, provided_df=None, current_time_override=None):
         """
         Main Scanning Function.
         Checks: Killzone -> Trend Bias -> Price Quartiles -> SMC Pattern
-        
-        Args:
-            cached_context: Pre-warmed context from background pulse (optional)
-            provided_df: Historical dataframe for backtesting (optional)
-            current_time_override: Historical timestamp for Killzone checks (optional)
         """
         # 1. HARD GATE: Time (Killzone)
         if not self.is_killzone(current_time=current_time_override):
@@ -725,6 +762,7 @@ class SMCScanner:
             return setup, df
         return None
 
+    @safe_scan("Scanner.scan_order_flow")
     def scan_order_flow(self, symbol, timeframe=Config.TIMEFRAME):
         """
         STRATEGY 3: ICT ORDER FLOW (Order Blocks + MSS)

@@ -94,6 +94,16 @@ class TelegramNotifier:
         )
         self._send_message(message)
 
+    def send_system_error(self, component, error):
+        """Sends a critical system error alert."""
+        message = (
+            f"🆘 *CRITICAL SYSTEM ERROR* 🆘\n\n"
+            f"📍 *Component:* `{component}`\n"
+            f"❌ *Error:* `{error[:300]}...`\n\n"
+            f"Check dashboard or Modal logs for details."
+        )
+        self._send_message(message)
+
     def _send_message(self, text, buttons=None):
         try:
             url = f"{self.base_url}/sendMessage"
@@ -114,3 +124,7 @@ class TelegramNotifier:
 def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None):
     notifier = TelegramNotifier()
     notifier.send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict, risk_calc, buttons=buttons, shadow_insights=shadow_insights)
+
+def send_system_error(component, error):
+    notifier = TelegramNotifier()
+    notifier.send_system_error(component, error)

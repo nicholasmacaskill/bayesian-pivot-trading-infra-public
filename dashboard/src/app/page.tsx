@@ -8,6 +8,7 @@ import { GlassCard } from "../components/glass-card";
 import { ShadowOptimizer } from "../components/shadow-optimizer";
 
 import { PropGuardianPanel } from "../components/prop-guardian";
+import { BurnoutGuard } from "../components/burnout-guard";
 import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -31,8 +32,9 @@ export default function Dashboard() {
   const [journal, setJournal] = useState<any[]>([]);
   const [comparisons, setComparisons] = useState<any[]>([]);
   const [equity, setEquity] = useState<number>(0);
-  const [tradesToday, setTradesToday] = useState<number>(0);
+  const [propAudits, setPropAudits] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [tradesToday, setTradesToday] = useState<number>(0);
   const [session, setSession] = useState({ name: "ASIA", sub: "MARKET CLOSED" });
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export default function Dashboard() {
         setEquity(data.equity || 0);
         setTradesToday(data.trades_today || 0);
         setJournal(data.journal_entries || []);
+        setPropAudits(data.prop_audits || []);
         if (data.alpha_delta) setComparisons(data.alpha_delta.comparisons || []);
       } catch (e) {
         console.error("Failed to load dashboard data:", e);
@@ -70,7 +73,7 @@ export default function Dashboard() {
 
   // Calculate Stats
   const avgScore = signals.length > 0
-    ? (signals.reduce((acc, s) => acc + (s.aiScore || 0), 0) / signals.length).toFixed(1)
+    ? (signals.reduce((acc, s) => acc + (s.ai_score || 0), 0) / signals.length).toFixed(1)
     : "0.0";
 
   const equityDisplay = equity > 0
@@ -110,140 +113,109 @@ export default function Dashboard() {
   });
 
   return (
-    <main className={`min-h-screen p-4 md:p-8 space-y-8 bg-black text-white transition-all duration-700 ${isZenMode ? "grayscale-[0.5]" : ""}`}>
-      {/* Header & Status */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tighter text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-white/40">
-            SMC ALPHA // {isZenMode ? "ZEN MODE" : "GLASS JOURNAL"}
-          </h1>
-          <p className="text-white/40 text-sm font-mono flex items-center gap-2 mt-1 uppercase tracking-widest">
-            <Activity className="w-3 h-3 text-emerald-400 animate-pulse" />
-            {isZenMode ? "PROCESS VALIDATION ACTIVE // PNL MASKED" : "SYSTEM STATUS: OPERATIONAL // IP-SAFE SYNC ACTIVE"}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-6">
-          {/* Zen Toggle */}
-          <div className="flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full">
-            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Process First</span>
-            <button
-              onClick={() => setIsZenMode(!isZenMode)}
-              className={`w-10 h-5 rounded-full transition-colors relative ${isZenMode ? "bg-blue-500" : "bg-white/10"}`}
-            >
-              <motion.div
-                animate={{ x: isZenMode ? 22 : 2 }}
-                className="w-4 h-4 bg-white rounded-full shadow-lg overflow-hidden"
-              />
-            </button>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-rose-400" />
-              <span className="text-xs font-bold text-white/80 uppercase">Risk: 0.65%</span>
-            </div>
-            <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full flex items-center gap-2">
-              <Zap className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-bold text-white/80 uppercase">Limit: {tradesToday}/2 Daily</span>
-            </div>
+    <main className={`min-h-screen p-4 md:p-8 space-y-12 bg-black text-white selection:bg-emerald-500/30`}>
+      {/* Software as Glass Header: The Data Ribbon */}
+      <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-8 border-b border-white/5 pb-8">
+        <div className="space-y-1">
+          <div className="text-[10px] font-mono font-bold text-white/20 uppercase tracking-[0.2em]">Neural Core // Operational</div>
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-2xl font-black tracking-tighter text-white">SMC ALPHA</h1>
+            <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
           </div>
         </div>
-      </div>
 
-      {/* KPI Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatsCard
-          label={isZenMode ? "Discipline XP" : "Total Equity"}
-          value={isZenMode ? "--- XP" : equityDisplay}
-          sub={equitySub}
-          icon={isZenMode ? Zap : TrendingUp}
-          alert={!isZenMode && dailyPnL < 0}
-        />
-        <StatsCard label="Market Bias" value={marketBias} sub="4H TREND (EMA 20/50)" icon={Target} className={biasColor} />
-        <StatsCard label="Max Drawdown" value={drawdownDisplay} sub="HARD LIMIT: 6.0%" icon={ShieldAlert} alert={parseFloat(drawdown) > 5} />
-        <StatsCard label="Avg AI Score" value={avgScore} sub={`SYMBOLS: ${signals.length} SCANS`} icon={Target} />
-        <StatsCard label="Session Time" value={session.name} sub={session.sub} icon={Clock} highlight />
-      </div>
-
-      {/* Progress Tracker Section */}
-      <GlassCard className={`p-6 border-blue-500/10 bg-blue-500/5 transition-all ${isZenMode ? "border-emerald-500/20 bg-emerald-500/5" : ""}`}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        {/* Primary Metrics Ribbon */}
+        <div className="flex flex-wrap items-end gap-x-12 gap-y-4">
+          {/* Equity & Growth Integrated */}
           <div className="space-y-1">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Target className={`w-5 h-5 ${isZenMode ? "text-emerald-400" : "text-blue-400"}`} />
-              {isZenMode ? "Monthly Discipline Goal" : "Monthly Growth Target"}
-            </h3>
-            <p className="text-sm text-white/40 font-mono uppercase tracking-widest">
-              {isZenMode ? "Objective: 35 A+ Grade Executions / Month" : "Objective: 3.0% / Month for Prop Firm Stability"}
-            </p>
-          </div>
-
-          <div className="w-full md:w-1/2 space-y-2">
-            <div className="flex justify-between text-xs font-bold uppercase tracking-tight">
-              <span className={isZenMode ? "text-emerald-400" : "text-blue-400"}>
-                {isZenMode ? "Current Streak: 0" : `Progress: ${totalReturnPercent}%`}
+            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Digital Equity</div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-mono font-bold tracking-tighter">
+                {isZenMode ? "— — — —" : equityDisplay}
               </span>
-              <span className="text-white/20">{isZenMode ? "Goal: 35" : "Target: 3.0%"}</span>
+              {!isZenMode && (
+                <span className={`text-xs font-bold ${totalPnL >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                  {pnlSign}{totalReturnPercent}%
+                </span>
+              )}
             </div>
-            <div className="w-full bg-white/5 h-3 rounded-full overflow-hidden border border-white/5">
+            <div className="w-32 h-[2px] bg-white/5 overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: isZenMode ? "0%" : `${progressPercent}%` }}
-                className={`h-full bg-gradient-to-r ${isZenMode ? "from-emerald-600 to-emerald-400" : "from-blue-600 to-emerald-400"} rounded-full`}
+                animate={{ width: `${progressPercent}%` }}
+                className="h-full bg-emerald-500"
               />
             </div>
           </div>
 
-          <div className={`px-6 py-3 border rounded-xl ${isZenMode ? "bg-blue-500/10 border-blue-500/20" : "bg-emerald-500/10 border-emerald-500/20"}`}>
-            <div className={`text-[10px] font-bold uppercase mb-1 ${isZenMode ? "text-blue-400" : "text-emerald-400"}`}>Status</div>
-            <div className="text-sm font-bold text-white uppercase tracking-tighter italic">{isZenMode ? "Focused" : "On Track"}</div>
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Market Bias</div>
+            <div className={`text-2xl font-black tracking-tighter ${biasColor}`}>{marketBias}</div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Daily Drawdown</div>
+            <div className={`text-2xl font-mono font-bold tracking-tighter ${parseFloat(drawdown) > 5 ? "text-rose-500" : "text-white/40"}`}>
+              {drawdownDisplay}
+            </div>
+          </div>
+
+          <div className="space-y-1 text-right">
+            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Session</div>
+            <div className="text-xl font-bold text-white tracking-tighter">
+              {session.name} <span className="text-[10px] text-white/20 align-middle ml-1">{session.sub}</span>
+            </div>
           </div>
         </div>
-      </GlassCard>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-white/10 pb-2 overflow-x-auto">
+        <div className="flex items-center gap-4">
+          <BurnoutGuard />
+          <button
+            onClick={() => setIsZenMode(!isZenMode)}
+            className={`text-[10px] font-bold px-3 py-1 rounded transition-colors ${isZenMode ? "bg-white text-black" : "bg-white/5 text-white/40 border border-white/10"}`}
+          >
+            {isZenMode ? "REVEAL PNL" : "ZEN MODE"}
+          </button>
+        </div>
+      </div>
+
+      {/* Glass Tab Navigation */}
+      <div className="flex gap-8 border-b border-white/5 pb-1 overflow-x-auto selection:bg-transparent">
         <button
           onClick={() => setActiveTab("signals")}
-          className={`px-4 py-2 rounded-t-lg text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === "signals"
-            ? "bg-white/10 text-white border-b-2 border-emerald-400"
-            : "text-white/40 hover:text-white/60"
+          className={`pb-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors whitespace-nowrap ${activeTab === "signals"
+            ? "text-white border-b border-white"
+            : "text-white/10 hover:text-white/30"
             }`}
         >
-          <Activity className="w-4 h-4 inline mr-2" />
-          Live Signals
+          Scanner
         </button>
         <button
           onClick={() => setActiveTab("journal")}
-          className={`px-4 py-2 rounded-t-lg text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === "journal"
-            ? "bg-white/10 text-white border-b-2 border-blue-400"
-            : "text-white/40 hover:text-white/60"
+          className={`pb-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors whitespace-nowrap ${activeTab === "journal"
+            ? "text-white border-b border-white"
+            : "text-white/10 hover:text-white/30"
             }`}
         >
-          <Target className="w-4 h-4 inline mr-2" />
-          AI Journal
+          Journal
         </button>
         <button
           onClick={() => setActiveTab("shadow")}
-          className={`px-4 py-2 rounded-t-lg text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === "shadow"
-            ? "bg-white/10 text-white border-b-2 border-purple-400"
-            : "text-white/40 hover:text-white/60"
+          className={`pb-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors whitespace-nowrap ${activeTab === "shadow"
+            ? "text-white border-b border-white"
+            : "text-white/10 hover:text-white/30"
             }`}
         >
-          <Zap className="w-4 h-4 inline mr-2" />
-          Shadow Optimizer
+          Projection
         </button>
-
         <button
           onClick={() => setActiveTab("guardian")}
-          className={`px-4 py-2 rounded-t-lg text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === "guardian"
-            ? "bg-white/10 text-white border-b-2 border-red-500"
-            : "text-white/40 hover:text-white/60"
+          className={`pb-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors whitespace-nowrap ${activeTab === "guardian"
+            ? "text-white border-b border-white"
+            : "text-white/10 hover:text-white/30"
             }`}
         >
-          <ShieldAlert className="w-4 h-4 inline mr-2" />
-          Prop Guardian
+          Guardian
         </button>
       </div>
 
@@ -294,7 +266,7 @@ export default function Dashboard() {
 
           {activeTab === "guardian" && (
             <div className="max-w-4xl mx-auto">
-              <PropGuardianPanel />
+              <PropGuardianPanel audits={propAudits} />
             </div>
           )}
         </>
