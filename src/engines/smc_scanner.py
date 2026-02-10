@@ -65,6 +65,40 @@ class SMCScanner:
         self.intermarket = IntermarketEngine()
         self.news = NewsFilter()
         self.order_book_enabled = True  # Can be disabled if exchange doesn't support
+
+    def get_hurst_exponent(self, time_series):
+        """
+        Calculates the Hurst Exponent to determine market regime.
+        H < 0.5 = Mean Reverting (Range) - Ideal for Turtle Soup
+        H = 0.5 = Brownian Motion (Random)
+        H > 0.5 = Trending (Momentum) - Ideal for Breakouts
+        """
+        try:
+            from scipy.stats import linregress
+            # Create a range of lag values
+            lags = range(2, 20)
+            tau = [np.sqrt(np.std(np.subtract(time_series[lag:], time_series[:-lag]))) for lag in lags]
+            # Use linear regression to estimate the Hurst Exponent
+            poly = np.polyfit(np.log(lags), np.log(tau), 1)
+            return poly[0] * 2.0
+        except Exception as e:
+            logger.error(f"Hurst Calculation Error: {e}")
+            return 0.5
+
+    def get_adf_test(self, time_series):
+        """
+        Performs Augmented Dickey-Fuller test to check for stationarity.
+        p-value < 0.05 indicates the series is stationary (Mean Reverting).
+        """
+        try:
+            from statsmodels.tsa.stattools import adfuller
+            result = adfuller(time_series)
+            return result[1] # p-value
+        except ImportError:
+            return 1.0 # Default to non-stationary
+        except Exception as e:
+            logger.error(f"ADF Test Error: {e}")
+            return 1.0
         
     @ensure_data(default_return=pd.Series(dtype=float))
     def calculate_atr(self, df, period=14):
@@ -167,6 +201,11 @@ class SMCScanner:
         # Check continuous NY session
         ny_session = Config.KILLZONE_NY_CONTINUOUS
         if ny_session and (ny_session[0] <= hour < ny_session[1]):
+            return True
+            
+        # Check Asia Session
+        asia = Config.KILLZONE_ASIA
+        if asia and (asia[0] <= hour < asia[1]):
             return True
         
         return False
@@ -592,6 +631,16 @@ class SMCScanner:
         recent_high = df['high'].iloc[-288:-1].max()
         recent_low = df['low'].iloc[-288:-1].min()
 
+        recent_low = df['low'].iloc[-288:-1].min()
+
+        # TIER 1: Time Series Analysis (New Quant Layer)
+        # We want Mean Reversion (Hurst < 0.5) for "Sweeps"
+        closes = df['close'].values
+        hurst = self.get_hurst_exponent(closes)
+        adf_p = self.get_adf_test(closes)
+        # We don't filter HARD on this yet, just log it
+        is_mean_reverting = hurst < 0.5 or adf_p < 0.05
+
         setup = None
 
         # BULLISH Setup (Run if Bullish OR Neutral)
@@ -670,6 +719,9 @@ class SMCScanner:
                     "price_quartiles": price_quartiles,
                     "index_context": index_context,
                     "smt_strength": round(smt_strength, 2),
+                    "hurst_exponent": round(hurst, 2),
+                    "adf_p_value": round(adf_p, 4),
+                    "is_mean_reverting": bool(is_mean_reverting),
                     "cross_asset_divergence": round(cross_asset_div, 2),
                     "news_context": news_context,
                     "is_discount": True,
@@ -749,6 +801,9 @@ class SMCScanner:
                     "price_quartiles": price_quartiles,
                     "index_context": index_context,
                     "smt_strength": round(smt_strength, 2),
+                    "hurst_exponent": round(hurst, 2),
+                    "adf_p_value": round(adf_p, 4),
+                    "is_mean_reverting": bool(is_mean_reverting),
                     "cross_asset_divergence": round(cross_asset_div, 2),
                     "news_context": news_context,
                     "is_premium": True,

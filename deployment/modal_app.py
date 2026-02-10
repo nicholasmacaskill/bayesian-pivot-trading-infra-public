@@ -26,6 +26,7 @@ image = (
     .pip_install("yfinance", "pytz")
     .add_local_dir("src", remote_path="/root/src")
     .add_local_file("ict_oracle_kb.json", remote_path="/root/ict_oracle_kb.json")
+    .add_local_file("ai_audit_engine.py", remote_path="/root/ai_audit_engine.py")
 )
 
 # Define App
@@ -33,6 +34,26 @@ app = modal.App("smc-alpha-scanner")
 
 # Persistent Volume for SQLite
 volume = modal.Volume.from_name("smc-alpha-storage", create_if_missing=True)
+
+@app.function(
+    image=image,
+    schedule=modal.Cron("0 * * * *"), # Runs every hour
+    secrets=Config.get_modal_secrets(),
+    volumes={"/data": volume},
+    timeout=600
+)
+def run_execution_audit():
+    """
+    Forensic Reconciler: Match real TradeLocker fills with system signals.
+    """
+    from src.engines.execution_audit import ExecutionAuditEngine
+    print("👮‍♂️ Starting Scheduled Execution Audit...")
+    try:
+        engine = ExecutionAuditEngine()
+        engine.run_audit(hours_back=24)
+        print("✅ Execution Audit Complete.")
+    except Exception as e:
+        print(f"❌ Execution Audit Failed: {e}")
 
 @app.function(
     image=image,

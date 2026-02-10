@@ -325,10 +325,15 @@ class AIValidator:
         )
 
         prompt = f"""
-        YOU ARE THE SOVEREIGN GATEKEEPER performing a DUAL-TRACK AUDIT.
+        YOU ARE THE SOVEREIGN GATEKEEPER acting as an INSTITUTIONAL RISK MANAGER (Red Team).
         
-        Your mission: Validate this setup for LIVE EXECUTION (Track 1) while simultaneously 
-        running SHADOW OPTIMIZATION (Track 2) to identify future architectural improvements.
+        Your Goal: REJECT THIS TRADE. 
+        You only approve it if the evidence is so overwhelming that rejecting it would be a failure of duty.
+        
+        ### PHILOSOPHY: "The Sniper"
+        - We do not want "good" trades. We want **PERFECT** trades.
+        - We are happy to sit in cash for days waiting for the one clear shot.
+        - If there is ANY doubt (weak displacement, messy structure, news risk), the verdict is **REJECTED**.
 
         {oracle_rules}
 
@@ -337,7 +342,7 @@ class AIValidator:
         - Pattern Detected: {setup.get('pattern', 'SMC Logic')}
         - Phase: {setup.get('time_quartile', {}).get('phase', 'Unknown')}
         - Price Position: {'Deep Discount' if setup.get('is_discount') else 'Premium' if setup.get('is_premium') else 'Neutral'}
-        - Institutional Sponsorship (SMT): {setup.get('smt_strength', 0)}
+        - Institutional Sponsorship (SMT): {setup.get('smt_strength', 0)} (Must be > 0.3 for Confirmation)
         - Cross-Asset Divergence: {setup.get('cross_asset_divergence', 0)}
         - Bias (4H): {setup.get('bias', 'Neutral')}
         - News Atmosphere: {setup.get('news_context', 'Clear')}
@@ -347,20 +352,23 @@ class AIValidator:
         - Slippage Estimate: {slippage_info.get('slippage_pct', 'N/A')}% ({slippage_info.get('quality', 'Unknown')})
 
         ### TRACK 1: LIVE VALIDATION (CONTROL)
-        - Validate against Oracle Ground Truth: Does this match {setup.get('pattern', 'PO3')} logic?
-        - Fixed risk-per-trade: 0.75% (NON-NEGOTIABLE)
-        - Verdict: FLOW_GO, REJECTED, or INDUCEMENT_WARNING
-        - Cite specific Oracle rules in your reasoning
+        - **Mandatory SMT Check:** Is SMT Strength > 0.3? If no, REJECT immediately.
+        - **Mandatory Discount/Premium:** Is it in Deep Discount for Longs / Deep Premium for Shorts? If no, REJECT.
+        - **Mandatory Bias:** Is the 4H Bias aligned? If Neutral/Opposed, REJECT.
+        
+        - Verdict Options:
+            * **FLOW_GO**: All criteria met. High conviction.
+            * **REJECTED**: Failed one or more gates.
+            * **INDUCEMENT_WARNING**: Looks like a trap (Retail Logic).
 
         ### TRACK 2: SHADOW OPTIMIZATION (EXPERIMENTAL)
         - Current Market Regime: {regime}
-        - Dynamic Position Size Logic:
-          * If Sovereign Score >8.5 AND Low-Volatility: Suggest 1.0% (1.33x multiplier)
-          * If Score <8.0 OR High-Impact News: Suggest 0.40% (0.53x multiplier)
-          * If High-Volatility: Suggest 0.65% (0.87x multiplier)
-          * Otherwise: Maintain 0.75% (1.0x multiplier)
+        - Risk Multiplier Logic (Sniper Mode):
+          * If Score >= 9.0 AND Low-Volatility: 1.25x (Aggressive)
+          * If Score < 8.5: 0.0x (Kill) - We don't trade weak signals.
+          * Otherwise: 1.0x (Standard)
         - Alpha Delta Prediction: How much better/worse would shadow recommendations perform vs control?
-        - Slippage Audit: Current estimate is {slippage_info.get('slippage_pct', 'N/A')}%. Flag if >0.05%
+        - Slippage Audit: Flag if >0.05%
         """
 
         if image_path:
@@ -400,18 +408,18 @@ class AIValidator:
             if self.api_key == "MOCK":
                 return {
                     "live_execution": {
-                        "score": 8.5,
+                        "score": 9.2,
                         "verdict": "FLOW_GO",
-                        "reasoning": f"MOCK: Grounded in {setup.get('pattern')}. Institutional sponsorship confirmed.",
+                        "reasoning": f"MOCK: {setup.get('pattern')} confirmed with Strong SMT (>0.35) and Deep Discount. Sniper criteria met.",
                         "execution_logic": "Execute at FVG with 1:3 RR",
-                        "discipline_check": "Good discipline, within parameters"
+                        "discipline_check": "Institutional Grade Setup"
                     },
                     "shadow_optimizer": {
-                        "suggested_risk_multiplier": 1.33,
+                        "suggested_risk_multiplier": 1.25,
                         "regime_classification": regime,
-                        "alpha_delta_prediction": "+15% vs control (high score + low vol)",
+                        "alpha_delta_prediction": "+20% vs control (High Precision)",
                         "slippage_estimate": f"{slippage_info.get('slippage_pct', 'N/A')}%",
-                        "optimization_reasoning": "Score >8.5 + Low-Volatility = Increase to 1.0%"
+                        "optimization_reasoning": "Score >9.0 + Low-Volatility = Aggressive 1.25x Size"
                     }
                 }
 

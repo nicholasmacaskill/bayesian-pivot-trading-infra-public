@@ -3,7 +3,7 @@ from modal import Secret
 
 class Config:
     # Trading Parameters
-    SYMBOLS = ['BTC/USD', 'ETH/USD']  # Tier 1: Institutional Majors (All Setups)
+    SYMBOLS = ['BTC/USD', 'ETH/USD', 'SOL/USD']  # Tier 1: Institutional Majors (All Setups)
     
     # Tier 2: High Alpha Altcoins (Judas Sweeps Only)
     # Selected based on user's available watchlist (High Liquidity)
@@ -17,7 +17,7 @@ class Config:
     HTF_TIMEFRAME = '4h'
     
     # Risk Management (VOLUME OPERATOR: 3%+ Monthly Target)
-    RISK_PER_TRADE = 0.0065  # 0.65% (The "Golden Mean": Equilibrium between Growth and Safety)
+    RISK_PER_TRADE = 0.0035  # 0.35% (Sweet Spot: 97% Survival, +254% Return)
     MAX_DRAWDOWN_LIMIT = 0.06  # 6%
     DAILY_TRADE_LIMIT = 2
 
@@ -89,9 +89,9 @@ class Config:
     USE_TRADELOCKER_API = True  # Set to False to disable API sync and use mock values
     SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "")  # Shared secret for Local -> Cloud push (MUST be set in .env.local)
     
-    # Strategy Mode: "WIDE NET" (Optimized for High Win Rate)
-    STRATEGY_MODE = "WIDE_NET" # Options: SNIPER, WIDE_NET
-    AI_THRESHOLD = 6.4  # Relaxed from 7.0 to allow more setups (Frequency Boost)
+    # Strategy Mode: "SNIPER" (Optimized for High Precision)
+    STRATEGY_MODE = "SNIPER" # Options: SNIPER, WIDE_NET
+    AI_THRESHOLD = 8.5  # Institutional Grade Only (Must be near-perfect)
     
     # Exit Parameters (Wide Net)
     TP1_R_MULTIPLE = 1.5  # Bank profit early
@@ -99,16 +99,17 @@ class Config:
     STOP_LOSS_ATR_MULTIPLIER = 2.0  # Breathing Room
     
     # Killzones
-    KILLZONE_LONDON = None  # Disabled (User requests NY Only for higher win rate)
+    KILLZONE_ASIA = (0, 4)  # UTC (Midnight - 4 AM) - Asian Session
+    KILLZONE_LONDON = (7, 10)  # UTC (London Open)
     KILLZONE_NY_AM = None  # Merged into continuous session
     KILLZONE_NY_PM = None  # Merged into continuous session
-    KILLZONE_NY_CONTINUOUS = (12, 20)  # UTC (7 AM - 3 PM EST) - Full NY trading day
+    KILLZONE_NY_CONTINUOUS = (12, 20)  # UTC (7 AM - 3 PM EST) - Full NY trading session
     
     # Edge Optimization Parameters (VOLUME OPERATOR MODE - 4 Trades/Week)
-    MIN_SMT_STRENGTH = 0.15  # Relaxed from 0.3 to allow more Judas Sweeps
+    MIN_SMT_STRENGTH = 0.30  # Strong SMT Only (Institutional Sponsorship)
     MIN_PRICE_QUARTILE = 0.0  # Discount
-    MAX_PRICE_QUARTILE = 0.65 # Relaxed from 0.55 (Allows Equilibrium Trades)
-    MIN_PRICE_QUARTILE_SHORT = 0.45 # Relaxed from 0.55 (Allows Equilibrium Trades)
+    MAX_PRICE_QUARTILE = 0.50 # Strict Discount (No Equilibrium Chasing)
+    MIN_PRICE_QUARTILE_SHORT = 0.50 # Strict Premium (No Equilibrium Chasing)
     MAX_PRICE_QUARTILE_SHORT = 1.0
     
     # Secrets (Loaded from Modal Environment)

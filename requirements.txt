@@ -4,6 +4,7 @@ pandas
 ccxt
 # smartmoneyconcepts  <-- Removed unused
 google-genai
+google-generativeai
 python-telegram-bot
 python-dotenv
 requests
@@ -12,3 +13,4 @@ uvicorn
 mplfinance
 Pillow
 supabase
+psycopg2-binary
