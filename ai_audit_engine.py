@@ -1,16 +1,44 @@
 import google.generativeai as genai
 import os
 import json
-from config import Config
+from src.core.config import Config
 
 class AIAuditEngine:
     def __init__(self, api_key=None):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        # Try explicit -> Config -> Env
+        self.api_key = api_key or getattr(Config, 'GEMINI_API_KEY', None) or os.environ.get("GEMINI_API_KEY")
+        
+        if not self.api_key:
+             from dotenv import load_dotenv
+             load_dotenv(".env.local")
+             self.api_key = os.environ.get("GEMINI_API_KEY")
+
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
         else:
             self.model = None
+
+    def get_text_embedding(self, text):
+        """Generates a 768-dimensional vector for the given text."""
+        if not self.model: 
+            print("DEBUG: Model not initialized")
+            return []
+        try:
+            print(f"DEBUG: Generating embedding for text len={len(text)}")
+            result = genai.embed_content(
+                model="models/gemini-embedding-001",
+                content=text,
+                task_type="retrieval_document",
+                title="Trade Logic",
+                output_dimensionality=768
+            )
+            emb = result.get('embedding', [])
+            print(f"DEBUG: Embedding result len={len(emb)}")
+            return emb
+        except Exception as e:
+            print(f"DEBUG EMBED ERROR: {e}")
+            return []
 
     def audit_trade(self, manual_trade, system_data, zen_mode=False):
         """
@@ -86,3 +114,47 @@ class AIAuditEngine:
                 "deviations": ["System Failure"],
                 "is_lucky_failure": False
             }
+    def audit_discretionary_trade(self, manual_trade):
+        """
+        Analyzes a trade taken WITHOUT a system signal.
+        Goal: Identify 'Alpha' (Human intuition/missed setup) vs 'Rogue' (Gambling).
+        """
+        if not self.model:
+            return {"score": 5.0, "feedback": "Auditor offline.", "is_alpha": False}
+
+        prompt = f"""
+        You are the 'Glass Auditor', analyzing a DISCRETIONARY trade.
+        The bot scanner did NOT flag this setup, but the human took it anyway.
+
+        **Manual Trade:**
+        - Symbol: {manual_trade['symbol']}
+        - Action: {manual_trade['side']}
+        - PnL: ${manual_trade['pnl']}
+        - Entry/Exit Context: {manual_trade.get('notes', 'No notes provided')}
+
+        **Your Mission:**
+        1. **Alpha Hunt**: Was there a valid SMC/ICT setup here (Liquidity grab, MSS, Inducement) that the scanner might have missed?
+        2. **Grade it (1-10)**: 
+           - 8-10: 'Human Alpha' (Good eyes, the model should learn this).
+           - 4-7: 'Average Discretion' (Context was okay, but risky).
+           - 1-3: 'Rogue/Gambling' (No clear logic).
+        3. **Model Feedback**: How could we improve the bot scanner to detect this in the future?
+
+        **Output Format (JSON strictly):**
+        {{
+            "score": <score>,
+            "feedback": "<Expert analysis>",
+            "is_alpha": <bool>,
+            "improvement_suggestion": "<how to fix the bot>"
+        }}
+        """
+
+        try:
+            response = self.model.generate_content(prompt)
+            text = response.text
+            start = text.find('{')
+            end = text.rfind('}') + 1
+            return json.loads(text[start:end])
+        except Exception as e:
+            return {"score": 3.0, "feedback": f"Discordant Audit Error: {e}", "is_alpha": False}
+

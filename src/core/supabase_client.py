@@ -24,7 +24,7 @@ class SupabaseBridge:
                 self.client = None
                 logger.error(f"Failed to initialize Supabase client: {e}")
 
-    def log_journal_entry(self, trade_id, symbol, side, pnl, ai_grade, mentor_feedback, strategy="ROGUE", status="OPEN", price=0.0, timestamp=None, deviations=None, is_lucky_failure=False, notes=None):
+    def log_journal_entry(self, trade_id, symbol, side, pnl, ai_grade, mentor_feedback, strategy="ROGUE", status="OPEN", price=0.0, timestamp=None, deviations=None, is_lucky_failure=False, notes=None, embedding=None):
         """Pushes a trade entry to the Supabase 'journal' table."""
         if not self.client: return False
         
@@ -42,7 +42,9 @@ class SupabaseBridge:
                 "deviations": deviations or "",
                 "is_lucky_failure": bool(is_lucky_failure),
                 "notes": notes or "",
-                "timestamp": timestamp or datetime.utcnow().isoformat()
+                "notes": notes or "",
+                "timestamp": timestamp or datetime.utcnow().isoformat(),
+                "embedding": embedding
             }
             
             # Upsert by trade_id

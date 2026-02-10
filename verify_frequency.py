@@ -21,6 +21,8 @@ def fetch_data(symbol, days=30):
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     return df
 
+from src.core.config import Config
+
 def scan_hybrid_sweeps(df):
     setups = 0
     df = df.copy()
@@ -29,16 +31,26 @@ def scan_hybrid_sweeps(df):
     df['pdh'] = df['high'].rolling(288).max().shift(1)
     df['pdl'] = df['low'].rolling(288).min().shift(1)
     
-    # Calculate London High/Low (approximate for speed: max/min of 7-10 UTC window)
-    # We will compute this row by row for accuracy in the loop or vectorized
-    
-    print("🔄 Scanning for Hybrid Sweeps...")
+    print("🔄 Scanning for Hybrid Sweeps (using Config Killzones)...")
     
     for i in range(288, len(df)):
         row = df.iloc[i]
         
-        # 1. Check Time (NY Session Only: 12-20 UTC)
-        if not (12 <= row['timestamp'].hour < 20):
+        # 1. Check Killzones (Asia, London, NY)
+        hour = row['timestamp'].hour
+        in_killzone = False
+        
+        # Check Asia
+        if Config.KILLZONE_ASIA and (Config.KILLZONE_ASIA[0] <= hour < Config.KILLZONE_ASIA[1]):
+            in_killzone = True
+        # Check London
+        elif Config.KILLZONE_LONDON and (Config.KILLZONE_LONDON[0] <= hour < Config.KILLZONE_LONDON[1]):
+            in_killzone = True
+        # Check NY
+        elif Config.KILLZONE_NY_CONTINUOUS and (Config.KILLZONE_NY_CONTINUOUS[0] <= hour < Config.KILLZONE_NY_CONTINUOUS[1]):
+            in_killzone = True
+            
+        if not in_killzone:
             continue
             
         # 2. Check PDH Sweep (Bearish)

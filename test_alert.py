@@ -2,7 +2,13 @@
 """
 Test script to send a sample Telegram alert
 """
-from telegram_notifier import TelegramNotifier
+import sys
+import os
+
+# Ensure project root is in path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from src.clients.telegram_notifier import TelegramNotifier
 from dotenv import load_dotenv
 
 # Load environment variables
