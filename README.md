@@ -32,11 +32,14 @@ Every technical setup is passed through a **Large Language Model (Gemini)** acti
 - **Hard Score Filtering**: Only setups scoring above a high confidence threshold (e.g., **7.5/10**) are sent to your Telegram.
 - **Discipline Enforcement**: AI monitors drawdown status and warns against strategy drift.
 
-### 3. Stealth Architecture (Security & Performance)
-The bot is engineered to remain "invisible" to broker WAFs (Web Application Firewalls):
-- **Request Fingerprinting**: Mimics a human-driven Chrome browser on macOS.
-- **Surgical Frequency**: Scans at the exact close of 5-minute candles to minimize noise and avoid rate-limit flags.
-- **Autonomous Cloud Sync**: Fully independent TradeLocker bridge that fetches real-time equity safely from the cloud.
+### 3. Sniper Architecture (Local First)
+The system has transitioned from cloud-orchestrated jobs to a high-frequency **Local Sniper Runner**:
+- **Latency**: Under 1s per scan (Zero cloud overhead).
+- **Frequency**: 60-second institutional polling.
+- **Anti-Sleep (Yard Mode)**: Integrated macOS `caffeinate` protection keeps the Mac awake while the display sleeps.
+- **Journal Watchdog**: Automatically syncs TradeLocker history and positions to the local database and Supabase every minute.
+- **Prop Guardian**: Forensic rule monitoring that spiders prop firm websites every 6 hours to detect adversarial traps.
+- **System Heartbeat**: Explicit terminal and cloud "pulse" confirms system life even during silent market hours.
 
 ## 🚀 Setup Guide
 
@@ -84,23 +87,22 @@ Create or edit the `.env.local` file in the root directory. This file stores you
 > [!CAUTION]
 > Keep this file private. It contains your real passwords.
 
-### 4. Deploy Backend
+### 4. Start the Sniper Engine (Yard Mode)
+Run the following command from the project root to start the high-frequency scanner with anti-sleep protection:
 ```bash
-cd smc-alpha
-modal deploy deployment/modal_app.py
+./start_runner.sh
 ```
 
-### 5. Run Dashboard (Local)
+To see the live heartbeat and scans directly in your terminal:
+```bash
+PYTHONPATH=. caffeinate -i -s python src/runners/local_scanner.py
+```
+
+### 5. Run Dashboard (Local Visualization)
 ```bash
 cd dashboard
 npm install
 npm run dev
-```
-
-### 6. Start IP-Safe Sync
-Run this on your home computer to keep the cloud updated securely:
-```bash
-python local_sync.py
 ```
 
 ## 🛡️ Risk Rules (Configurable)
