@@ -7,17 +7,13 @@ class Config:
     
     # Tier 2: High Alpha Altcoins (Judas Sweeps Only)
     # Selected based on user's available watchlist (High Liquidity)
-    ALT_SYMBOLS = [
-        'SOL/USD', 'XRP/USD', 'ADA/USD', 'DOGE/USD', 
-        'DOT/USD', 'LTC/USD', 'LINK/USD', 'BNB/USD',
-        'MATIC/USD', 'AVAX/USD'
-    ]
+    ALT_SYMBOLS = []
     
     TIMEFRAME = '5m'
-    HTF_TIMEFRAME = '4h'
+    HTF_TIMEFRAME = '1h'
     
     # Risk Management (VOLUME OPERATOR: 3%+ Monthly Target)
-    RISK_PER_TRADE = 0.0035  # 0.35% (Sweet Spot: 97% Survival, +254% Return)
+    RISK_PER_TRADE = 0.0045  # 0.45% (Optimized for Non-Punitive SMT - ~157% ROI)
     MAX_DRAWDOWN_LIMIT = 0.06  # 6%
     DAILY_TRADE_LIMIT = 2
 
@@ -91,7 +87,7 @@ class Config:
     
     # Strategy Mode: "SNIPER" (Optimized for High Precision)
     STRATEGY_MODE = "SNIPER" # Options: SNIPER, WIDE_NET
-    AI_THRESHOLD = 8.5  # Institutional Grade Only (Must be near-perfect)
+    AI_THRESHOLD = 8.0  # High Confidence (Relaxed from 8.5)
     
     # Exit Parameters (Wide Net)
     TP1_R_MULTIPLE = 1.5  # Bank profit early
@@ -106,7 +102,7 @@ class Config:
     KILLZONE_NY_CONTINUOUS = (12, 20)  # UTC (7 AM - 3 PM EST) - Full NY trading session
     
     # Edge Optimization Parameters (VOLUME OPERATOR MODE - 4 Trades/Week)
-    MIN_SMT_STRENGTH = 0.30  # Strong SMT Only (Institutional Sponsorship)
+    MIN_SMT_STRENGTH = 0.30  # Require strong multi-asset alignment (Optimized for Quality over Quantity)
     MIN_PRICE_QUARTILE = 0.0  # Discount
     MAX_PRICE_QUARTILE = 0.50 # Strict Discount (No Equilibrium Chasing)
     MIN_PRICE_QUARTILE_SHORT = 0.50 # Strict Premium (No Equilibrium Chasing)
@@ -124,3 +120,10 @@ class Config:
 
     # Database Path (Modal Volume)
     DB_PATH = "/data/smc_alpha.db" if os.path.exists("/data") else os.path.join(os.getcwd(), "smc_alpha.db")
+
+    # Local Runner Parameters
+    RUN_INTERVAL_MINS = 1
+
+    @classmethod
+    def get(cls, key, default=None):
+        return getattr(cls, key, default)

@@ -182,10 +182,10 @@ def log_scan(scan_data, ai_result):
         
     return scan_id
 
-def log_journal_entry(trade_id, symbol, side, pnl, score, feedback, deviations, is_lucky_failure=0, strategy="ROGUE"):
+def log_journal_entry(trade_id, symbol, side, pnl, score, feedback, deviations, is_lucky_failure=0, strategy="ROGUE", timestamp=None):
     conn = get_db_connection()
     c = conn.cursor()
-    now = datetime.now().isoformat()
+    now = timestamp or datetime.now().isoformat()
     try:
         c.execute('''
             INSERT OR REPLACE INTO journal (timestamp, trade_id, symbol, side, pnl, ai_grade, mentor_feedback, deviations, is_lucky_failure, strategy)

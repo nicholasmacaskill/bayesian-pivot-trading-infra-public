@@ -404,17 +404,21 @@ def run_scanner_job():
                         {"text": "❌ DISMISS", "url": "https://t.me/SovereignSMCAuditBot"}
                     ]]
 
-                    send_alert(
-                        symbol=symbol, 
-                        timeframe=Config.TIMEFRAME,
-                        pattern=setup['pattern'],
-                        ai_score=live_score,
-                        reasoning=live.get('reasoning', ai_result.get('reasoning', '')),
-                        verdict=live.get('verdict', ai_result.get('verdict', 'N/A')),
-                        risk_calc=risk_calc,
-                        buttons=buttons,
-                        shadow_insights=shadow
-                    )
+                    try:
+                        send_alert(
+                            symbol=symbol, 
+                            timeframe=Config.TIMEFRAME,
+                            pattern=setup['pattern'],
+                            ai_score=live_score,
+                            reasoning=live.get('reasoning', ai_result.get('reasoning', '')),
+                            verdict=live.get('verdict', ai_result.get('verdict', 'N/A')),
+                            risk_calc=risk_calc,
+                            buttons=buttons,
+                            shadow_insights=shadow
+                        )
+                    except Exception as alert_err:
+                        print(f"⚠️ Telegram Alert Failed for {symbol}: {alert_err}")
+                        log_system_event("Scanner Notifier", f"Failed to send alert for {symbol}: {str(alert_err)}", level="ERROR")
             else:
                 # Hearbeat logging (optional, every 30 mins)
                 if datetime.now().minute % 30 == 0:

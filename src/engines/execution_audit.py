@@ -209,7 +209,8 @@ class ExecutionAuditEngine:
             status=trade['status'],
             price=trade['price'],
             deviations="None",
-            embedding=embedding
+            embedding=embedding,
+            timestamp=trade.get('entry_time') or trade.get('time')
         )
 
     def _mark_missed(self, signal):
@@ -241,5 +242,6 @@ class ExecutionAuditEngine:
             status=trade.get('status', 'CLOSED'),
             price=trade.get('price', 0.0),
             deviations=audit.get('improvement_suggestion', "Discretionary Entry"),
-            embedding=embedding
+            embedding=embedding,
+            timestamp=trade.get('entry_time') or trade.get('time')
         )
