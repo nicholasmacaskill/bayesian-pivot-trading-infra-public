@@ -15,7 +15,7 @@ from src.engines.ai_validator import validate_setup
 from src.engines.prop_guardian import PropGuardian
 from src.core.database import init_db, log_scan, update_sync_state, log_system_event, get_db_connection, log_prop_audit
 from src.clients.tl_client import TradeLockerClient
-from src.clients.telegram_notifier import send_alert, send_system_error
+from src.clients.telegram_notifier import TelegramNotifier, send_alert, send_system_error
 from src.engines.execution_audit import ExecutionAuditEngine
 
 # Configure Logging
@@ -50,6 +50,7 @@ class LocalScannerRunner:
         self.tl = TradeLockerClient()
         self.audit_engine = ExecutionAuditEngine()
         self.prop_guardian = PropGuardian()
+        self.notifier = TelegramNotifier()  # <--- PERSISTENT INSTANCE
         self.last_prop_audit = 0
         self.running = True
         
@@ -168,7 +169,7 @@ class LocalScannerRunner:
                         }
                         
                         try:
-                            send_alert(
+                            self.notifier.send_alert(
                                 symbol=symbol,
                                 timeframe=Config.TIMEFRAME,
                                 pattern=setup['pattern'],
