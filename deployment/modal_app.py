@@ -25,7 +25,7 @@ image = (
     .pip_install_from_requirements("requirements.txt")
     .pip_install("yfinance", "pytz")
     .add_local_dir("src", remote_path="/root/src")
-    .add_local_file("ict_oracle_kb.json", remote_path="/root/ict_oracle_kb.json")
+    .add_local_file("docs/ict_oracle_kb.json", remote_path="/root/ict_oracle_kb.json")
     .add_local_file("ai_audit_engine.py", remote_path="/root/ai_audit_engine.py")
 )
 
@@ -34,6 +34,9 @@ app = modal.App("smc-alpha-scanner")
 
 # Persistent Volume for SQLite
 volume = modal.Volume.from_name("smc-alpha-storage", create_if_missing=True)
+
+# Pulse Protocol: Dead Man's Switch for Yard Mode
+yard_heartbeats = modal.Dict.from_name("yard-heartbeats", create_if_missing=True)
 
 @app.function(
     image=image,
@@ -61,159 +64,119 @@ def run_execution_audit():
     secrets=Config.get_modal_secrets(),
     volumes={"/data": volume}
 )
-def refresh_market_context():
+def master_watchdog():
     """
-    ASYNCHRONOUS INTELLIGENCE: Background Pulse
+    MASTER SYNCHRONIZER: Background Pulse & Equity Watchdog
     
-    Runs every 1 minute to pre-warm market context, eliminating API latency
-    during pattern execution. Caches news, sentiment, whale flow, and DXY data.
+    1. Pre-warms market context (news, sentiment, DXY).
+    2. Syncs Equity & Closed Positions from TradeLocker.
     """
     import json
     from datetime import datetime
-    print("🧠 Refreshing Market Context (Background Pulse)...")
+    print("🧠 Master Watchdog: Refreshing Market & Equity...")
     
+    # --- 1. Market Context Refresh ---
     from src.engines.news_filter import NewsFilter
     from src.engines.intermarket_engine import IntermarketEngine
+    from src.engines.sentiment_engine import SentimentEngine
     
     try:
-        # Initialize engines
         news = NewsFilter()
         intermarket = IntermarketEngine()
         sentiment_engine = SentimentEngine()
         
-        # Fetch all context
         is_safe, event, mins = news.is_news_safe()
         intermarket_data = intermarket.get_market_context()
-        
-        # Get sentiment and whale data for BTC (primary)
         market_sentiment = sentiment_engine.get_market_sentiment('BTC/USDT')
         whale_flow = sentiment_engine.get_whale_confluence()
         
-        # Build context cache
         context = {
             'timestamp': str(datetime.utcnow()),
-            'news': {
-                'is_safe': is_safe,
-                'event': event,
-                'minutes_until': mins
-            },
+            'news': {'is_safe': is_safe, 'event': event, 'minutes_until': mins},
             'intermarket': intermarket_data,
             'sentiment': market_sentiment,
             'whales': whale_flow
         }
         
-        # Save to volume
         cache_path = "/data/context_cache.json"
         with open(cache_path, 'w') as f:
             json.dump(context, f)
-        
-        volume.commit()
-        print(f"✅ Context cached at {context['timestamp']}")
-        
+        print("✅ Market context cached.")
     except Exception as e:
         print(f"⚠️ Context refresh failed: {e}")
 
-@app.function(
-    image=image,
-    schedule=modal.Cron("* * * * *"), # Runs every minute
-    secrets=Config.get_modal_secrets(),
-    volumes={"/data": volume}
-)
-def equity_watchdog():
-    """Lightweight 1-minute poller to sync Equity & Closed Positions"""
-    print("👀 Equity Watchdog: Checking for updates...")
-    init_db()
-    
+    # --- 2. Equity & Journal Sync ---
     try:
+        init_db()
         tl = TradeLockerClient()
         equity = tl.get_total_equity()
-        
-        # 1. Sync Equity
-        if equity > 0:
-             # Just use a placeholder for trade count until we fetch history below
-             update_sync_state(equity, 0)
-        
-        
-        # 2a. Sync Active Positions (OPEN)
         open_positions = tl.get_open_positions()
-        
-        # 2b. Sync Closed History (CLOSED)
         history = tl.get_recent_history(hours=24)
-        
         trades_today = len(history) + len(open_positions)
         
-        # Update sync state with actual count
         if equity > 0:
-             update_sync_state(equity, trades_today)
+            update_sync_state(equity, trades_today)
 
-        # Sync trades to Journal DB
         conn = get_db_connection()
         c = conn.cursor()
-        new_synced = 0
-        
-        # A. Upsert OPEN positions
         for t in open_positions:
-            try:
-                # UPSERT logic: UPDATE if exists, INSERT if new
-                # We update PnL and ensure status is OPEN
-                c.execute("""
-                    INSERT INTO journal 
-                    (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback)
-                    VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0.0, 'Synced Active Trade')
-                    ON CONFLICT(trade_id) DO UPDATE SET
-                        pnl = excluded.pnl,
-                        status = 'OPEN',
-                        timestamp = excluded.timestamp
-                """, (
-                    t['entry_time'], 
-                    t['id'], 
-                    t['symbol'], 
-                    t['side'], 
-                    t['pnl'], 
-                    t['price']
-                ))
-                new_synced += 1
-            except Exception as e:
-                print(f"⚠️ Open Position Sync Error {t['id']}: {e}")
+            c.execute("""
+                INSERT INTO journal 
+                (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback)
+                VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0.0, 'Synced Active Trade')
+                ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'OPEN'
+            """, (t['entry_time'], t['id'], t['symbol'], t['side'], t['pnl'], t['price']))
 
-        # B. Upsert CLOSED positions (This handles the OPEN -> CLOSED transition)
         for t in history:
-            try:
-                # If trade was previously OPEN, this will switch it to CLOSED and finalize PnL
-                c.execute("""
-                    INSERT INTO journal 
-                    (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback)
-                    VALUES (?, ?, ?, ?, ?, ?, 'CLOSED', 0.0, 'Synced Closed Trade')
-                    ON CONFLICT(trade_id) DO UPDATE SET
-                        pnl = excluded.pnl,
-                        status = 'CLOSED',
-                        price = excluded.price,
-                        timestamp = excluded.timestamp
-                """, (
-                    t['close_time'], 
-                    t['id'], 
-                    t['symbol'], 
-                    t['side'], 
-                    t['pnl'], 
-                    t['price']
-                ))
-                # Only count as 'new synced' if it wasn't there (hard to track with upsert, but roughly)
-            except Exception as e:
-                print(f"⚠️ History Sync Error {t['id']}: {e}")
-                
+            c.execute("""
+                INSERT INTO journal 
+                (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback)
+                VALUES (?, ?, ?, ?, ?, ?, 'CLOSED', 0.0, 'Synced Closed Trade')
+                ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'CLOSED', price = excluded.price
+            """, (t['close_time'], t['id'], t['symbol'], t['side'], t['pnl'], t['price']))
+            
         conn.commit()
         conn.close()
-        
-        # PERSIST TO MODAL VOLUME
-        try:
-            volume.commit()
-        except Exception as ve:
-            print(f"⚠️ Volume Commit Failed: {ve}")
-
-        print(f"✅ Watchdog: Equity=${equity:,.2f} | Trades={trades_today} | Synced={new_synced} new")
-             
+        volume.commit()
+        print(f"✅ Equity Sync: ${equity:,.2f} (Trades: {trades_today})")
     except Exception as e:
-        print(f"⚠️ Watchdog Failed: {e}")
+        print(f"⚠️ Equity sync failed: {e}")
+
+@app.function(
+    image=image,
+    schedule=modal.Cron("*/5 * * * *"), # Every 5 minutes
+    secrets=Config.get_modal_secrets()
+)
+def yard_watchdog():
+    """
+    DEAD MAN'S SWITCH (The Guard)
+    Checks if the local Yard Mode scanner has pinged Modal recently.
+    """
+    from src.clients.telegram_notifier import send_message
+    from datetime import datetime, timedelta
+    
+    now = datetime.utcnow()
+    last_pulse_str = yard_heartbeats.get("last_pulse")
+    
+    if not last_pulse_str:
+        print("⚠️ No Yard Pulse recorded yet.")
+        return
+
+    last_pulse = datetime.fromisoformat(last_pulse_str)
+    diff = now - last_pulse
+    
+    if diff > timedelta(minutes=7): # 7 min grace (for 5 min scan cycle)
+        print(f"🚨 YARD OFFLINE DETECTED: Last pulse {diff.total_seconds()/60:.1f}m ago")
+        msg = (
+            f"⚠️ *YARD MODE: CONNECTION LOST*\n\n"
+            f"🛑 *Status:* Critical\n"
+            f"🕒 *Last Pulse:* `{last_pulse.strftime('%H:%M:%S UTC')}`\n"
+            f"⏳ *Downtime:* `{int(diff.total_seconds()/60)} minutes`\n\n"
+            f"Check local power and macOS process logs."
+        )
+        send_message(msg)
+    else:
+        print(f"🟢 Yard Pulse Healthy: Last seen {diff.total_seconds():.0f}s ago")
 
 @app.function(
     image=image,
@@ -481,6 +444,27 @@ async def push_equity(request: Request):
 
 @app.function(
     image=image,
+    secrets=Config.get_modal_secrets()
+)
+@modal.fastapi_endpoint(method="POST")
+async def yard_heartbeat(request: Request):
+    """
+    PULSE PROTOCOL: Local Scanner pings this to confirm it is alive.
+    """
+    data = await request.json()
+    auth_key = os.environ.get("SYNC_AUTH_KEY")
+    
+    if data.get("key") != auth_key:
+        raise HTTPException(status_code=403, detail="Invalid pulse key")
+        
+    now = datetime.utcnow().isoformat()
+    yard_heartbeats["last_pulse"] = now
+    
+    print(f"💓 Heartbeat received from {data.get('symbol', 'unknown')} at {now}")
+    return {"status": "success", "timestamp": now}
+
+@app.function(
+    image=image,
     secrets=Config.get_modal_secrets(),
     volumes={"/data": volume}
 )
@@ -581,6 +565,13 @@ def get_dashboard_state():
                 "strategy": j.get('strategy', 'ROGUE')
             })
             
+    # 4. Backtest Reports (Consolidated)
+    try:
+        c.execute("SELECT * FROM backtest_results ORDER BY id DESC LIMIT 10")
+        backtest_reports = [dict(row) for row in c.fetchall()]
+    except:
+        backtest_reports = []
+        
     conn.close()
     
     return {
@@ -590,7 +581,8 @@ def get_dashboard_state():
         "trades_today": trades_today,
         "journal_entries": journals,
         "alpha_delta": {"comparisons": alpha_results},
-        "prop_audits": get_latest_prop_audits()
+        "prop_audits": get_latest_prop_audits(),
+        "backtest_reports": backtest_reports
     }
 
 @app.function(
@@ -608,26 +600,6 @@ def trigger_backfill_job(symbol: str = "BTC/USDT"):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@app.function(
-    image=image,
-    secrets=Config.get_modal_secrets(),
-    volumes={"/data": volume}
-)
-@modal.fastapi_endpoint(docs=True)
-def get_backtest_reports():
-    """Fetches historical simulation results"""
-    volume.reload()
-    from src.core.database import get_db_connection
-    conn = get_db_connection()
-    c = conn.cursor()
-    # Check if table exists first (just in case init didn't run recently)
-    try:
-        c.execute("SELECT * FROM backtest_results ORDER BY id DESC LIMIT 5")
-        rows = [dict(row) for row in c.fetchall()]
-    except:
-        rows = []
-    conn.close()
-    return {"status": "success", "reports": rows}
 
 @app.function(
     image=image,
@@ -726,10 +698,6 @@ def monthly_growth_alert():
     from src.clients.telegram_notifier import send_message
     from datetime import datetime
     
-    # 1. Calculate Realized Profit (Simplified logic for now)
-    # In reality, this would query trade history for the last 30 days
-    # For now, we estimate based on equity growth
-    
     tl = TradeLockerClient()
     current_equity = tl.get_total_equity()
     
@@ -743,7 +711,6 @@ def monthly_growth_alert():
         phase = "Phase 3 (Harvest)"
         reinvest_rate = 0.0
         
-    # Assume 3% monthly return for the notification estimates
     est_profit = current_equity * 0.03
     
     withdraw_amt = est_profit * (1 - reinvest_rate)

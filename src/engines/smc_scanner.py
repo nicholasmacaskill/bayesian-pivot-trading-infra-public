@@ -435,7 +435,7 @@ class SMCScanner:
         ATR-Dynamic Targeting: Adjusts targets based on current volatility.
         
         High Volatility (ATR > 1.5x mean): Target SD 2.0 (capture expansion)
-        Low Volatility (ATR < mean): Target nearest FVG or 50% mean (take quick profit)
+        Low Volatility (ATR < mean): Target nearest FVG or institutional draw (minimum 3R)
         Normal Volatility: Target SD 1.0 (current strategy)
         
         Args:
@@ -445,7 +445,7 @@ class SMCScanner:
             session_range: Price quartiles dict
         
         Returns:
-            Target price
+            Target price (guaranteed minimum 3R from entry)
         """
         atr = self.calculate_atr(df)
         if atr is None or len(atr) < 14:
@@ -455,21 +455,42 @@ class SMCScanner:
         mean_atr = atr.iloc[-50:].mean()  # 50-period mean
         current_atr = atr.iloc[-1]
         
+        # Calculate stop loss to determine minimum 3R target
+        stop_buffer = current_atr * Config.STOP_LOSS_ATR_MULTIPLIER
+        if direction == 'LONG':
+            stop_loss = entry_price - stop_buffer
+            risk = entry_price - stop_loss
+            min_target_3r = entry_price + (3.0 * risk)
+        else:  # SHORT
+            stop_loss = entry_price + stop_buffer
+            risk = stop_loss - entry_price
+            min_target_3r = entry_price - (3.0 * risk)
+        
         # High Volatility: Expanded Targets
         if current_atr > mean_atr * 1.5:
             logger.info(f"📈 High Volatility Detected (ATR: {current_atr:.2f} > {mean_atr*1.5:.2f}). Targeting SD 2.0")
-            return session_range.get('sd_2_pos' if direction == 'LONG' else 'sd_2_neg', 
+            target = session_range.get('sd_2_pos' if direction == 'LONG' else 'sd_2_neg', 
                                     session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg'))
         
-        # Low Volatility: Tighter Targets
+        # Low Volatility: Use institutional draw, NOT session midpoint
         elif current_atr < mean_atr:
-            logger.info(f"📉 Low Volatility Detected (ATR: {current_atr:.2f} < {mean_atr:.2f}). Targeting 50% Mean")
-            # Target 50% of range (mean threshold)
-            return session_range.get('mid')
+            logger.info(f"📉 Low Volatility Detected (ATR: {current_atr:.2f} < {mean_atr:.2f}). Targeting Institutional Draw (min 3R)")
+            # Use get_next_institutional_target instead of session midpoint
+            target = self.get_next_institutional_target(df, direction, entry_price)
         
         # Normal Volatility: SD 1.0 (current strategy)
         else:
-            return session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg')
+            target = session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg')
+        
+        # CRITICAL: Enforce minimum 3R for all institutional setups
+        if direction == 'LONG' and target < min_target_3r:
+            logger.warning(f"⚠️ Target {target:.2f} < 3R floor {min_target_3r:.2f}. Using 3R minimum.")
+            return min_target_3r
+        elif direction == 'SHORT' and target > min_target_3r:
+            logger.warning(f"⚠️ Target {target:.2f} > 3R floor {min_target_3r:.2f}. Using 3R minimum.")
+            return min_target_3r
+            
+        return target
             
     def get_next_institutional_target(self, df, direction, entry_price):
         """

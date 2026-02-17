@@ -9,12 +9,33 @@ class TelegramNotifier:
         self.bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
         self.chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        
+        # Deduplication Tracker: {key: timestamp}
+        # Key format: f"{symbol}_{pattern}"
+        self.last_alerts = {} 
+        self.COOLDOWN_MINUTES = 60
 
     def send_alert(self, symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None):
         """Sends a formatted high-priority alert with optional execution buttons and shadow insights."""
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram credentials not found. Skipping alert.")
             return
+            
+        # DEDUPLICATION CHECK
+        from datetime import datetime
+        current_time = datetime.now()
+        alert_key = f"{symbol}_{pattern}"
+        
+        if alert_key in self.last_alerts:
+            last_time = self.last_alerts[alert_key]
+            elapsed_minutes = (current_time - last_time).total_seconds() / 60
+            
+            if elapsed_minutes < self.COOLDOWN_MINUTES:
+                logger.info(f"🤫 Smart Silence: Suppressing duplicate alert for {symbol} ({elapsed_minutes:.1f}m ago)")
+                return
+        
+        # Update timestamp for this alert
+        self.last_alerts[alert_key] = current_time
             
         logger.info(f"Preparing Telegram alert for {symbol}...") # Force-refresh deployment
 
@@ -43,13 +64,20 @@ class TelegramNotifier:
         )
         
         if risk_calc:
-            position_value = risk_calc['position_size'] * risk_calc['entry']
+            position_size = risk_calc.get('position_size', 0.0)
+            entry_price = risk_calc.get('entry', 0.0)
+            position_value = position_size * entry_price
+            
+            # Robust TP extraction
+            tp_price = risk_calc.get('take_profit') or risk_calc.get('target', 'OPEN')
+            tp_str = f"${tp_price:,.2f}" if isinstance(tp_price, (int, float)) else str(tp_price)
+            
             message += (
                 f"🛡️ *Risk Management (0.75%):*\n"
-                f"• Entry: `${risk_calc['entry']:,.2f}`\n"
-                f"• Stop: `${risk_calc['stop_loss']:,.2f}`\n"
-                f"• TP: `${risk_calc.get('take_profit', 'OPEN')}`\n"
-                f"• Position Size: `{risk_calc['position_size']} {symbol.split('/')[0]}`\n"
+                f"• Entry: `${entry_price:,.2f}`\n"
+                f"• Stop: `${risk_calc.get('stop_loss', 0.0):,.2f}`\n"
+                f"• TP: `{tp_str}`\n"
+                f"• Position Size: `{position_size} {symbol.split('/')[0]}`\n"
                 f"• Position Value: `${position_value:,.2f}`\n\n"
             )
         
