@@ -74,30 +74,30 @@ class IntermarketEngine:
             yield_trend = context['TNX']['trend']
             if btc_direction == 'LONG':
                 # Bullish BTC needs falling yields (risk-on)
-                score += 0.4 if yield_trend == 'DOWN' else -0.4
+                score += 0.4 if yield_trend == 'DOWN' else 0.0
             else:  # SHORT
                 # Bearish BTC confirmed by rising yields (risk-off)
-                score += 0.4 if yield_trend == 'UP' else -0.4
+                score += 0.4 if yield_trend == 'UP' else 0.0
         
         # Check 2: Nasdaq Futures (Equity Risk Appetite)
         if 'NQ' in context:
             nq_trend = context['NQ']['trend']
             if btc_direction == 'LONG':
                 # Bullish BTC needs rising NQ (risk-on equities)
-                score += 0.3 if nq_trend == 'UP' else -0.3
+                score += 0.3 if nq_trend == 'UP' else 0.0
             else:  # SHORT
                 # Bearish BTC confirmed by falling NQ (risk-off equities)
-                score += 0.3 if nq_trend == 'DOWN' else -0.3
+                score += 0.3 if nq_trend == 'DOWN' else 0.0
         
         # Check 3: DXY (Dollar Strength)
         if 'DXY' in context:
             dxy_trend = context['DXY']['trend']
             if btc_direction == 'LONG':
                 # Bullish BTC needs falling DXY (weak dollar)
-                score += 0.3 if dxy_trend == 'DOWN' else -0.3
+                score += 0.3 if dxy_trend == 'DOWN' else 0.0
             else:  # SHORT
                 # Bearish BTC confirmed by rising DXY (strong dollar)
-                score += 0.3 if dxy_trend == 'UP' else -0.3
+                score += 0.3 if dxy_trend == 'UP' else 0.0
         
         # Normalize to -1 to +1 range
         return max(-1.0, min(1.0, score))

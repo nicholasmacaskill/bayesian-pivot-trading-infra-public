@@ -342,7 +342,7 @@ class AIValidator:
         - Pattern Detected: {setup.get('pattern', 'SMC Logic')}
         - Phase: {setup.get('time_quartile', {}).get('phase', 'Unknown')}
         - Price Position: {'Deep Discount' if setup.get('is_discount') else 'Premium' if setup.get('is_premium') else 'Neutral'}
-        - Institutional Sponsorship (SMT): {setup.get('smt_strength', 0)} (Must be > 0.3 for Confirmation)
+        - Institutional Sponsorship (SMT): {setup.get('smt_strength', 0)} (Must be > {Config.MIN_SMT_STRENGTH} for Confirmation)
         - Cross-Asset Divergence: {setup.get('cross_asset_divergence', 0)}
         - Bias (4H): {setup.get('bias', 'Neutral')}
         - News Atmosphere: {setup.get('news_context', 'Clear')}
@@ -352,9 +352,9 @@ class AIValidator:
         - Slippage Estimate: {slippage_info.get('slippage_pct', 'N/A')}% ({slippage_info.get('quality', 'Unknown')})
 
         ### TRACK 1: LIVE VALIDATION (CONTROL)
-        - **Mandatory SMT Check:** Is SMT Strength > 0.3? If no, REJECT immediately.
-        - **Mandatory Discount/Premium:** Is it in Deep Discount for Longs / Deep Premium for Shorts? If no, REJECT.
-        - **Mandatory Bias:** Is the 4H Bias aligned? If Neutral/Opposed, REJECT.
+        - **Primary SMT Check:** Is SMT Strength > {Config.MIN_SMT_STRENGTH}? If no, be highly skeptical but consider if other confluences are overwhelming (9.0+ score).
+        - **Primary Discount/Premium:** Is it in Deep Discount for Longs / Deep Premium for Shorts?
+        - **Primary Bias:** Is the 4H Bias aligned?
         
         - Verdict Options:
             * **FLOW_GO**: All criteria met. High conviction.
@@ -365,7 +365,7 @@ class AIValidator:
         - Current Market Regime: {regime}
         - Risk Multiplier Logic (Sniper Mode):
           * If Score >= 9.0 AND Low-Volatility: 1.25x (Aggressive)
-          * If Score < 8.5: 0.0x (Kill) - We don't trade weak signals.
+          * If Score < {Config.AI_THRESHOLD}: 0.0x (Kill) - We don't trade weak signals.
           * Otherwise: 1.0x (Standard)
         - Alpha Delta Prediction: How much better/worse would shadow recommendations perform vs control?
         - Slippage Audit: Flag if >0.05%
@@ -455,20 +455,22 @@ class AIValidator:
             if not text:
                 raise last_err or Exception("All Gemini models failed")
             
-            # Extract JSON from response
-            start = text.find('{')
-            end = text.rfind('}') + 1
-            if start != -1 and end != -1:
-                result = json.loads(text[start:end])
-                
-                # Validate structure
-                if 'live_execution' not in result or 'shadow_optimizer' not in result:
-                    print("⚠️ AI returned incomplete dual-track structure. Using fallback.")
+            # Extract JSON from response (Robust extraction)
+            import re
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group())
+                    # Validate structure
+                    if 'live_execution' not in result or 'shadow_optimizer' not in result:
+                        print("⚠️ AI returned incomplete dual-track structure. Using fallback.")
+                        return self.hard_logic_audit(setup, df)
+                    return result
+                except json.JSONDecodeError:
+                    print(f"⚠️ AI returned invalid JSON. Raw output first 100 chars: {text[:100]}...")
                     return self.hard_logic_audit(setup, df)
-                
-                return result
             else:
-                print("⚠️ AI Output Parsing Error. Using fallback.")
+                print(f"⚠️ AI Output Parsing Error (No JSON block found). Raw output first 100 chars: {text[:100]}...")
                 return self.hard_logic_audit(setup, df)
                 
         except Exception as e:

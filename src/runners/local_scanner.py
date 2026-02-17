@@ -82,6 +82,10 @@ class LocalScannerRunner:
                 logger.info(f"🔎 Scanning {symbol}...")
                 
                 # Scan Logic (SMC + Order Flow Fallback)
+                # Fetch Bias first for logging
+                bias_score = self.scanner.get_detailed_bias(symbol)
+                logger.info(f"CAPTURED BIAS: {bias_score} on {symbol}")
+
                 result = self.scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME)
                 if not result:
                     result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME)

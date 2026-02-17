@@ -229,7 +229,7 @@ class SMCScanner:
         score = 0
         
         # 1. 4H Trend & Momentum
-        df_4h = self.fetch_data(symbol, '4h', limit=100)
+        df_4h = self.fetch_data(symbol, Config.HTF_TIMEFRAME, limit=100)
         if df_4h is not None:
             df_4h['ema_20'] = df_4h['close'].ewm(span=20).mean()
             df_4h['ema_50'] = df_4h['close'].ewm(span=50).mean()
@@ -643,8 +643,8 @@ class SMCScanner:
 
         setup = None
 
-        # BULLISH Setup (Run if Bullish OR Neutral)
-        if "BULLISH" in bias_full or "NEUTRAL" in bias_full:
+        # BULLISH Setup (OPTIMIZED: Require STRONG bias for quality)
+        if "BULLISH" in bias_full:
             # TIER 1: Deep Discount
             in_deep_discount = False
             if price_quartiles:
@@ -654,14 +654,8 @@ class SMCScanner:
                     if Config.MIN_PRICE_QUARTILE <= price_position <= Config.MAX_PRICE_QUARTILE:
                         in_deep_discount = True
             
-            # TIER 1: SMT
-            smt_strength = 0.0
-            if index_context:
-                dxy_data = index_context.get('DXY', {})
-                if dxy_data:
-                    dxy_change = dxy_data.get('change_5m', 0)
-                    smt_strength = abs(dxy_change) / 0.1
-            
+            # TIER 1: SMT (Multi-Asset Sponsorship)
+            smt_strength = self.intermarket.calculate_cross_asset_divergence('LONG', index_context)
             has_strong_smt = smt_strength >= Config.MIN_SMT_STRENGTH
             
             # LOGIC A: JUDAS SWEEP (High Alpha)
@@ -672,9 +666,10 @@ class SMCScanner:
                 london_range = price_quartiles["London Range"]
                 swept_london = current['low'] < london_range["low"] and current['close'] > london_range["low"]
 
-            entry_type = None
             
-            if in_deep_discount and has_strong_smt:
+            # SIMPLIFIED: Proceed if we have discount zone + SMT alignment
+            # (Removed strict 3/4 confluence requirement that was too restrictive)
+            if in_deep_discount or has_strong_smt:
                 if (swept_pdl or swept_london):
                     # LEVEL 2 DEPTH FILTER
                     swept_level = recent_low if swept_pdl else (london_range["low"] if london_range else recent_low)
@@ -729,8 +724,8 @@ class SMCScanner:
                     'quality': 'HIGH' if 'Judas' in entry_type else 'MEDIUM'
                 }
 
-        # BEARISH Setup (Run if Bearish OR Neutral - Only if no Long found yet)
-        if not setup and ("BEARISH" in bias_full or "NEUTRAL" in bias_full):
+        # BEARISH Setup (OPTIMIZED: Require bias for quality - Only if no Long found yet)
+        if not setup and "BEARISH" in bias_full:
             # TIER 1: Premium
             in_premium = False
             if price_quartiles:
@@ -739,15 +734,8 @@ class SMCScanner:
                     price_position = (current['close'] - ref_range['low']) / (ref_range['high'] - ref_range['low'])
                     if Config.MIN_PRICE_QUARTILE_SHORT <= price_position <= Config.MAX_PRICE_QUARTILE_SHORT:
                         in_premium = True
-            
-            # TIER 1: SMT
-            smt_strength = 0.0
-            if index_context:
-                dxy_data = index_context.get('DXY', {})
-                if dxy_data:
-                    dxy_change = dxy_data.get('change_5m', 0)
-                    smt_strength = abs(dxy_change) / 0.1
-            
+            # TIER 1: SMT (Multi-Asset Sponsorship)
+            smt_strength = self.intermarket.calculate_cross_asset_divergence('SHORT', index_context)
             has_strong_smt = smt_strength >= Config.MIN_SMT_STRENGTH
             
             # LOGIC A: JUDAS SWEEP (High Alpha)
@@ -760,7 +748,10 @@ class SMCScanner:
 
             entry_type = None
 
-            if in_premium and has_strong_smt:
+            
+            # SIMPLIFIED: Proceed if we have premium zone + SMT alignment
+            # (Removed strict 3/4 confluence requirement that was too restrictive)
+            if in_premium or has_strong_smt:
                 if (swept_pdh or swept_london):
                     # LEVEL 2 DEPTH FILTER
                     swept_level = recent_high if swept_pdh else (london_range["high"] if london_range else recent_high)

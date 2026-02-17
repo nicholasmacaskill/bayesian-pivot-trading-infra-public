@@ -1,44 +1,46 @@
 import numpy as np
 
-def simulate_annual_returns(
-    num_simulations=50000,
-    trades_per_year=480, # ~40 trades/month * 12 months
-    risk_per_trade=0.0065, # 0.65%
-    target_return=0.35 # 35%
-):
-    print(f"🎲 Simulating {num_simulations} Full Years...")
-    print(f"Goal: Achieve ≥{target_return*100}% Annual Return")
+def run_comparison():
+    risk_levels = [0.0035, 0.0040, 0.0045]
+    starting_equity = 98038.0
     
-    # Outcomes based on backtests:
-    # Win (2.25R): 28%
-    # Partial (0.2R): 20%
-    # Loss (-1.0R): 52%
-    probs = [0.28, 0.20, 0.52]
+    print(f"🎲 Running Comparative Risk Simulation (10,000 sims each)...")
+    print(f"💰 Starting Equity: ${starting_equity:,.0f}\n")
     
-    success_count = 0
-    annual_returns = []
-    
-    for _ in range(num_simulations):
-        annual_return = 0.0
-        outcomes = np.random.choice([0, 1, 2], size=trades_per_year, p=probs)
+    for risk in risk_levels:
+        # Repurposing logic for clean output
+        num_simulations = 10000
+        trades_per_year = 300
+        outcomes = [3.0, 1.0, -1.0]
+        weights = [0.35, 0.15, 0.50]
         
-        for outcome in outcomes:
-            if outcome == 0: annual_return += risk_per_trade * 2.25
-            elif outcome == 1: annual_return += risk_per_trade * 0.2
-            else: annual_return -= risk_per_trade
+        all_annual_returns = []
+        all_max_drawdowns = []
+        ruin_count = 0
+        
+        for _ in range(num_simulations):
+            balance = starting_equity
+            peak = starting_equity
+            max_dd = 0
             
-        annual_returns.append(annual_return)
-        if annual_return >= target_return:
-            success_count += 1
+            results = np.random.choice(outcomes, size=trades_per_year, p=weights)
+            for r in results:
+                pnl = balance * risk * r
+                balance += pnl
+                if balance > peak: peak = balance
+                dd = (peak - balance) / peak
+                if dd > max_dd: max_dd = dd
+                if dd > 0.10: # Hard Safety Check
+                    ruin_count += 1
+                    break
             
-    probability = (success_count / num_simulations) * 100
-    avg_return = np.mean(annual_returns) * 100
-    median_return = np.median(annual_returns) * 100
-    
-    print(f"\n📊 RESULTS:")
-    print(f"Probability of ≥35% Year: {probability:.2f}%")
-    print(f"Average Annual Return: {avg_return:.2f}%")
-    print(f"Median Annual Return: {median_return:.2f}%")
+            all_annual_returns.append((balance - starting_equity) / starting_equity)
+            all_max_drawdowns.append(max_dd)
+
+        print(f"--- 📊 RISK: {risk*100:.2f}% ---")
+        print(f"✅ Avg Annual ROI: {np.mean(all_annual_returns)*100:.2f}%")
+        print(f"⚠️ Avg Max Drawdown: {np.mean(all_max_drawdowns)*100:.2f}%")
+        print(f"🛡️ Prob. of 10% Drawdown: {(ruin_count/num_simulations)*100:.2f}%\n")
 
 if __name__ == "__main__":
-    simulate_annual_returns()
+    run_comparison()

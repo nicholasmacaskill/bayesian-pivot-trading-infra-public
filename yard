@@ -1,0 +1,7 @@
+#!/bin/bash
+export PYTHONPATH=.
+echo "🦁 Entering Yard Mode (System Awake)..."
+# Kill any existing instances first
+pkill -9 -f "python src/runners/local_scanner.py" || true
+rm -f /tmp/smc_scanner.lock
+caffeinate -i -s venv/bin/python src/runners/local_scanner.py
