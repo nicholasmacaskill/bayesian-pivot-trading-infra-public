@@ -1,6 +1,7 @@
 import matplotlib
 matplotlib.use('Agg')
 import time
+import requests
 import logging
 import signal
 import sys
@@ -60,8 +61,22 @@ class LocalScannerRunner:
         logger.info("🛑 Shutdown signal received. Cleaning up...")
         self.running = False
 
+    def _send_pulse(self):
+        """PULSE PROTOCOL: Notify Modal that we are alive."""
+        try:
+            url = "https://nicholasmacaskill--smc-alpha-scanner-yard-heartbeat.modal.run"
+            auth_key = os.environ.get("SYNC_AUTH_KEY")
+            payload = {"key": auth_key, "symbol": "YARD_HUB"}
+            
+            response = requests.post(url, json=payload, timeout=5)
+            response.raise_for_status()
+            logger.info("💓 Pulse Sent: Yard Mode is Live.")
+        except Exception as e:
+            logger.warning(f"⚠️ Pulse Failed (Modal might be throttled): {e}")
+
     def run_cycle(self):
         logger.info("🚀 Starting SMC Alpha Scan Cycle...")
+        self._send_pulse()
         try:
             init_db()
             
@@ -131,17 +146,25 @@ class LocalScannerRunner:
                         setups_found += 1
                         logger.info(f"🔔 HIGH QUALITY SETUP! Sending alert for {symbol}")
                         
-                        # Risk Calculation (Simplified for runner)
-                        risk_amt = live_equity * Config.RISK_PER_TRADE
+                        # 💰 Risk Calculation (Optimized for Prop Mode)
+                        # Default to $100k if sync failed (Safety fallback for offline mode)
+                        calc_equity = live_equity if live_equity > 0 else 100000.0
+                        risk_amt = calc_equity * Config.RISK_PER_TRADE
                         distance = abs(setup['entry'] - setup['stop_loss'])
-                        lots = (risk_amt / distance) / 100000 if distance > 0 else 0 # Placeholder for contract size
+                        
+                        # Unit-based sizing (Standard for Crypto/Indices)
+                        # Lots = (Risk $) / (Price Distance)
+                        lots = (risk_amt / distance) if distance > 0 else 0
+                        
+                        # For BTC/ETH, we round to 2 decimal places (standard micro-lots)
+                        lots = round(lots, 2)
                         
                         risk_calc = {
                             "entry": setup['entry'],
                             "stop_loss": setup['stop_loss'],
-                            "target": setup['target'],
-                            "position_size": round(lots, 2),
-                            "equity_basis": live_equity
+                            "take_profit": setup.get('target') or setup.get('tp1'), 
+                            "position_size": lots,
+                            "equity_basis": calc_equity
                         }
                         
                         try:
