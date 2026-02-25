@@ -2,8 +2,13 @@ import requests
 import os
 import logging
 from datetime import datetime, date
+from dotenv import load_dotenv
+
+load_dotenv('.env.local')
+load_dotenv()
 
 logger = logging.getLogger(__name__)
+
 
 class TradeLockerHelper:
     """Helper to manage a single TradeLocker account session using User-provided logic."""

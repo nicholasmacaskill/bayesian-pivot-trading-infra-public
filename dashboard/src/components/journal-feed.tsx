@@ -50,7 +50,7 @@ export function JournalFeed({ entries, isZenMode }: { entries: JournalEntry[], i
                         key={trade.trade_id}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="group bg-black hover:bg-white/[0.02] transition-colors"
+                        className="group bg-black/20 hover:bg-white/[0.02] transition-colors"
                     >
                         <div className="flex flex-col md:flex-row md:items-center justify-between py-2 px-1">
                             <div className="flex items-center gap-6">

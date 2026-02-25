@@ -289,7 +289,7 @@ class AIValidator:
             }
         }
 
-    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None):
+    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
         """
         Calls Gemini API to validate the setup with DUAL-TRACK analysis.
         
@@ -300,6 +300,7 @@ class AIValidator:
             image_path: Optional chart image path
             df: Optional dataframe for regime detection
             exchange: Optional CCXT exchange for slippage estimation
+            memory_context: Optional historical context from RAG
         
         Returns:
             dict: Dual-track analysis with live_execution and shadow_optimizer sections
@@ -329,6 +330,14 @@ class AIValidator:
         
         Your Goal: REJECT THIS TRADE. 
         You only approve it if the evidence is so overwhelming that rejecting it would be a failure of duty.
+        
+         ### THE "INSTITUTIONAL FADE" ALPHA (YOUR PRIMARY DIRECTIVE):
+        - Historical manual analysis shows a **100% Win Rate** when fading the Asian Range High/Low.
+        - Look for price rejecting the **Upper/Lower Quartile** of the Asian Range.
+        - Favor trades that occur after a **False Move (Wick)** through a session high/low.
+        
+        ### 🧠 SOVEREIGN MEMORY (PAST EXPERIENCE):
+        {memory_context or "No highly similar historical setups found for reference."}
         
         ### PHILOSOPHY: "The Sniper"
         - We do not want "good" trades. We want **PERFECT** trades.
@@ -534,7 +543,7 @@ class AIValidator:
             print(f"⚠️ Visual Bias Check Failed: {e}")
             return 0
 
-def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None):
+def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
     """
     Main entry point for trade validation with dual-track analysis.
     
@@ -545,9 +554,10 @@ def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=
         image_path: Optional chart image path
         df: Optional dataframe for regime detection
         exchange: Optional CCXT exchange for slippage estimation
+        memory_context: Optional historical context from RAG
     
     Returns:
         dict: Dual-track analysis result
     """
     validator = AIValidator()
-    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange)
+    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context)

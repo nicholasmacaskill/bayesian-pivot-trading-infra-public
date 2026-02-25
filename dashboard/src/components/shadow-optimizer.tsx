@@ -65,7 +65,7 @@ export function ShadowOptimizer({ comparisons }: ShadowOptimizerProps) {
                             key={i}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="bg-black hover:bg-white/[0.02] flex flex-col md:flex-row justify-between py-2 px-1 transition-colors group"
+                            className="bg-black/20 hover:bg-white/[0.02] flex flex-col md:flex-row justify-between py-2 px-1 transition-colors group"
                         >
                             <div className="flex items-center gap-6">
                                 <div className="text-[10px] font-mono text-white/20 w-16">
