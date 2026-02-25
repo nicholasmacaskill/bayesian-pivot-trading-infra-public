@@ -113,7 +113,7 @@ export default function Dashboard() {
   });
 
   return (
-    <main className={`min-h-screen p-4 md:p-8 space-y-12 bg-black text-white selection:bg-emerald-500/30`}>
+    <main className={`min-h-screen p-4 md:p-8 space-y-12 bg-transparent text-white selection:bg-emerald-500/30`}>
       {/* Software as Glass Header: The Data Ribbon */}
       <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-8 border-b border-white/5 pb-8">
         <div className="space-y-1">

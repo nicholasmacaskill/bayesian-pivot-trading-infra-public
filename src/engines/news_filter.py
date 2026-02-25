@@ -16,15 +16,15 @@ class NewsFilter:
         self.high_impact_events = []
         self.last_fetch = None
 
-    def fetch_calendar(self):
-        """Fetches the weekly calendar and filters for High Impact USD news."""
+    def fetch_calendar(self, currencies=['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD']):
+        """Fetches the weekly calendar and filters for High Impact news in specified currencies."""
         try:
             resp = requests.get(self.CALENDAR_URL, timeout=10)
             if resp.status_code == 200:
                 events = resp.json()
                 self.high_impact_events = [
                     e for e in events 
-                    if e.get('impact') == 'High' and e.get('country') == 'USD'
+                    if e.get('impact') == 'High' and e.get('country') in currencies
                 ]
                 self.last_fetch = datetime.now()
                 return True

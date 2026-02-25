@@ -189,10 +189,14 @@ class SMCScanner:
         return is_high, is_low
 
     def is_killzone(self, current_time=None):
-        """Checks if current time (or override) is within London or NY session"""
+        """Checks if current time (or override) is within any active trading session."""
         now_utc = current_time.time() if current_time else datetime.utcnow().time()
         hour = now_utc.hour
         
+        # Check Asian Fade Prime Window (⭐ Highest priority)
+        if self.is_asian_fade_window(hour):
+            return True
+
         # Check London Session
         london = Config.KILLZONE_LONDON
         if london and (london[0] <= hour < london[1]):
@@ -209,6 +213,111 @@ class SMCScanner:
             return True
         
         return False
+
+    def is_asian_fade_window(self, hour=None):
+        """Returns True if we are in the 11 PM – 2 AM EST (4–7 AM UTC) Asian Fade prime window."""
+        if hour is None:
+            hour = datetime.utcnow().hour
+        fade = Config.KILLZONE_ASIAN_FADE
+        return fade is not None and (fade[0] <= hour < fade[1])
+
+    def scan_asian_fade(self, symbol):
+        """
+        ⭐ PRIME ALPHA DETECTOR: Asian Range High/Low Fade
+        
+        Edge: 100% win rate when fading the Asian Range H/L during the
+              11 PM – 2 AM EST manipulation window (4–7 AM UTC).
+        
+        Logic:
+            1. Identify Asian Range (00:00–04:00 UTC candles)
+            2. Detect Upper/Lower Quartile zones (top/bottom 25% of range)
+            3. Look for a wick / false break above/below the range
+            4. Confirm candle closes back inside the range (rejection)
+            5. Return a SHORT (at High) or LONG (at Low) setup
+        """
+        if not self.is_asian_fade_window():
+            return None  # Only fire during the prime window
+
+        df = self.fetch_data(symbol, '5m', limit=500)
+        if df is None or len(df) < 100:
+            return None
+
+        try:
+            # Step 1: Extract Asian Range candles (00:00 – 04:00 UTC)
+            df['hour'] = df['timestamp'].dt.hour
+            asian_candles = df[df['hour'].between(0, 3)].tail(48)  # Last ~4 hours of 5m candles
+
+            if len(asian_candles) < 5:
+                logger.debug(f"Insufficient Asian candles for {symbol}")
+                return None
+
+            asian_high = asian_candles['high'].max()
+            asian_low = asian_candles['low'].min()
+            asian_range = asian_high - asian_low
+
+            if asian_range <= 0:
+                return None
+
+            # Step 2: Define the quartile "trap" zones
+            upper_quartile = asian_high - (asian_range * 0.25)  # Top 25% of range
+            lower_quartile = asian_low + (asian_range * 0.25)   # Bottom 25% of range
+
+            # Step 3 & 4: Check the last 6 candles for a false break + rejection
+            recent = df.tail(6)
+            last = df.iloc[-1]
+
+            # --- SHORT SETUP: Wick above Asian High, close back inside ---
+            short_setup = (
+                recent['high'].max() > asian_high           # Swept high
+                and last['close'] < asian_high              # Rejected back below
+                and last['close'] > upper_quartile          # Closed in premium zone
+                and last['close'] < last['open']            # Bearish close
+            )
+
+            # --- LONG SETUP: Wick below Asian Low, close back inside ---
+            long_setup = (
+                recent['low'].min() < asian_low             # Swept low
+                and last['close'] > asian_low               # Rejected back above
+                and last['close'] < lower_quartile          # Closed in discount zone
+                and last['close'] > last['open']            # Bullish close
+            )
+
+            if not (short_setup or long_setup):
+                return None
+
+            direction = "SHORT" if short_setup else "LONG"
+            entry = last['close']
+            atr = self.calculate_atr(df).iloc[-1]
+
+            stop_loss = (asian_high + atr * 0.5) if direction == "SHORT" else (asian_low - atr * 0.5)
+            target = entry - (abs(entry - stop_loss) * 3.0) if direction == "SHORT" else entry + (abs(stop_loss - entry) * 3.0)
+
+            setup = {
+                'symbol': symbol,
+                'pattern': f'Asian Range {direction} Fade',
+                'direction': direction,
+                'entry': round(entry, 2),
+                'stop_loss': round(stop_loss, 2),
+                'target': round(target, 2),
+                'asian_high': round(asian_high, 2),
+                'asian_low': round(asian_low, 2),
+                'asian_range': round(asian_range, 2),
+                'is_asian_fade': True,  # Flag for priority treatment
+                'price_quartiles': {
+                    'Asian Range': {'high': round(asian_high, 2), 'low': round(asian_low, 2)}
+                },
+                'time_quartile': {'num': 2, 'phase': 'Manipulation'},
+                'smt_strength': 0.0,   # Will be enriched by SMT engine if available
+                'bias': 'Bearish' if direction == 'SHORT' else 'Bullish',
+                'index_context': 'Asian Session Fade Window',
+            }
+
+            logger.info(f"⭐ ASIAN FADE DETECTED: {symbol} {direction} | Asian H: {asian_high} | L: {asian_low}")
+            return setup, df
+
+        except Exception as e:
+            logger.error(f"scan_asian_fade error for {symbol}: {e}")
+            return None
 
     def get_detailed_bias(self, symbol, index_context=None, visual_check=False):
         """
@@ -663,6 +772,7 @@ class SMCScanner:
         is_mean_reverting = hurst < 0.5 or adf_p < 0.05
 
         setup = None
+        entry_type = None
 
         # BULLISH Setup (OPTIMIZED: Require STRONG bias for quality)
         if "BULLISH" in bias_full:

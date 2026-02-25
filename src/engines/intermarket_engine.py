@@ -15,7 +15,7 @@ class IntermarketEngine:
         self.symbols = {
             "NQ": "^IXIC",      # NASDAQ Composite
             "ES": "^GSPC",      # S&P 500
-            "DXY": "DX-Y.NYB",  # US Dollar Index (Institutional SMT Key)
+            "DXY": "DX=F",      # US Dollar Index Futures (Institutional SMT Key)
             "TNX": "^TNX"       # 10-Year Treasury Yield (Bond Market Sponsorship)
         }
 
@@ -23,8 +23,8 @@ class IntermarketEngine:
         context = {}
         try:
             for key, ticker in self.symbols.items():
-                # Fetch recent 5m data
-                data = yf.download(ticker, period="1d", interval="5m", progress=False)
+                # Fetch recent 5m data (5d period ensure we have data on weekends)
+                data = yf.download(ticker, period="5d", interval="5m", progress=False)
                 
                 if data is not None and len(data) > 2:
                     # Handle potential MultiIndex columns from yfinance

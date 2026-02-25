@@ -1,9 +1,11 @@
 import logging
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 from src.core.supabase_client import supabase
 from src.clients.tl_client import TradeLockerClient
 from ai_audit_engine import AIAuditEngine
+from src.engines.smc_scanner import SMCScanner
 
 logger = logging.getLogger(__name__)
 
@@ -11,11 +13,13 @@ class ExecutionAuditEngine:
     """
     The 'Policeman' of the system.
     Reconciles System Signals (Scans) with Real Executions (TradeLocker).
+    Also auto-contextualizes rogue (discretionary) trades for training data.
     """
     def __init__(self):
         self.tl = TradeLockerClient()
         self.sb = supabase
         self.ai = AIAuditEngine()
+        self.scanner = SMCScanner()
         
     def run_audit(self, hours_back=24):
         """
@@ -216,32 +220,172 @@ class ExecutionAuditEngine:
     def _mark_missed(self, signal):
         """Logs a 'Missed Opportunity'"""
         logger.warning(f"❌ MISSED SIGNAL: {signal['symbol']} {signal['pattern']} at {signal['timestamp']}")
-        # Potentially log to a 'missed_trades' table or journal with status 'MISSED'
-        
+
+    # ─── Auto-Contextualizer Helpers ──────────────────────────────────────────
+
+    def _infer_session(self, hour):
+        """Maps UTC hour to trading session name."""
+        if 4 <= hour < 7:   return "Asian Fade Window (PRIME)"
+        if 7 <= hour < 10:  return "London Open"
+        if 10 <= hour < 12: return "London Close"
+        if 12 <= hour < 20: return "New York Session"
+        if 0 <= hour < 4:   return "Asian Session"
+        return "Off-Hours"
+
+    def _get_entry_datetime(self, trade):
+        """Safely parses trade entry time to naive UTC datetime."""
+        t_val = trade.get('entry_time') or trade.get('time')
+        try:
+            if isinstance(t_val, (int, float)):
+                return datetime.utcfromtimestamp(t_val / 1000.0)
+            if isinstance(t_val, str):
+                ts = t_val.replace('Z', '')
+                if 'T' in ts:
+                    dp, tp = ts.split('T')
+                    tp = tp.split('+')[0].split('-')[0]
+                    ts = f"{dp}T{tp}"
+                return datetime.fromisoformat(ts)
+        except Exception:
+            pass
+        return datetime.utcnow()
+
+    def _reconstruct_market_context(self, trade):
+        """
+        AUTO-CONTEXTUALIZER: Reconstructs market state at the exact entry time.
+        No input from trader required — uses historical 5m candle data.
+
+        Infers:
+            - Trading session (Asian Fade, London, NY, etc.)
+            - Price position within Asian Range (Premium / Discount / Equilibrium)
+            - 4H trend bias (EMA20 vs EMA50)
+            - Whether a swing high/low was swept before entry
+        """
+        symbol = trade.get('symbol', 'BTC/USDT')
+        entry_price = float(trade.get('price', 0))
+        side = trade.get('side', 'SELL').upper()
+        entry_dt = self._get_entry_datetime(trade)
+        session = self._infer_session(entry_dt.hour)
+
+        ctx = {
+            'session': session,
+            'price_quartile': 'Unknown',
+            'trend_bias': 'Unknown',
+            'asian_high': None,
+            'asian_low': None,
+            'asian_context': 'Unknown',
+            'liquidity_swept': 'Unknown',
+            'is_rogue': True,
+        }
+
+        try:
+            # Fetch ~10h of 5m candles leading up to entry
+            since_ms = int((entry_dt - timedelta(hours=10)).timestamp() * 1000)
+            norm_symbol = symbol.replace('USD', 'USDT') if 'USDT' not in symbol else symbol
+            ohlcv = self.scanner.exchange.fetch_ohlcv(norm_symbol, '5m', since=since_ms, limit=500)
+            if not ohlcv:
+                return ctx
+
+            df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df['hour'] = df['timestamp'].dt.hour
+
+            # ── 1. Asian Range ────────────────────────────────────────────────
+            asian_df = df[df['hour'].between(0, 3)].tail(48)
+            if len(asian_df) >= 3:
+                asian_high = asian_df['high'].max()
+                asian_low  = asian_df['low'].min()
+                asian_range = asian_high - asian_low
+                ctx['asian_high'] = round(asian_high, 2)
+                ctx['asian_low']  = round(asian_low, 2)
+
+                if asian_range > 0:
+                    pos = (entry_price - asian_low) / asian_range
+                    if pos > 0.75:
+                        ctx['price_quartile'] = 'Premium (Top 25%)'
+                    elif pos < 0.25:
+                        ctx['price_quartile'] = 'Discount (Bottom 25%)'
+                    else:
+                        ctx['price_quartile'] = 'Equilibrium'
+
+                    if side == 'SELL' and entry_price >= asian_high * 0.998:
+                        ctx['asian_context'] = f'Entry at Asian High — Classic Fade SHORT (H:{asian_high:,.0f})'
+                    elif side == 'BUY' and entry_price <= asian_low * 1.002:
+                        ctx['asian_context'] = f'Entry at Asian Low — Classic Fade LONG (L:{asian_low:,.0f})'
+                    else:
+                        ctx['asian_context'] = f'Inside Asian Range (H:{asian_high:,.0f} L:{asian_low:,.0f})'
+
+            # ── 2. 4H Trend Bias ─────────────────────────────────────────────
+            df_4h = self.scanner.fetch_data(symbol, '1h', limit=60)
+            if df_4h is not None and len(df_4h) >= 50:
+                ema20 = df_4h['close'].ewm(span=20).mean().iloc[-1]
+                ema50 = df_4h['close'].ewm(span=50).mean().iloc[-1]
+                if ema20 > ema50 * 1.001:
+                    ctx['trend_bias'] = 'Bullish (EMA20 > EMA50)'
+                elif ema20 < ema50 * 0.999:
+                    ctx['trend_bias'] = 'Bearish (EMA20 < EMA50)'
+                else:
+                    ctx['trend_bias'] = 'Neutral (EMAs Converging)'
+
+            # ── 3. Liquidity Sweep ───────────────────────────────────────────
+            recent  = df.tail(12)  # Last 60 mins of 5m candles
+            swing_h = df.tail(48)['high'].max()
+            swing_l = df.tail(48)['low'].min()
+
+            if side == 'SELL' and recent['high'].max() >= swing_h * 0.998:
+                ctx['liquidity_swept'] = f'Swing High swept (${swing_h:,.0f})'
+            elif side == 'BUY' and recent['low'].min() <= swing_l * 1.002:
+                ctx['liquidity_swept'] = f'Swing Low swept (${swing_l:,.0f})'
+            else:
+                ctx['liquidity_swept'] = 'No obvious sweep'
+
+        except Exception as e:
+            logger.warning(f"Context reconstruction partial error ({symbol}): {e}")
+
+        # ── Build Full Narrative ────────────────────────────────────────────
+        direction = 'SHORT' if side == 'SELL' else 'LONG'
+        ctx['narrative'] = (
+            f"{symbol} {direction} | Session: {ctx['session']} | "
+            f"Zone: {ctx['price_quartile']} | "
+            f"4H Bias: {ctx['trend_bias']} | "
+            f"Asian: {ctx['asian_context']} | "
+            f"Liquidity: {ctx['liquidity_swept']}"
+        )
+        return ctx
+
     def _mark_rogue(self, trade):
-        """Analyze a trade that had NO matching signal."""
-        logger.info(f"🕵️‍♂️ Analyzing Discretionary Trade: {trade['symbol']} {trade['side']}")
-        
-        # Call AI to see if it's Alpha or Rogue
-        audit = self.ai.audit_discretionary_trade(trade)
-        
+        """Auto-contextualizes a discretionary trade. Zero input required from trader."""
+        logger.info(f"🕵️  Auto-Contextualizing Rogue Trade: {trade['symbol']} {trade['side']}")
+
+        ctx = self._reconstruct_market_context(trade)
+        narrative = ctx.get('narrative', 'Discretionary trade — context unavailable')
+
+        logger.info(f"   📍 Session:   {ctx['session']}")
+        logger.info(f"   📊 Zone:      {ctx['price_quartile']}")
+        logger.info(f"   📈 4H Bias:   {ctx['trend_bias']}")
+        logger.info(f"   🏔  Asian:     {ctx['asian_context']}")
+        logger.info(f"   💧 Liquidity: {ctx['liquidity_swept']}")
+
+        # Grade with AI using reconstructed context
+        audit = self.ai.audit_discretionary_trade({**trade, 'auto_context': narrative})
         strategy_label = "ALPHA" if audit.get('is_alpha', False) else "ROGUE"
-        feedback = audit.get('feedback', 'No feedback provided.')
-        embedding = self.ai.get_text_embedding(feedback)
-        
-        logger.info(f"   Result: {strategy_label} (Score: {audit.get('score')})")
-        
+
+        # Embed the auto-generated narrative for semantic search
+        embedding = self.ai.get_text_embedding(narrative)
+
         self.sb.log_journal_entry(
             trade_id=trade['id'],
             symbol=trade['symbol'],
             side=trade['side'],
-            pnl=trade['pnl'],
+            pnl=trade.get('pnl', 0.0),
             ai_grade=audit.get('score', 0.0),
-            mentor_feedback=feedback,
+            mentor_feedback=audit.get('feedback', narrative),
             strategy=strategy_label,
             status=trade.get('status', 'CLOSED'),
             price=trade.get('price', 0.0),
-            deviations=audit.get('improvement_suggestion', "Discretionary Entry"),
+            deviations=narrative,
+            notes=f"AUTO-CONTEXT | {ctx['session']} | {ctx['asian_context']}",
             embedding=embedding,
             timestamp=trade.get('entry_time') or trade.get('time')
         )
+
+        logger.info(f"   ✅ Logged: {strategy_label} — '{narrative[:80]}...'")

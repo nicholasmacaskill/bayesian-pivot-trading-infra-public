@@ -12,6 +12,8 @@ from src.core.config import Config
 from src.engines.smc_scanner import SMCScanner
 from src.engines.sentiment_engine import SentimentEngine
 from src.engines.ai_validator import validate_setup
+from src.engines.visualizer import generate_ict_chart
+from src.core.memory import memory
 from src.engines.prop_guardian import PropGuardian
 from src.core.database import init_db, log_scan, update_sync_state, log_system_event, get_db_connection, log_prop_audit
 from src.clients.tl_client import TradeLockerClient
@@ -102,13 +104,24 @@ class LocalScannerRunner:
                 bias_score = self.scanner.get_detailed_bias(symbol)
                 logger.info(f"CAPTURED BIAS: {bias_score} on {symbol}")
 
-                result = self.scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME)
+                # --- ⭐ PRIORITY: Asian Fade Prime Window Scan ---
+                is_prime_window = self.scanner.is_asian_fade_window()
+                result = None
+                if is_prime_window:
+                    result = self.scanner.scan_asian_fade(symbol)
+                    if result:
+                        logger.info(f"⭐ PRIME WINDOW SETUP: Asian Fade detected on {symbol}")
+
+                # --- Standard SMC Scan (fallback) ---
+                if not result:
+                    result = self.scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME)
                 if not result:
                     result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME)
-                
+
                 if result:
                     setup, df = result
-                    if not setup: continue
+                    if not setup:
+                        continue
                     
                     logger.info(f"✅ Pattern Found: {setup.get('pattern')} on {symbol}")
                     
@@ -116,13 +129,24 @@ class LocalScannerRunner:
                     market_data = self.sentiment_engine.get_market_sentiment(symbol)
                     whale_flow = self.sentiment_engine.get_whale_confluence()
                     
-                    # AI Validation
+                    # Generate Visual Context for VLM Proxy
+                    chart_filename = f"setup_{symbol.replace('/', '_')}_{int(time.time())}.png"
+                    chart_path = os.path.join("data", "charts", chart_filename)
+                    generated_chart = generate_ict_chart(df, setup, output_path=chart_path)
+                    
+                    # Retrieve Memory Context (RAG)
+                    memory_context = memory.get_context_for_validator(setup)
+                    logger.info(f"🧠 Memory Context retrieved ({'Found history' if 'Found similar' in memory_context else 'No history'})")
+                    
+                    # AI Validation (Vision Proxy + RAG Active)
                     ai_result = validate_setup(
                         setup, 
                         market_data, 
                         whale_flow, 
+                        image_path=generated_chart,
                         df=df,
-                        exchange=self.scanner.exchange
+                        exchange=self.scanner.exchange,
+                        memory_context=memory_context
                     )
                     
                     live = ai_result.get('live_execution', ai_result)
@@ -142,8 +166,12 @@ class LocalScannerRunner:
                     }
                     log_scan(log_data, live)
                     
+                    # Use relaxed threshold for the proven Asian Fade prime window
+                    is_asian_fade = setup.get('is_asian_fade', False)
+                    threshold = Config.AI_THRESHOLD_ASIAN_FADE if is_asian_fade else Config.AI_THRESHOLD
+
                     # Alert if threshold met
-                    if live_score >= Config.AI_THRESHOLD:
+                    if live_score >= threshold:
                         setups_found += 1
                         logger.info(f"🔔 HIGH QUALITY SETUP! Sending alert for {symbol}")
                         
@@ -169,10 +197,11 @@ class LocalScannerRunner:
                         }
                         
                         try:
+                            prime_tag = "\n⭐ *PRIME WINDOW* — Asian Fade (100% Historical WR)" if setup.get('is_asian_fade') else ""
                             self.notifier.send_alert(
                                 symbol=symbol,
                                 timeframe=Config.TIMEFRAME,
-                                pattern=setup['pattern'],
+                                pattern=setup['pattern'] + prime_tag,
                                 ai_score=live_score,
                                 reasoning=live.get('reasoning', ''),
                                 verdict=live.get('verdict', 'N/A'),

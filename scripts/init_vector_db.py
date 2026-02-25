@@ -29,12 +29,13 @@ def init_vector_schema():
         print("🧠 Enabling pgvector extension...")
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
         
-        print("📊 Adding embedding column to journal table...")
-        # Add vector column (768 dimensions for Gemini/Vertex embeddings)
+        print("📊 Adding embedding columns to journal and scans tables...")
+        # Add vector columns (768 dimensions for Gemini/Vertex embeddings)
         cur.execute("ALTER TABLE journal ADD COLUMN IF NOT EXISTS embedding vector(768);")
+        cur.execute("ALTER TABLE scans ADD COLUMN IF NOT EXISTS embedding vector(768);")
         
-        print("🔎 Creating match_trades function...")
-        # Create RPC function for similarity search
+        print("🔎 Creating match functions...")
+        # Create RPC functions for similarity search
         cur.execute("""
             create or replace function match_trades (
               query_embedding vector(768),
@@ -65,6 +66,38 @@ def init_vector_schema():
                 from journal
                 where 1 - (journal.embedding <=> query_embedding) > match_threshold
                 order by journal.embedding <=> query_embedding
+                limit match_count
+              );
+            end;
+            $$;
+
+            create or replace function match_scans (
+              query_embedding vector(768),
+              match_threshold float,
+              match_count int
+            )
+            returns table (
+              id bigint,
+              symbol text,
+              pattern text,
+              ai_score real,
+              ai_reasoning text,
+              similarity float
+            )
+            language plpgsql
+            as $$
+            begin
+              return query(
+                select
+                  scans.id,
+                  scans.symbol,
+                  scans.pattern,
+                  scans.ai_score,
+                  scans.ai_reasoning,
+                  1 - (scans.embedding <=> query_embedding) as similarity
+                from scans
+                where 1 - (scans.embedding <=> query_embedding) > match_threshold
+                order by scans.embedding <=> query_embedding
                 limit match_count
               );
             end;

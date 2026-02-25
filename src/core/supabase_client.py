@@ -74,7 +74,13 @@ class SupabaseBridge:
                 "status": scan_data.get('status', 'PENDING'),
                 "verdict": verdict,
                 "shadow_regime": shadow_regime,
-                "shadow_multiplier": float(shadow_multiplier)
+                "shadow_multiplier": float(shadow_multiplier),
+                # --- Trade Levels (for outcome resolution + fine-tuning) ---
+                "entry": scan_data.get('entry'),
+                "stop_loss": scan_data.get('stop_loss'),
+                "target": scan_data.get('target'),
+                "r_multiple": float(scan_data.get('r_multiple', 3.0)),
+                "outcome": 'OPEN',  # Resolved later by resolve_scan_outcomes.py
             }
             self.client.table("scans").insert(data).execute()
             return True

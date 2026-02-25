@@ -87,7 +87,8 @@ class Config:
     
     # Strategy Mode: "SNIPER" (Optimized for High Precision)
     STRATEGY_MODE = "SNIPER" # Options: SNIPER, WIDE_NET
-    AI_THRESHOLD = 8.0  # High Confidence (Relaxed from 8.5)
+    AI_THRESHOLD = 8.0              # Standard confidence gate
+    AI_THRESHOLD_ASIAN_FADE = 7.5   # Relaxed for the 100% win rate Asian Fade window
     
     # Exit Parameters (Wide Net)
     TP1_R_MULTIPLE = 1.5  # Bank profit early
@@ -95,10 +96,11 @@ class Config:
     STOP_LOSS_ATR_MULTIPLIER = 2.0  # Breathing Room
     
     # Killzones
-    KILLZONE_ASIA = (0, 4)  # UTC (Midnight - 4 AM) - Asian Session
-    KILLZONE_LONDON = (7, 10)  # UTC (London Open)
-    KILLZONE_NY_AM = None  # Merged into continuous session
-    KILLZONE_NY_PM = None  # Merged into continuous session
+    KILLZONE_ASIA = (0, 4)          # UTC (Midnight - 4 AM) → 7–11 PM EST Asian Session
+    KILLZONE_ASIAN_FADE = (4, 7)    # UTC (4 AM - 7 AM)     → 11 PM – 2 AM EST ⭐ PRIME WINDOW (100% Win Rate)
+    KILLZONE_LONDON = (7, 10)       # UTC (London Open)     → 2 AM – 5 AM EST
+    KILLZONE_NY_AM = None           # Merged into continuous session
+    KILLZONE_NY_PM = None           # Merged into continuous session
     KILLZONE_NY_CONTINUOUS = (12, 20)  # UTC (7 AM - 3 PM EST) - Full NY trading session
     
     # Edge Optimization Parameters (VOLUME OPERATOR MODE - 4 Trades/Week)
