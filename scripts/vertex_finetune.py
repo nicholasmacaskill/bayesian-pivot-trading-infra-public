@@ -92,13 +92,21 @@ def submit_finetune_job(training_gcs_uri: str) -> str:
     logger.info(f"🚀 Submitting fine-tuning job: {job_name}")
 
     # Vertex AI supervised tuning for Gemini
-    from google.cloud.aiplatform.preview import tuning
+    from google.cloud import aiplatform
+    import google.generativeai as genai
     
-    tuning_job = tuning.SupervisedTuningJob.create(
-        base_model=f"publishers/google/models/{BASE_MODEL}",
-        training_dataset_uri=training_gcs_uri,
+    # Using the vertexai initialization for Gemini tuning
+    import vertexai
+    from vertexai.generative_models import GenerativeModel
+    from vertexai.tuning import sft
+    
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
+    
+    tuning_job = sft.train(
+        source_model=BASE_MODEL,
+        train_dataset=training_gcs_uri,
         tuned_model_display_name=job_name,
-        # Hyperparameters (sensible defaults for small datasets)
+        # Sensible defaults for small datasets
         epochs=3,
         learning_rate_multiplier=1.0,
     )
@@ -132,10 +140,14 @@ def check_job_status():
         job_info = json.load(f)
     
     import google.cloud.aiplatform as aiplatform
-    from google.cloud.aiplatform.preview import tuning
+    # Fixing the status check to use the correct sft object
+    import vertexai
+    from vertexai.tuning import sft
     
-    aiplatform.init(project=PROJECT_ID, location=LOCATION)
-    job = tuning.SupervisedTuningJob(job_info['resource_name'])
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
+    
+    # In the modern SDK, we use sft.SupervisedTuningJob directly
+    job = sft.SupervisedTuningJob(job_info['resource_name'])
     
     logger.info(f"Job: {job_info['job_name']}")
     logger.info(f"State: {job.state}")

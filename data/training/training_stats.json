@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-02-23T00:53:34.649949",
-  "total_examples": 17,
-  "wins": 5,
-  "losses": 12,
-  "win_rate_pct": 29.4,
+  "generated_at": "2026-02-28T02:24:51.025813",
+  "total_examples": 58,
+  "wins": 31,
+  "losses": 27,
+  "win_rate_pct": 53.4,
   "output_file": "data/training/sovereign_trades.jsonl"
 }

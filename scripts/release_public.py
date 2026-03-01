@@ -44,10 +44,27 @@ def redact_config(filepath):
     content = re.sub(r'API_KEY = ".*?"', 'API_KEY = "REDACTED"', content)
     content = re.sub(r'TELEGRAM_.* = ".*?"', 'TELEGRAM_TOKEN = "REDACTED"', content)
     
-    # Redact Numeric Parameters (e.g., STOP_LOSS_ATR_MULTIPLIER = 2.5 -> = <HIDDEN>)
-    # But Python needs valid syntax. So replace with standard defaults or 0.0
-    content = re.sub(r'(STOP_LOSS_ATR_MULTIPLIER)\s*=\s*[\d\.]+', r'\1 = 2.0  # Proprietary Parameter (Default)', content)
-    content = re.sub(r'(TP1_R_MULTIPLE)\s*=\s*[\d\.]+', r'\1 = 1.0  # Proprietary Parameter (Default)', content)
+    # Redact Numeric Parameters and ROI stats
+    content = re.sub(r'(RISK_PER_TRADE)\s*=\s*[\d\.]+', r'\1 = 0.001  # Proprietary (Redacted)', content)
+    content = re.sub(r'(MAX_DRAWDOWN_LIMIT)\s*=\s*[\d\.]+', r'\1 = 0.05', content)
+    content = re.sub(r'(DAILY_TRADE_LIMIT)\s*=\s*[\d\.]+', r'\1 = 1', content)
+    content = re.sub(r'(ROI)\s*=\s*~[\d%]+', r'ROI = ~REDACTED%', content)
+    
+    # Redact Prop Firm Profiles
+    content = re.sub(r'PROP_FIRMS = \{.*?\}', 'PROP_FIRMS = {"PUBLIC": {"name": "Public Profile", "url": "https://example.com", "contract_size": 1.0, "commission_rate": 0.0}}', content, flags=re.DOTALL)
+    
+    # Redact AI Thresholds
+    content = re.sub(r'(AI_THRESHOLD)\s*=\s*[\d\.]+', r'\1 = 9.0', content)
+    content = re.sub(r'(AI_THRESHOLD_ASIAN_FADE)\s*=\s*[\d\.]+', r'\1 = 9.0', content)
+
+    # Redact Killzone Windows
+    content = re.sub(r'(KILLZONE_.*?)\s*=\s*\(.*?\)', r'\1 = (0, 0) # Redacted Timing', content)
+
+    # Redact Multi-Asset Alignments
+    content = re.sub(r'(MIN_SMT_STRENGTH)\s*=\s*[\d\.]+', r'\1 = 0.99', content)
+
+    # Redact Quartiles
+    content = re.sub(r'(_QUARTILE.*?)\s*=\s*[\d\.]+', r'\1 = 0.0', content)
     
     with open(filepath, 'w') as f: f.write(content)
 
@@ -65,7 +82,6 @@ def redact_scanner(filepath):
             new_lines.append(line)
             new_lines.append('        """\n        Calculates Multi-Factor Bias using proprietary signal inputs.\n        Returns: Bias String (BULLISH/BEARISH/NEUTRAL)\n        """\n')
             new_lines.append('        # [REDACTED] Proprietary Geometric Logic\n')
-            new_lines.append('        # Tracks: 4H Trend, Daily Structure, Momentum, Intermarket Flows\n')
             new_lines.append('        return "NEUTRAL"  # Placeholder for public repo\n')
             in_redacted_block = True
             continue
@@ -74,6 +90,55 @@ def redact_scanner(filepath):
             new_lines.append(line)
             new_lines.append('        """\n        Main Scanning Function.\n        [REDACTED] Core Logic Hidden for Public Release.\n        """\n')
             new_lines.append('        return None\n')
+            in_redacted_block = True
+            continue
+
+        if "def scan_asian_fade" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Proprietary Asian Range Fade Alpha.\n        """\n')
+            new_lines.append('        return None\n')
+            in_redacted_block = True
+            continue
+
+        if "def get_price_quartiles" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Proprietary Price Quartile Calculation.\n        """\n')
+            new_lines.append('        return {}\n')
+            in_redacted_block = True
+            continue
+
+        if "def get_session_quartile" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Proprietary Session Cycle Logic.\n        """\n')
+            new_lines.append('        return {}\n')
+            in_redacted_block = True
+            continue
+
+        if "def validate_sweep_depth" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Institutional Order Book Absorption Validation.\n        """\n')
+            new_lines.append('        return True\n')
+            in_redacted_block = True
+            continue
+
+        if "def get_volatility_adjusted_target" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Dynamic Targeted Alpha Logic.\n        """\n')
+            new_lines.append('        return 0.0\n')
+            in_redacted_block = True
+            continue
+
+        if "def get_next_institutional_target" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Recursively Scans for Draw on Liquidity.\n        """\n')
+            new_lines.append('        return None\n')
+            in_redacted_block = True
+            continue
+
+        if "def is_tapping_fvg" in line:
+            new_lines.append(line)
+            new_lines.append('        """\n        [REDACTED] Fair Value Gap Neutralization Logic.\n        """\n')
+            new_lines.append('        return False\n')
             in_redacted_block = True
             continue
 
@@ -97,13 +162,35 @@ def redact_scanner(filepath):
             new_lines.append('        return None\n')
             in_redacted_block = True
             continue 
+
+        if "def get_hurst_exponent" in line:
+            new_lines.append(line)
+            new_lines.append('        # [REDACTED] Proprietary Geometric Persistence Math\n')
+            new_lines.append('        return 0.5\n')
+            in_redacted_block = True
+            continue
+
+        if "def check_stationarity" in line:
+            new_lines.append(line)
+            new_lines.append('        # [REDACTED] Proprietary Unit Root Logic\n')
+            new_lines.append('        return True\n')
+            in_redacted_block = True
+            continue
+
+        if "def get_smt_divergence" in line:
+            new_lines.append(line)
+            new_lines.append('        # [REDACTED] Proprietary Multi-Asset Correlation Math\n')
+            new_lines.append('        return 0.0\n')
+            in_redacted_block = True
+            continue
             
         if in_redacted_block:
             # Check if we exited the function (dedent)
-            if line.strip().startswith("def "):
+            if line.startswith("    def ") or line.startswith("def "):
                 in_redacted_block = False
-                new_lines.append(line) # Add the new function def
-            continue # Skip lines inside redacted function
+                # Do NOT continue here - we need to process this line as a regular line
+            else:
+                continue # Skip lines inside redacted function
             
         new_lines.append(line)
         
