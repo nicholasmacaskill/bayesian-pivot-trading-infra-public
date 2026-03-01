@@ -63,10 +63,11 @@ def backfill_embeddings(limit=100):
 
     # 2. Fetch Records from 'journal' that need embeddings
     try:
+        # Prioritize high PnL trades for "Human Alpha" injection
         res = supabase.client.table('journal')\
             .select('*')\
             .is_('embedding', 'null')\
-            .order('timestamp', desc=True)\
+            .order('pnl', desc=True)\
             .limit(limit)\
             .execute()
         
@@ -74,11 +75,13 @@ def backfill_embeddings(limit=100):
         if not records:
             print("✅ No records in 'journal' table need embedding.")
         else:
-            print(f"📦 Found {len(records)} journal entries to vectorize.")
+            print(f"📦 Found {len(records)} journal entries to vectorize (Prioritizing high PnL).")
             
             for rec in tqdm(records, desc="Vectorizing Journal"):
                 # Journal uses mentor_feedback for embedding usually
-                text = rec.get('mentor_feedback') or rec.get('notes') or "Manual Trade"
+                # We also include symbol and side to ensure technical context
+                metadata = f"Trade: {rec.get('symbol')} {rec.get('side')}. "
+                text = metadata + (rec.get('mentor_feedback') or rec.get('notes') or "Manual Trade")
                 embedding = memory.ai.get_text_embedding(text)
                 
                 if embedding:

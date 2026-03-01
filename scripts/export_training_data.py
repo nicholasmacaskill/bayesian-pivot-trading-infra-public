@@ -86,15 +86,23 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
         .in_('outcome', list(outcomes))\
         .gte('ai_score', min_score)\
         .order('timestamp', desc=True)\
-        .limit(5000)\
+        .limit(2000)\
         .execute()
 
     scans = res.data or []
-    logger.info(f"📦 Found {len(scans)} resolved scans.")
-
-    if not scans:
-        logger.warning("No resolved scans found. Run resolve_scan_outcomes.py first.")
-        return
+    
+    # 🌟 NEW: Fetch successful journal entries as "WIN" examples
+    logger.info("👤 Fetching Human Alpha (Journal) for training export...")
+    journal_res = supabase.client.table('journal')\
+        .select('*')\
+        .gt('pnl', 0)\
+        .order('timestamp', desc=True)\
+        .limit(200)\
+        .execute()
+    
+    journal_entries = journal_res.data or []
+    
+    logger.info(f"📦 Found {len(scans)} bot scans and {len(journal_entries)} human alpha wins.")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -102,13 +110,10 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
     win_count = 0
     loss_count = 0
 
+    # Process Bot Scans
     for scan in scans:
         outcome = scan.get('outcome')
-        if outcome not in outcomes:
-            continue
-
         narrative = build_narrative(scan)
-
         example = {
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -117,11 +122,27 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
             ]
         }
         examples.append(example)
+        if outcome == 'WIN': win_count += 1
+        else: loss_count += 1
 
-        if outcome == 'WIN':
-            win_count += 1
-        else:
-            loss_count += 1
+    # Process Human Alpha (Journal) -> All are WINs
+    for trade in journal_entries:
+        # Create a simplified narrative for manual trades
+        narrative = (
+            f"Symbol: {trade.get('symbol')} | Direction: {trade.get('side')}\n"
+            f"Pattern: Discretionary Alpha\n"
+            f"Session: Human Optimized\n"
+            f"AI Analysis: {trade.get('mentor_feedback', 'High performance manual trade.')[:300]}"
+        )
+        example = {
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": narrative},
+                {"role": "model", "content": "WIN"}
+            ]
+        }
+        examples.append(example)
+        win_count += 1
 
     # Write JSONL
     with open(OUTPUT_FILE, 'w') as f:
@@ -130,7 +151,7 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
 
     logger.info(f"✅ Exported {len(examples)} training examples → {OUTPUT_FILE}")
     logger.info(f"   WIN: {win_count} | LOSS: {loss_count}")
-    logger.info(f"   Win Rate in training data: {win_count/len(examples)*100:.1f}%")
+    logger.info(f"   Improved Win Rate in training data: {win_count/len(examples)*100:.1f}%")
     
     # Also write a stats summary
     stats = {

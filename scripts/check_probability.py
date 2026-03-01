@@ -7,11 +7,11 @@ import pandas as pd
 import numpy as np
 
 def calculate_probability():
-    print("🦁 Sovereign System: Calculating 65k Probability...")
+    print("🦁 Sovereign System: Calculating 61k Probability...")
     
     scanner = SMCScanner()
     symbol = "BTC/USD"
-    target = 65000
+    target = 61000
     
     # 1. Fetch Daily Data for ATR/Volatility
     df_daily = scanner.fetch_data(symbol, "1d", limit=30)
@@ -60,10 +60,17 @@ def calculate_probability():
     
     prob_score = 50 # Base
     
-    # Trend Bonus
-    if "STRONG BEARISH" in bias: prob_score += 25
-    elif "BEARISH" in bias: prob_score += 15
-    elif "BULLISH" in bias: prob_score -= 20
+    # Direction-Aware Trend Bonus/Penalty
+    is_short_target = target < current_price
+    
+    if "STRONG BEARISH" in bias:
+        prob_score += 25 if is_short_target else -30
+    elif "BEARISH" in bias:
+        prob_score += 15 if is_short_target else -20
+    elif "STRONG BULLISH" in bias:
+        prob_score += 25 if not is_short_target else -30
+    elif "BULLISH" in bias:
+        prob_score += 15 if not is_short_target else -20
     
     # Distance Penalty (Harder if further away)
     if pct_distance > 5: prob_score -= 20

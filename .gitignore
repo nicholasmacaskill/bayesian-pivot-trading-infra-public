@@ -7,6 +7,10 @@ secrets.json
 # Database
 *.db
 *.sqlite
+data/charts/
+public_export/
+*.out
+*.log
 
 # Python
 __pycache__/
