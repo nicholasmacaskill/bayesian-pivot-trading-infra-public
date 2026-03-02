@@ -129,36 +129,25 @@ class PropGuardian:
                 "firm_name": "Unknown"
             }
 
-        prompt = f"""
-        You are a Proprietary Trading Risk Auditor specializing in Adversarial Design. 
-        Your goal is to perform a forensic audit of the following prop firm's rules and documentation.
-        
-        Look for "Adversarial Loops" designed to trigger failure:
-        1. **Drawdown Reset Mechanics**: Does drawdown trail balance or equity? Is it calculated at the end of the day or live (High Risk)?
-        2. **Consistency Traps**: Are there hidden rules about lot size variance (e.g. no trade can exceed 2x the average)?
-        3. **Hidden Fees**: Are commissions baked into the spread or charged as external drag?
-        4. **Execution Bans**: Are news trades allowed? Is holding over weekends restricted? Are VPNs/IPs flagged?
-        5. **Scalability Illusions**: Does the Scaling Plan have impossible hurdles?
+        # Load Sovereign Prompts (Private IP)
+        try:
+            from src.sovereign_core.prompts.guardian_prompts import SOVEREIGN_GUARDIAN_PROMPT
+            sovereign_prompt = SOVEREIGN_GUARDIAN_PROMPT
+        except ImportError:
+            sovereign_prompt = None
 
-        INPUT TEXT:
-        {content[:40000]}
-
-        Output valid JSON only:
-        {{
-            "risk_score": (1-10, 1=Fair/Transparent, 10=Predatory/Adversarial),
-            "firm_name": "Full Name of Firm",
-            "traps": [
-                {{
-                    "category": "Structure" | "Fees" | "Rules" | "Execution" | "Payout",
-                    "severity": "High" | "Medium" | "Low",
-                    "title": "Concise Trap Name",
-                    "description": "Short, sharp technical explanation of why this is a trap."
-                }}
-            ],
-            "verdict": "One sentence summary of who this firm is for (Beginners, Pros, or Avoid).",
-            "recommendation": "Technical advice for the trader to survive this environment."
-        }}
-        """
+        if sovereign_prompt:
+            prompt = sovereign_prompt.format(content=content[:40000])
+        else:
+            # Public Lite Version
+            prompt = f"""
+            Analyze the following prop firm rules for basic risks (drawdown, fees, execution).
+            
+            FIRM TEXT:
+            {content[:10000]}
+            
+            Return JSON with risk_score (1-10) and traps list.
+            """
 
         models_to_try = [
             "gemini-2.0-flash",

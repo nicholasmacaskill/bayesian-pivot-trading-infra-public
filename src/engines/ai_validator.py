@@ -13,8 +13,11 @@ class AIValidator:
         else:
             self.client = None
             
-        # Load ICT Oracle Knowledge Base
-        self.kb_path = os.path.join(os.path.dirname(__file__), "ict_oracle_kb.json")
+        # Load ICT Oracle Knowledge Base (Attempt Sovereign Core first)
+        self.kb_path = os.path.join(os.getcwd(), "src", "sovereign_core", "ict_oracle_kb.json")
+        if not os.path.exists(self.kb_path):
+            self.kb_path = os.path.join(os.path.dirname(__file__), "ict_oracle_kb.json")
+            
         self.oracle_kb = {}
         if os.path.exists(self.kb_path):
             try:
@@ -22,6 +25,17 @@ class AIValidator:
                     self.oracle_kb = json.load(f)
             except Exception as e:
                 print(f"⚠️ Failed to load Oracle KB: {e}")
+
+        # Load Sovereign Prompts (Private IP)
+        try:
+            from src.sovereign_core.prompts.validator_prompts import SOVEREIGN_VALIDATOR_PROMPT, SOVEREIGN_VISION_PROMPT
+            self.sovereign_prompt = SOVEREIGN_VALIDATOR_PROMPT
+            self.sovereign_vision = SOVEREIGN_VISION_PROMPT
+            self.is_lite = False
+        except ImportError:
+            self.sovereign_prompt = None
+            self.sovereign_vision = None
+            self.is_lite = True
 
     def _get_oracle_prompt(self, pattern):
         """Extracts relevant ground truth from the Oracle KB."""
@@ -325,69 +339,48 @@ class AIValidator:
             exchange
         )
 
-        prompt = f"""
-        YOU ARE THE SOVEREIGN GATEKEEPER acting as an INSTITUTIONAL RISK MANAGER (Red Team).
-        
-        Your Goal: REJECT THIS TRADE. 
-        You only approve it if the evidence is so overwhelming that rejecting it would be a failure of duty.
-        
-         ### THE "INSTITUTIONAL FADE" ALPHA (YOUR PRIMARY DIRECTIVE):
-        - Historical manual analysis shows a **100% Win Rate** when fading the Asian Range High/Low.
-        - Look for price rejecting the **Upper/Lower Quartile** of the Asian Range.
-        - Favor trades that occur after a **False Move (Wick)** through a session high/low.
-        
-        ### 🧠 SOVEREIGN MEMORY (PAST EXPERIENCE):
-        {memory_context or "No highly similar historical setups found for reference."}
-        
-        ### PHILOSOPHY: "The Sniper"
-        - We do not want "good" trades. We want **PERFECT** trades.
-        - We are happy to sit in cash for days waiting for the one clear shot.
-        - If there is ANY doubt (weak displacement, messy structure, news risk), the verdict is **REJECTED**.
-
-        {oracle_rules}
-
-        ### THE RAW INTEL:
-        - Symbol: {setup['symbol']}
-        - Pattern Detected: {setup.get('pattern', 'SMC Logic')}
-        - Phase: {setup.get('time_quartile', {}).get('phase', 'Unknown')}
-        - Price Position: {'Deep Discount' if setup.get('is_discount') else 'Premium' if setup.get('is_premium') else 'Neutral'}
-        - Institutional Sponsorship (SMT): {setup.get('smt_strength', 0)} (Must be > {Config.MIN_SMT_STRENGTH} for Confirmation)
-        - Cross-Asset Divergence: {setup.get('cross_asset_divergence', 0)}
-        - Bias (4H): {setup.get('bias', 'Neutral')}
-        - News Atmosphere: {setup.get('news_context', 'Clear')}
-        - Sentiment: {sentiment}
-        - Whale Activity: {whales}
-        - Market Regime (Detected): {regime}
-        - Slippage Estimate: {slippage_info.get('slippage_pct', 'N/A')}% ({slippage_info.get('quality', 'Unknown')})
-
-        ### TRACK 1: LIVE VALIDATION (CONTROL)
-        - **Primary SMT Check:** Is SMT Strength > {Config.MIN_SMT_STRENGTH}? If no, be highly skeptical but consider if other confluences are overwhelming (9.0+ score).
-        - **Primary Discount/Premium:** Is it in Deep Discount for Longs / Deep Premium for Shorts?
-        - **Primary Bias:** Is the 4H Bias aligned?
-        
-        - Verdict Options:
-            * **FLOW_GO**: All criteria met. High conviction.
-            * **REJECTED**: Failed one or more gates.
-            * **INDUCEMENT_WARNING**: Looks like a trap (Retail Logic).
-
-        ### TRACK 2: SHADOW OPTIMIZATION (EXPERIMENTAL)
-        - Current Market Regime: {regime}
-        - Risk Multiplier Logic (Sniper Mode):
-          * If Score >= 9.0 AND Low-Volatility: 1.25x (Aggressive)
-          * If Score < {Config.AI_THRESHOLD}: 0.0x (Kill) - We don't trade weak signals.
-          * Otherwise: 1.0x (Standard)
-        - Alpha Delta Prediction: How much better/worse would shadow recommendations perform vs control?
-        - Slippage Audit: Flag if >0.05%
-        """
+        # DUAL-TRACK PROMPT CONSTRUCTION
+        if self.sovereign_prompt:
+            # Full Sovereign Version (Master Theory active)
+            prompt = self.sovereign_prompt.format(
+                symbol=setup['symbol'],
+                pattern=setup.get('pattern', 'SMC Logic'),
+                phase=setup.get('time_quartile', {}).get('phase', 'Unknown'),
+                position='Deep Discount' if setup.get('is_discount') else 'Premium' if setup.get('is_premium') else 'Neutral',
+                smt_strength=setup.get('smt_strength', 0),
+                min_smt=Config.MIN_SMT_STRENGTH,
+                cross_asset=setup.get('cross_asset_divergence', 0),
+                bias=setup.get('bias', 'Neutral'),
+                news=setup.get('news_context', 'Clear'),
+                sentiment=sentiment,
+                whales=whales,
+                regime=regime,
+                slippage_pct=slippage_info.get('slippage_pct', 'N/A'),
+                slippage_quality=slippage_info.get('quality', 'Unknown'),
+                threshold=Config.AI_THRESHOLD,
+                memory_context=memory_context or "No highly similar historical setups found for reference."
+            ).replace("[ORACLE_RULES_PLACEHOLDER]", oracle_rules)
+        else:
+            # Public Lite Version (General ICT logic)
+            prompt = f"""
+            YOU ARE AN INSTITUTIONAL RISK MANAGER (ICT PHILOSOPHY).
+            Analyze this trade setup using Standard ICT concepts (PO3, FVG, SMT).
+            
+            ### GOAL: Identify if this setup aligns with institutional expansion or retail inducement.
+            
+            - Pattern: {setup.get('pattern', 'SMC Logic')}
+            - SMT Strength: {setup.get('smt_strength', 0)}
+            - Regime: {regime}
+            - Confluences: {oracle_rules}
+            
+            Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
+            """
 
         if image_path:
-            prompt += """
-        ### VISUAL MANDATE (VISION ACTIVE):
-        The attached chart shows the setup. 
-        1. Inspect displacement wicks for institutional sponsorship (long bodies)
-        2. Identify nearest FVG and validate price respect
-        3. Cross-reference visual with Oracle Ground Truth
-        """
+            if self.sovereign_vision:
+                prompt += self.sovereign_vision
+            else:
+                prompt += "\nAnalysis of attached chart image requested for ICT confluence."
 
         prompt += """
         ### OUTPUT FORMAT (STRICT JSON):

@@ -79,24 +79,16 @@ class BiometricEngine:
     def calculate_physio_tilt(self) -> float:
         """
         Calculates a 1-10 tilt score purely from physiology.
-        High BPM + Low HRV = High Tilt.
+        Uses Sovereign Logic if available; otherwise uses a basic threshold.
         """
-        tilt = 1.0
-        
-        # 1. Heart Rate Factor (Hyper-arousal)
-        if self.current_bpm > 100:
-            tilt += 4.0
-        elif self.current_bpm > 90:
-            tilt += 2.0
-            
-        # 2. HRV Factor (Stress/Resilience)
-        # Low HRV (< 30ms) typically indicates high sympathetic stress
-        if self.current_hrv < 25:
-            tilt += 3.0
-        elif self.current_hrv < 40:
-            tilt += 1.5
-            
-        return min(10.0, tilt)
+        try:
+            from src.sovereign_core.logic.biometric_math import calculate_sovereign_physio_tilt
+            return calculate_sovereign_physio_tilt(self.current_bpm, self.current_hrv)
+        except ImportError:
+            # Public Lite Fallback
+            if self.current_bpm > 100 or self.current_hrv < 25:
+                return 7.0
+            return 1.0
 
     def start_server(self):
         """Runs the FastAPI server in a background thread."""
