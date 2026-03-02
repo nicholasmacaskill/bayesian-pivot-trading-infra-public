@@ -136,6 +136,11 @@ class RetrainingLoop:
         """
         outcome = record.get('outcome', 'UNKNOWN')
         pnl     = record.get('pnl', 0.0) or 0.0
+        
+        # Phase 2: Extract enriched context
+        vol_spike = record.get('volume_spike', 1.0)
+        smt = record.get('true_smt') or "None"
+        regime = record.get('shadow_regime') or "Unknown"
 
         # Build a compact prompt/completion pair
         prompt = (
@@ -143,17 +148,17 @@ class RetrainingLoop:
             f"Direction: {record['direction']} | "
             f"Pattern: {record['pattern']} | "
             f"AI Score: {record['ai_score']}/10 | "
-            f"Entry: {record['entry_price']} | "
-            f"SL: {record['stop_loss']} | "
-            f"TP: {record['take_profit']}"
+            f"Regime: {regime} | "
+            f"Vol Spike: {vol_spike}x | "
+            f"SMT: {smt}"
         )
 
         # What actually happened — this is the ground truth label
         if outcome == 'WIN':
-            label = f"Trade was a WINNER. PnL: +${pnl:.2f}. Signal validated by live market."
+            label = f"Trade was a WINNER. PnL: +${pnl:.2f}. Signal validated by live market. Volume/SMT confluence confirmed institutional sponsorship."
             score_adjustment = +0.5  # Upvote
         elif outcome == 'LOSS':
-            label = f"Trade was a LOSS. PnL: -${abs(pnl):.2f}. Pattern failed in live conditions."
+            label = f"Trade was a LOSS. PnL: -${abs(pnl):.2f}. Pattern failed. Check if volume spike or SMT was insufficient for this regime."
             score_adjustment = -0.5  # Downvote
         elif outcome == 'BREAKEVEN':
             label = f"Trade broke even. PnL: ${pnl:.2f}. Partial validation."
@@ -173,12 +178,15 @@ class RetrainingLoop:
             'prompt':           prompt,
             'label':            label,
             'score_adjustment': score_adjustment,
+            'regime':           regime,
+            'vol_spike':        vol_spike,
+            'true_smt':         smt
         }
 
     def _export_jsonl(self, examples: list[dict]) -> Path:
         """
         Exports training examples in Vertex AI fine-tuning JSONL format.
-        Each line: {"messages": [{"role": "user", "content": "..."}, {"role": "model", "content": "..."}]}
+        Optimized for Phase 2 instruction-tuning.
         """
         date_str = datetime.utcnow().strftime('%Y%m%d_%H%M')
         out_path = TRAINING_DATA_DIR / f"training_{date_str}.jsonl"
@@ -192,20 +200,18 @@ class RetrainingLoop:
                         {
                             "role": "user",
                             "content": (
-                                f"Evaluate this trade setup:\n{ex['prompt']}\n\n"
-                                f"Historical context: This exact setup previously resulted in a {ex['outcome']} "
-                                f"trade: {ex['label']}\n\n"
-                                f"Given this live outcome, would you revise your confidence score?"
+                                f"Evaluate this institutional setup:\n{ex['prompt']}\n\n"
+                                f"Outcome: This setup resulted in a {ex['outcome']} ({ex['label']}).\n\n"
+                                f"Instruction: Calibrate your weighting of Vol Spike and SMT for the '{ex['regime']}' regime."
                             )
                         },
                         {
                             "role": "model",
                             "content": (
-                                f"Based on live outcome: {ex['label']} "
-                                f"Score adjustment: {ex['score_adjustment']:+.1f}. "
-                                f"The {ex['pattern']} on {ex['symbol']} {ex['direction']} "
-                                f"at this price structure has been validated/invalidated by "
-                                f"live market data. Future similar setups should be weighted accordingly."
+                                f"Live Audit: {ex['label']} "
+                                f"Adjustment: {ex['score_adjustment']:+.1f}. "
+                                f"In {ex['regime']} regimes, the {ex['pattern']} requires "
+                                f"strict adherence to institutional prints (Vol: {ex['vol_spike']}x, SMT: {ex['true_smt']})."
                             )
                         }
                     ]

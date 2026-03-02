@@ -170,10 +170,27 @@ class SMCScanner:
             df = df.loc[:, ~df.columns.duplicated()]
             
             return df
-
         except Exception as e:
             logger.error(f"Error fetching data via yfinance for {symbol}: {e}")
             return None
+
+    def calculate_volume_cluster(self, df, lookback=20):
+        """
+        PHASE 2: Volume Cluster Detection.
+        Institutional Logic: Smart money leaves large 'prints' in volume 
+        when sweeping liquidity or absorbing orders.
+        """
+        if df is None or len(df) < lookback:
+            return 1.0
+        
+        recent_volume = df['volume'].iloc[-1]
+        avg_volume = df['volume'].iloc[-lookback:-1].mean()
+        
+        if avg_volume == 0:
+            return 1.0
+            
+        ratio = recent_volume / avg_volume
+        return round(ratio, 2)
 
     @ensure_data(default_return=(pd.Series(dtype=bool), pd.Series(dtype=bool)))
     def detect_fractals(self, df, window=2):
@@ -806,19 +823,31 @@ class SMCScanner:
                 london_range = price_quartiles["London Range"]
                 swept_london = current['low'] < london_range["low"] and current['close'] > london_range["low"]
 
+            # PHASE 2: Volume & SMT Confirmation
+            vol_spike = self.calculate_volume_cluster(df)
+            true_smt = self.intermarket.detect_true_smt(df, "DXY")
+            has_true_smt = true_smt is not None
+            
+            # PHASE 2: 90-Minute Cycle Logic (Q2 Manipulation Window)
+            is_q2 = time_quartile.get('num') == 2
+
             
             # SIMPLIFIED: Proceed if we have discount zone + SMT alignment
-            # (Removed strict 3/4 confluence requirement that was too restrictive)
-            if in_deep_discount or has_strong_smt:
-                if (swept_pdl or swept_london):
+            # PHASE 2: Strict Institutional Requirements
+            # We want: (Discount + SMT) AND (Sweep + Vol Spike)
+            if (in_deep_discount or has_true_smt or has_strong_smt):
+                # Require Volume Spike (Smart Money Print) or True SMT for JUDAS
+                if (swept_pdl or swept_london) and (vol_spike >= 1.5 or has_true_smt):
                     # LEVEL 2 DEPTH FILTER
                     swept_level = recent_low if swept_pdl else (london_range["low"] if london_range else recent_low)
                     if self.validate_sweep_depth(symbol, swept_level, 'LONG'):
                         entry_type = "Judas Sweep (High Alpha)"
                 
                 # LOGIC B: FVG TAP (Medium Alpha - Standard Pullback)
+                # Ensure Q3 (Distribution) for pullbacks, or Q2 with extremely high volume
                 elif self.is_tapping_fvg(df, 'LONG'):
-                     entry_type = "Trend Pullback (Medium Alpha)"
+                     if time_quartile.get('num') >= 3 or (is_q2 and vol_spike >= 2.0):
+                        entry_type = "Trend Pullback (Medium Alpha)"
 
             if entry_type:
                 # ATR-DYNAMIC TARGETING
@@ -861,7 +890,9 @@ class SMCScanner:
                     "news_context": news_context,
                     "is_discount": True,
                     'risk_reward': Config.TP2_R_MULTIPLE,
-                    'quality': 'HIGH' if 'Judas' in entry_type else 'MEDIUM'
+                    'quality': 'HIGH' if 'Judas' in entry_type else 'MEDIUM',
+                    'volume_spike': vol_spike,
+                    'true_smt': true_smt
                 }
 
         # BEARISH Setup (OPTIMIZED: Require bias for quality - Only if no Long found yet)
@@ -886,13 +917,19 @@ class SMCScanner:
                 london_range = price_quartiles["London Range"]
                 swept_london = current['high'] > london_range["high"] and current['close'] < london_range["high"]
 
+            # PHASE 2: Volume & SMT Confirmation (Bearish)
+            vol_spike = self.calculate_volume_cluster(df)
+            true_smt = self.intermarket.detect_true_smt(df, "DXY")
+            has_true_smt = true_smt is not None
+            is_q2 = time_quartile.get('num') == 2
+
             entry_type = None
 
             
             # SIMPLIFIED: Proceed if we have premium zone + SMT alignment
-            # (Removed strict 3/4 confluence requirement that was too restrictive)
-            if in_premium or has_strong_smt:
-                if (swept_pdh or swept_london):
+            # PHASE 2: Strict Institutional Requirements
+            if (in_premium or has_true_smt or has_strong_smt):
+                if (swept_pdh or swept_london) and (vol_spike >= 1.5 or has_true_smt):
                     # LEVEL 2 DEPTH FILTER
                     swept_level = recent_high if swept_pdh else (london_range["high"] if london_range else recent_high)
                     if self.validate_sweep_depth(symbol, swept_level, 'SHORT'):
@@ -900,7 +937,8 @@ class SMCScanner:
                 
                 # LOGIC B: FVG TAP (Medium Alpha)
                 elif self.is_tapping_fvg(df, 'SHORT'):
-                     entry_type = "Trend Pullback (Medium Alpha)"
+                     if time_quartile.get('num') >= 3 or (is_q2 and vol_spike >= 2.0):
+                        entry_type = "Trend Pullback (Medium Alpha)"
 
             if entry_type:
                 ref_range_target = london_range or price_quartiles.get("Asian Range")
@@ -939,7 +977,9 @@ class SMCScanner:
                     "news_context": news_context,
                     "is_premium": True,
                     'risk_reward': Config.TP2_R_MULTIPLE,
-                    'quality': 'HIGH' if 'Judas' in entry_type else 'MEDIUM'
+                    'quality': 'HIGH' if 'Judas' in entry_type else 'MEDIUM',
+                    'volume_spike': vol_spike,
+                    'true_smt': true_smt
                 }
 
 
