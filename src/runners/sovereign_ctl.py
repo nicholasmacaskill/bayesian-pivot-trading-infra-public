@@ -134,6 +134,13 @@ def status():
                 print("🛡️  Mode: SECURE")
     else:
         print("❌ Sovereign Guard: STOPPED")
+    
+    # Check for last forensic audit
+    audit_log = _get_log("forensic_audit.log")
+    if os.path.exists(audit_log):
+        mtime = os.path.getmtime(audit_log)
+        last_audit = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+        print(f"🔎 Last Deep Audit: {last_audit}")
 
 def dev_mode():
     if not authorize_action(): return
@@ -145,6 +152,23 @@ def dev_mode():
         print("[-] To unseal Port 9222 for debugging, run: sudo pfctl -a com.sovereign.guard -F rules")
     else:
         print("[-] Already in Developer Mode.")
+
+def deep_audit():
+    """Executes the modern forensic audit script."""
+    print("🚀 Initializing Deep Forensic Audit...")
+    audit_script = os.path.join(SMC_ROOT, "src", "runners", "forensic_audit.py")
+    audit_log = _get_log("forensic_audit.log")
+    
+    try:
+        # We run it and pipe to a log for the status command to see
+        with open(audit_log, "w") as f:
+            subprocess.check_call([VENV_PYTHON, audit_script], stdout=sys.stdout, stderr=sys.stderr)
+            # Touching the log to update mtime even if stdout is redirected
+            os.utime(audit_log, None)
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Audit failed with exit code {e.returncode}")
+    except Exception as e:
+        print(f"❌ Error running audit: {e}")
 
 def secure_mode():
     if os.path.exists(SAFE_MODE_FILE):
@@ -279,7 +303,8 @@ def main():
         'dashboard': dashboard,
         'report': report,
         'sessions': sessions,
-        'uninstall': uninstall_wizard
+        'uninstall': uninstall_wizard,
+        'audit': deep_audit
     }
     
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:

@@ -1,305 +1,160 @@
-import ccxt
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-import json
-import time
+import sys
+import os
+
+# Add root to path for imports
+SMC_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, SMC_ROOT)
+
+from backtesting.backtest_utils import DataManager, VectorizedIndicators, NewsSimulator
 
 class ComparativeBacktest:
-    def __init__(self, symbol='BTC/USDT', start_date='2025-01-06', end_date='2026-01-06'):
+    def __init__(self, symbol='BTC/USDT', days=30):
         self.symbol = symbol
-        self.start_date = start_date
-        self.end_date = end_date
-        self.exchange = ccxt.binance({'enableRateLimit': True})
-        self.data_cache = None
+        self.data_manager = DataManager()
+        self.indicators = VectorizedIndicators()
+        self.days = days
+        self.df = None
 
-    def fetch_data(self):
-        if self.data_cache is not None:
-            return self.data_cache.copy()
-
-        print(f"📥 Fetching {self.symbol} data...")
-        start_ts = int(datetime.strptime(self.start_date, '%Y-%m-%d').timestamp() * 1000)
-        end_ts = int(datetime.strptime(self.end_date, '%Y-%m-%d').timestamp() * 1000)
+    def prepare_data(self):
+        if self.df is not None: return self.df
         
-        all_data = []
-        current_ts = start_ts
+        # 1. Fetch Main Data
+        df = self.data_manager.get_data(self.symbol, '5m', days=self.days)
         
-        # Limit to last 3 months for speed if needed, but trying full year
-        # Actually, let's just fetch 90 days to be quick and responsive
-        start_ts = int((datetime.now() - timedelta(days=90)).timestamp() * 1000)
-        current_ts = start_ts
-
-        while current_ts < end_ts:
-            try:
-                ohlcv = self.exchange.fetch_ohlcv(self.symbol, '5m', since=current_ts, limit=1000)
-                if not ohlcv:
-                    break
-                all_data.extend(ohlcv)
-                current_ts = ohlcv[-1][0] + 1
-            except Exception as e:
-                print(f"Error fetching: {e}")
-                break
-                
-        df = pd.DataFrame(all_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df = df.drop_duplicates(subset='timestamp')
+        # 2. Fetch Correlation Data (DXY)
+        dxy_df = self.data_manager.get_data("DXY", '5m', days=self.days)
         
-        # Calculate ATR once
-        high_low = df['high'] - df['low']
-        high_close = np.abs(df['high'] - df['close'].shift())
-        low_close = np.abs(df['low'] - df['close'].shift())
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        df['atr'] = np.max(ranges, axis=1).rolling(14).mean()
+        print("📊 Calculating Alpha Indicators...")
+        df = self.indicators.add_atr(df)
+        df = self.indicators.add_bias(df)
+        df = self.indicators.add_session_ranges(df)
         
-        self.data_cache = df
-        print(f"✅ Loaded {len(df)} candles")
+        # Support for SMT: Add recent highs/lows first
+        df['recent_high'] = df['high'].rolling(20).max().shift(1)
+        df['recent_low'] = df['low'].rolling(20).min().shift(1)
+        
+        df = self.indicators.add_regime_regime(df)
+        df = self.indicators.add_smt_divergence(df, dxy_df)
+        df = NewsSimulator.add_news_blackouts(df)
+        
+        # PHASE 3: Intraday Reversal Mastery
+        df = self.indicators.add_displacement(df)
+        df = self.indicators.add_mss(df)
+        
+        self.df = df
         return df
 
-    def get_4h_bias(self, df, idx):
-        # Simplified bias for speed: Price > EMA 50 (4H approx)
-        # 4H EMA 50 ~ 50*48 = 2400 5m candles
-        if idx < 2400: return "NEUTRAL"
-        
-        # Approximate HTF trend using 5m EMAs with equivalent periods
-        # EMA relative to Close at 2400 periods back is roughly HTF 
-        # Better: Calculate true EMA on resampled data? 
-        # Let's stick to the logic from sniper_backtest.py but optimized
-        
-        # Just use simple Moving Average of 2400 periods as a proxy for HTF Trend
-        # closing_price = df['close'].iloc[idx]
-        # ma_long = df['close'].iloc[idx-2400:idx].mean()
-        # return "BULLISH" if closing_price > ma_long else "BEARISH"
-        
-        # Reusing sniper logic exactly for fairness
-        lookback = min(6000, idx)
-        if lookback < 2500: return "NEUTRAL"
-        
-        # We process a slice. This is slow in a loop. 
-        # Optimization: Pre-calculate bias column?
-        # Yes, let's pre-calculate. See run_model.
-        return df['bias'].iloc[idx]
-
     def run_model(self, model_name, params):
-        df = self.fetch_data()
+        df = self.prepare_data()
         
-        # Pre-calculate Bias (HTF)
-        # Resample to 4H
-        df_4h = df.set_index('timestamp').resample('4h').agg({'close': 'last'}).dropna()
-        df_4h['ema_20'] = df_4h['close'].ewm(span=20).mean()
-        df_4h['ema_50'] = df_4h['close'].ewm(span=50).mean()
+        print(f"🚀 Running Model: {model_name}")
+        killzone_hours = params['killzones']
+        q_limit = params.get('q_limit', 0.25)
         
-        # Map 4H bias back to 5m
-        # Timestamps for join
-        df_4h['bias_val'] = np.where(df_4h['ema_20'] > df_4h['ema_50'], 'BULLISH', 'BEARISH')
-        
-        # Merge bias back (method="ffill")
-        df_merged = pd.merge_asof(df, df_4h[['bias_val']], left_on='timestamp', right_index=True, direction='backward')
-        df['bias'] = df_merged['bias_val'].fillna('NEUTRAL')
-
-        print(f"\n🚀 Running Model: {model_name}")
-        print(f"   Settings: Killzone={params['killzones']}, "
-              f"Quartiles={params['quartile_range']}, "
-              f"Targets={params['tp_multiples']}R")
-
         trades = []
-        equity = 100.0
         
-        killzone_hours = params['killzones'] # List of valid hours [12,13, ..., 20]
-        q_min, q_max = params['quartile_range']
-        tp1_r, tp2_r = params['tp_multiples']
+        # Filter candidates (Killzone + Bias + News + Regime)
+        candidates = df[
+            (df['hour'].isin(killzone_hours)) & 
+            (df['bias'] != 'NEUTRAL') & 
+            (df['news_blackout'] == False) &
+            (df['hurst'] < 0.45)
+        ]
         
-        # Pre-calculate ranges logic helper
-        # We need a rolling window for ranges. 
-        # Iterating is still safest for "simulation" correctness.
-        
-        # Optimization: Only iterate candles in killzones
-        df['hour'] = df['timestamp'].dt.hour
-        potential_entries = df[df['hour'].isin(killzone_hours)]
-        
-        print(f"   Scanning {len(potential_entries)} killzone candles...")
-        
-        for idx in potential_entries.index:
-            if idx < 300: continue
-            
-            row = df.loc[idx]
-            
-            # 1. Bias Check
+        for idx, row in candidates.iterrows():
             bias = row['bias']
-            if bias == 'NEUTRAL': continue
             
-            # 2. Quartile Check checks
-            # Need recent data for range
-            # Asian Range: 00-05 UTC. London: 07-10 UTC.
-            # We look back 24h (288 candles)
-            lookback_start = max(0, idx - 288)
-            recent = df.iloc[lookback_start:idx]
+            # Quartile Check
+            ref_high = row['asian_high'] if not pd.isna(row['asian_high']) else row['london_high']
+            ref_low = row['asian_low'] if not pd.isna(row['asian_low']) else row['london_low']
+            if pd.isna(ref_high): continue
             
-            # Find ranges
-            # Optimization: Don't re-filter dataframe every loop. 
-            # Just grab today's ranges if possible.
-            # For backtest speed, we'll do the "dumb" check:
-            # Current price relative to 24h High/Low is what matters most for "Discount/Premium"
-            day_high = recent['high'].max()
-            day_low = recent['low'].min()
+            price_pos = (row['close'] - ref_low) / (ref_high - ref_low)
+            if bias == 'BULLISH' and price_pos > q_limit: continue
+            if bias == 'BEARISH' and price_pos < (1.0 - q_limit): continue
             
-            if day_high == day_low: continue
-            
-            price_pos = (row['close'] - day_low) / (day_high - day_low)
-            
-            # Quartile Logic
-            if bias == 'BULLISH':
-                # Must be in discount
-                if not (0.0 <= price_pos <= q_max): continue
-            else:
-                # Must be in premium
-                if not ((1.0 - q_max) <= price_pos <= 1.0): continue # mirroring logic
+            # 3. Sweep/SMT Initial Hunt
+            smt_bull = row['smt_bullish']
+            smt_bear = row['smt_bearish']
+            has_intent = False
+            if bias == 'BULLISH' and (row['low'] < row['recent_low'] or smt_bull):
+                has_intent = True
+            elif bias == 'BEARISH' and (row['high'] > row['recent_high'] or smt_bear):
+                has_intent = True
                 
-            # 3. Sweep Logic (Mock)
-            # Simulating sweep check: Did we just wick below low/high?
-            # True Sweep checking is complex. We'll simulate "Setup Found" based on 5% probability 
-            # IF we are in the right zone. This preserves relative frequency between models.
-            # Actual frequency is roughly 1-2 per day.
-            # Killzone is 8 hours = 96 candles. 
-            # 1.5% chance per candle gives ~1.4 setups.
+            if not has_intent: continue
             
-            if np.random.random() > 0.015: continue
+            # 4. PHASE 3: REVERSAL CONFIRMATION (MSS + Displacement)
+            confirmation = df.iloc[idx:idx+6]
+            if confirmation.empty: continue
             
-            # ENTRY
-            entry = row['close']
-            atr = row['atr'] if not pd.isna(row['atr']) else entry*0.005
-            stop_dist = atr * 2.0
+            is_confirmed = False
+            for c_idx, c_row in confirmation.iterrows():
+                if bias == 'BULLISH' and (c_row['mss_bullish'] or c_row['displaced']):
+                    is_confirmed = True; break
+                if bias == 'BEARISH' and (c_row['mss_bearish'] or c_row['displaced']):
+                    is_confirmed = True; break
+                    
+            if not is_confirmed: continue
             
-            if bias == 'BULLISH':
-                stop = entry - stop_dist
-                tp1 = entry + (stop_dist * tp1_r)
-                tp2 = entry + (stop_dist * tp2_r)
-            else:
-                stop = entry + stop_dist
-                tp1 = entry - (stop_dist * tp1_r)
-                tp2 = entry - (stop_dist * tp2_r)
-                
-            # OUTCOME SIMULATION
-            # We check the next 4 hours (48 candles)
-            outcome = 'TIMEOUT'
-            pnl_r = 0.0
+            # Simulate Outcome
+            future = df.iloc[idx+1:idx+100]
+            if future.empty: continue
             
-            # Check next 48 candles
-            future = df.iloc[idx+1:idx+49]
-            hit_tp1 = False
-            
-            for _, f_row in future.iterrows():
-                if bias == 'BULLISH':
-                    if f_row['low'] <= stop:
-                        pnl_r = -1.0
-                        outcome = 'LOSS'
-                        break
-                    if not hit_tp1 and f_row['high'] >= tp1:
-                        hit_tp1 = True
-                        pnl_r += 0.5 * tp1_r # Bank 50%
-                        # Move SL to BE
-                        stop = entry 
-                    if hit_tp1 and f_row['high'] >= tp2:
-                        pnl_r += 0.5 * tp2_r # Bank rest
-                        outcome = 'FULL_WIN'
-                        break
-                    if hit_tp1 and f_row['low'] <= stop:
-                        outcome = 'PARTIAL_WIN'
-                        # PnL is just the TP1 part
-                        break
-                else:
-                    if f_row['high'] >= stop:
-                        pnl_r = -1.0
-                        outcome = 'LOSS'
-                        break
-                    if not hit_tp1 and f_row['low'] <= tp1:
-                        hit_tp1 = True
-                        pnl_r += 0.5 * tp1_r
-                        stop = entry
-                    if hit_tp1 and f_row['low'] <= tp2:
-                        pnl_r += 0.5 * tp2_r
-                        outcome = 'FULL_WIN'
-                        break
-                    if hit_tp1 and f_row['high'] >= stop:
-                        outcome = 'PARTIAL_WIN'
-                        break
-            
-            if outcome == 'TIMEOUT':
-                # Close at market? Or assume validation fail.
-                # Let's say we close at market
-                exit_price = future.iloc[-1]['close'] if len(future) > 0 else entry
-                dist = abs(entry - stop_dist - entry) # risk unit
-                if bias == 'BULLISH':
-                    pnl_r = (exit_price - entry) / stop_dist
-                else:
-                    pnl_r = (entry - exit_price) / stop_dist
-                
-                # Cap at -1
-                if pnl_r < -1: pnl_r = -1
-            
-            trades.append({
-                'outcome': outcome,
-                'pnl_r': pnl_r,
-                'bias': bias
-            })
+            res = self.simulate_trade(bias, row['close'], row['atr'] * 1.5, 1.5, 3.0, future)
+            trades.append(res)
             
         return trades
 
+    def simulate_trade(self, bias, entry, stop_dist, tp1_r, tp2_r, future):
+        is_long = bias == 'BULLISH'
+        stop = entry - stop_dist if is_long else entry + stop_dist
+        tp1 = entry + (stop_dist * tp1_r) if is_long else entry - (stop_dist * tp1_r)
+        tp2 = entry + (stop_dist * tp2_r) if is_long else entry - (stop_dist * tp2_r)
+        
+        hit_tp1 = False
+        for row in future.itertuples():
+            if is_long:
+                if row.low <= stop: return {'pnl_r': -1.0} if not hit_tp1 else {'pnl_r': 0.5 * tp1_r}
+                if not hit_tp1 and row.high >= tp1: hit_tp1 = True; stop = entry
+                if hit_tp1 and row.high >= tp2: return {'pnl_r': 0.5*tp1_r + 0.5*tp2_r}
+            else:
+                if row.high >= stop: return {'pnl_r': -1.0} if not hit_tp1 else {'pnl_r': 0.5 * tp1_r}
+                if not hit_tp1 and row.low <= tp1: hit_tp1 = True; stop = entry
+                if hit_tp1 and row.low <= tp2: return {'pnl_r': 0.5*tp1_r + 0.5*tp2_r}
+        
+        return {'pnl_r': 0}
+
     def analyze(self, trades):
-        if not trades: return {}
+        if not trades: return {"Total Trades": 0, "Win Rate": "0%", "Total Return (R)": "0R"}
         df = pd.DataFrame(trades)
         wins = len(df[df['pnl_r'] > 0])
-        total = len(df)
-        win_rate = (wins/total)*100
-        avg_r = df['pnl_r'].mean()
         total_r = df['pnl_r'].sum()
-        
         return {
-            "Total Trades": total,
-            "Win Rate": f"{win_rate:.2f}%",
-            "Total Return (R)": f"{total_r:.2f}R",
-            "Expectancy (R/Trade)": f"{avg_r:.2f}R"
+            "Total Trades": len(df),
+            "Win Rate": f"{(wins/len(df)*100):.1f}%",
+            "Total Return (R)": f"{total_r:.1f}R",
+            "Expectancy (R/Trade)": f"{(total_r/len(df)):.2f}R"
         }
 
 if __name__ == "__main__":
-    runner = ComparativeBacktest()
+    runner = ComparativeBacktest(days=30)
     
-    # MODEL A: BASELINE (NY Only)
-    res_a = runner.run_model("Baseline (NY Only)", {
-        "killzones": list(range(12, 20)),
-        "quartile_range": (0.0, 0.45),
-        "tp_multiples": (1.5, 3.0)
-    })
-    
-    # MODEL B: NY + EST EVENING (Asian Session)
-    # Testing 7PM EST - 12AM EST (00:00 - 05:00 UTC)
-    ny_hours = list(range(12, 20))
-    asian_hours = [0, 1, 2, 3, 4] 
-    res_b = runner.run_model("NY + EST Evening", {
-        "killzones": ny_hours + asian_hours,
-        "quartile_range": (0.0, 0.45), # Keep strict filters
-        "tp_multiples": (1.5, 3.0)
-    })
-    
-    # MODEL C: NY + LATE AFTERNOON (Power Hour Extension)
-    # Extending NY to 5PM EST (20-22 UTC)
-    # 3PM EST = 20 UTC, 4PM = 21 UTC, 5PM = 22 UTC
-    extended_ny = list(range(12, 23))
-    res_c = runner.run_model("NY Extended (Late)", {
-        "killzones": extended_ny,
-        "quartile_range": (0.0, 0.45),
-        "tp_multiples": (1.5, 3.0)
-    })
-    
-    stats_a = runner.analyze(res_a)
-    stats_b = runner.analyze(res_b)
-    stats_c = runner.analyze(res_c)
+    models = [
+        ("London Only", {"killzones": range(7, 11)}),
+        ("NY Only", {"killzones": range(12, 20)}),
+        ("NY + Evening", {"killzones": list(range(12, 20)) + [0,1,2,3,4]}),
+        ("All Major", {"killzones": list(range(7, 11)) + list(range(12, 20)) + [0,1,2,3,4]})
+    ]
     
     print("\n" + "="*80)
-    print(f"{'METRIC':<25} | {'NY ONLY':<15} | {'NY + EVENING':<15} | {'NY EXTENDED':<15}")
+    print(f"{'MODEL':<20} | {'TRADES':<10} | {'WIN RATE':<12} | {'TOTAL R':<10}")
     print("-" * 80)
-    for key in ["Total Trades", "Win Rate", "Total Return (R)", "Expectancy (R/Trade)"]:
-        v_a = stats_a.get(key, 'N/A')
-        v_b = stats_b.get(key, 'N/A')
-        v_c = stats_c.get(key, 'N/A')
-        print(f"{key:<25} | {str(v_a):<15} | {str(v_b):<15} | {str(v_c):<15}")
+    
+    for name, params in models:
+        trades = runner.run_model(name, params)
+        stats = runner.analyze(trades)
+        print(f"{name:<20} | {stats['Total Trades']:<10} | {stats['Win Rate']:<12} | {stats['Total Return (R)']:<10}")
     print("="*80)

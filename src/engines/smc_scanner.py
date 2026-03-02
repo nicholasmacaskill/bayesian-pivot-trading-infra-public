@@ -260,6 +260,7 @@ class SMCScanner:
             return None
 
         try:
+
             # Step 1: Extract Asian Range candles (00:00 – 04:00 UTC)
             df['hour'] = df['timestamp'].dt.hour
             asian_candles = df[df['hour'].between(0, 3)].tail(48)  # Last ~4 hours of 5m candles
@@ -556,6 +557,58 @@ class SMCScanner:
         
         return atr
     
+    def detect_mss(self, df):
+        """
+        Market Structure Shift: Price breaks the most recent swing fractal.
+        """
+        is_high, is_low = self.detect_fractals(df)
+        
+        # Get most recent confirmed swing high/low
+        recent_highs = df[is_high]['high']
+        recent_lows = df[is_low]['low']
+        
+        if recent_highs.empty or recent_lows.empty:
+            return None
+            
+        last_high = recent_highs.iloc[-1]
+        last_low = recent_lows.iloc[-1]
+        
+        current_close = df['close'].iloc[-1]
+        prev_close = df['close'].iloc[-2]
+        
+        mss_bullish = current_close > last_high and prev_close <= last_high
+        mss_bearish = current_close < last_low and prev_close >= last_low
+        
+        if mss_bullish: return 'BULLISH'
+        if mss_bearish: return 'BEARISH'
+        return None
+
+    def is_displaced_move(self, df, direction):
+        """
+        Confirms institutional participation via high-momentum candle (Displacement).
+        Body > 1.5 * ATR.
+        """
+        last = df.iloc[-1]
+        atr = self.calculate_atr(df).iloc[-1]
+        body_size = abs(last['close'] - last['open'])
+        
+        return body_size > (atr * 1.5)
+
+    def detect_inducement_trap(self, df, direction):
+        """
+        Detects 'Retail Inducement' (minor highs/lows) swept just before reversal.
+        """
+        recent = df.tail(10)
+        last = df.iloc[-1]
+        
+        if direction == 'LONG':
+            # Swept a minor low (inducement) before MSS
+            minor_low = recent['low'].iloc[:-1].min()
+            return last['low'] < minor_low and last['close'] > minor_low
+        else:
+            minor_high = recent['high'].iloc[:-1].max()
+            return last['high'] > minor_high and last['close'] < minor_high
+
     def get_volatility_adjusted_target(self, df, direction, entry_price, session_range):
         """
         ATR-Dynamic Targeting: Adjusts targets based on current volatility.
@@ -722,7 +775,7 @@ class SMCScanner:
         return False
 
     @safe_scan("Scanner.scan_pattern")
-    def scan_pattern(self, symbol, timeframe='5m', cached_context=None, provided_df=None, current_time_override=None):
+    def scan_pattern(self, symbol, timeframe='5m', cached_context=None, provided_df=None, current_time_override=None, visual_check=True):
         """
         Main Scanning Function.
         Checks: Killzone -> Trend Bias -> Price Quartiles -> SMC Pattern
@@ -762,8 +815,8 @@ class SMCScanner:
             index_context = self.intermarket.get_market_context()
             
         # 4. HARD GATE: Bias (HTF 4H + Daily + Intermarket + Visual)
-        # We pass visual_check=True as per User Request for enhanced accuracy
-        bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=True)
+        # We pass visual_check as per parameter (default True)
+        bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=visual_check)
         if "STRONG" in bias_full:
             logger.info(f"💪 STRONG BIAS DETECTED: {bias_full}")
         

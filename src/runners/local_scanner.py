@@ -26,6 +26,8 @@ from src.engines.calendar_filter  import CalendarFilter
 from src.engines.regime_filter     import RegimeFilter
 from src.engines.trade_ledger      import TradeLedger
 from src.engines.retraining_loop   import RetrainingLoop
+from src.engines.psychology_engine import PsychologyEngine
+from src.engines.biometric_engine  import BiometricEngine
 
 # Configure Logging
 logging.basicConfig(
@@ -74,6 +76,14 @@ class LocalScannerRunner:
         self.regime_filter = RegimeFilter()
         self.ledger        = TradeLedger() if Config.get('LEDGER_ENABLED', True) else None
         self.retrain_loop  = RetrainingLoop()  if Config.get('RETRAIN_ENABLED',  True) else None
+        
+        # ── Biometrics & Psychology ───────────────────────────────────
+        self.psychology    = PsychologyEngine()
+        self.biometrics    = BiometricEngine(port=8080)
+        self.biometrics.start_server()
+        self.current_tilt_score = 1
+        self.risk_multiplier   = 1.0
+        # ───────────────────────────────────────────────────────────
         # ───────────────────────────────────────────────────────────
 
         # ── Sovereign Guard (Security Layer) ────────────────────────────────
@@ -111,6 +121,22 @@ class LocalScannerRunner:
         try:
             init_db()
             
+            # 0. Biometric & Psychology Audit
+            logger.info("🧠 Performing Psychology & Biometric Audit...")
+            physio_tilt = self.biometrics.calculate_physio_tilt()
+            psych_state = self.psychology.analyze_user_state(
+                current_text="Periodic scan check.", 
+                physio_tilt=physio_tilt
+            )
+            self.current_tilt_score = psych_state.get('tilt_score', 1)
+            self.risk_multiplier = self.psychology.get_risk_multiplier(self.current_tilt_score)
+            
+            if self.risk_multiplier < 1.0:
+                logger.warning(f"⚠️ RISK GATED: Tilt Level {self.current_tilt_score} | Multiplier: {self.risk_multiplier}x")
+            if self.risk_multiplier == 0:
+                logger.error("🛑 HARD SHUTDOWN: High Tilt detected. Skipping cycle.")
+                return
+
             # 1. Sync Equity
             live_equity = self.tl.get_total_equity()
             if live_equity > 0:
@@ -124,12 +150,20 @@ class LocalScannerRunner:
             scan_list = Config.SYMBOLS + Config.ALT_SYMBOLS
             setups_found = 0
             
+            # 3. INTERMARKET CONTEXT BATCHING (Phase 3.5 Fix)
+            # Fetch once per cycle to avoid getting IP-blocked by Yahoo Finance
+            market_context = self.scanner.intermarket.get_market_context()
+            logger.info("📡 Batched Intermarket Context retrieved.")
+            
             for symbol in scan_list:
                 logger.info(f"🔎 Scanning {symbol}...")
                 
                 # Scan Logic (SMC + Order Flow Fallback)
+                # Pass batched context to avoid redundant network calls
+                cached_ctx = {'intermarket': market_context} if market_context else None
+                
                 # Fetch Bias first for logging
-                bias_score = self.scanner.get_detailed_bias(symbol)
+                bias_score = self.scanner.get_detailed_bias(symbol, index_context=market_context)
                 logger.info(f"CAPTURED BIAS: {bias_score} on {symbol}")
 
                 # ── GATE 1: Economic Calendar ────────────────────────────────────
@@ -148,7 +182,11 @@ class LocalScannerRunner:
 
                 # --- Standard SMC Scan (fallback) ---
                 if not result:
-                    result = self.scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME)
+                    result = self.scanner.scan_pattern(
+                        symbol, 
+                        timeframe=Config.TIMEFRAME,
+                        cached_context=cached_ctx
+                    )
                 if not result:
                     result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME)
 
@@ -242,7 +280,8 @@ class LocalScannerRunner:
                         # 💰 Risk Calculation (with regime size multiplier applied)
                         calc_equity = live_equity if live_equity > 0 else 100000.0
                         base_risk   = calc_equity * Config.RISK_PER_TRADE
-                        risk_amt    = base_risk * regime_size_mult  # Regime adjusts size
+                        # Apply both Regime and Psychology risk multipliers
+                        risk_amt    = base_risk * regime_size_mult * self.risk_multiplier
                         distance    = abs(setup['entry'] - setup['stop_loss'])
                         
                         # Unit-based sizing (Standard for Crypto/Indices)
@@ -256,6 +295,8 @@ class LocalScannerRunner:
                             "position_size": lots,
                             "equity_basis":  calc_equity,
                             "regime_mult":   regime_size_mult,
+                            "psych_mult":    self.risk_multiplier,
+                            "tilt_score":    self.current_tilt_score
                         }
 
                         # ── SIGN THE SIGNAL (Feature 5: Signed Ledger) ──────────────
