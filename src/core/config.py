@@ -84,6 +84,27 @@ class Config:
     # Safety Toggles
     USE_TRADELOCKER_API = True  # Set to False to disable API sync and use mock values
     SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "")  # Shared secret for Local -> Cloud push (MUST be set in .env.local)
+
+
+    # ── Feature 1: Correlation Gate ───────────────────────────────────────────
+    CORRELATION_MAX_PER_DIRECTION = 1  # Block if ≥ N signals in same direction per basket
+    CORRELATION_SLOT_EXPIRY_HRS   = 4  # Auto-release slot after N hours (safety valve)
+
+    # ── Feature 2: Economic Calendar ─────────────────────────────────────────
+    CALENDAR_BLACKOUT_MINUTES = 30  # Block N minutes before AND after high-impact events
+
+    # ── Feature 4: Regime Filter ─────────────────────────────────────────────
+    REGIME_BLOCK_CHOPPY   = True   # Block signals in choppy regime
+    REGIME_ADX_TREND_MIN  = 25     # ADX ≥ this = trending
+    REGIME_ADX_CHOPPY_MAX = 18     # ADX ≤ this + Hurst ≈ 0.5 = choppy
+
+    # ── Feature 5: Signed Trade Ledger ───────────────────────────────────────
+    LEDGER_ENABLED = True  # Cryptographically sign every signal (strongly recommended)
+
+    # ── Feature 6: Automated Retraining ──────────────────────────────────────
+    RETRAIN_ENABLED          = True  # Run weekly retraining loop
+    RETRAIN_MIN_SAMPLES      = 5     # Minimum outcomes before retraining
+    RETRAIN_EXPORT_JSONL     = True  # Export JSONL for Vertex AI fine-tuning
     
     # Strategy Mode: "SNIPER" (Optimized for High Precision)
     STRATEGY_MODE = "SNIPER" # Options: SNIPER, WIDE_NET
@@ -121,7 +142,7 @@ class Config:
 
 
     # Database Path (Modal Volume)
-    DB_PATH = "/data/smc_alpha.db" if os.path.exists("/data") else os.path.join(os.getcwd(), "smc_alpha.db")
+    DB_PATH = "/data/smc_alpha.db" if os.path.exists("/data") else os.path.join(os.getcwd(), "data", "smc_alpha.db")
 
     # Local Runner Parameters
     RUN_INTERVAL_MINS = 1

@@ -14,3 +14,6 @@ mplfinance
 Pillow
 supabase
 psycopg2-binary
+psutil
+plyer
+cryptography

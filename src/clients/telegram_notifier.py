@@ -112,6 +112,22 @@ class TelegramNotifier:
 
         self._send_message(message, buttons=buttons)
 
+    def send_security_alert(self, title: str, summary: str, severity: str = "HIGH"):
+        """Sends a Sovereign Guard security threat alert to the Telegram channel."""
+        severity_icon = {
+            "CRITICAL": "🚨",
+            "HIGH":     "⚠️",
+            "MEDIUM":   "🟡",
+        }.get(severity, "⚠️")
+
+        message = (
+            f"{severity_icon} *SOVEREIGN GUARD — {severity} ALERT*\n\n"
+            f"🛡️ *{title}*\n\n"
+            f"{summary}\n\n"
+            f"⏰ `{__import__('datetime').datetime.now().strftime('%H:%M:%S UTC')}`"
+        )
+        self._send_message(message)
+
     def send_kill_switch(self, reason):
         """Sends a critical Kill Switch/Circuit Breaker alert."""
         message = (

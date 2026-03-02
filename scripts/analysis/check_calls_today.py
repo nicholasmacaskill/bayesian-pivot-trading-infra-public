@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 # Mimic Config logic for local DB
-DB_PATH = "smc_alpha.db"
+DB_PATH = "data/smc_alpha.db"
 if not os.path.exists(DB_PATH):
     print(f"Warning: {DB_PATH} not found in current directory.")
 

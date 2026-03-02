@@ -5,6 +5,7 @@ import re
 SOURCE_DIR = os.getcwd()
 EXPORT_DIR = os.path.join(SOURCE_DIR, "public_export")
 IGNORE_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".gemini", "public_export"}
+IGNORE_EXTENSIONS = {".log", ".csv", ".jsonl", ".pt", ".bin"}  # No data backups or weights in public repo
 SENSITIVE_FILES = ["config.py", "smc_scanner.py", "strategies/strategy_1_smc_alpha.md"]
 
 def setup_export_dir():
@@ -30,6 +31,10 @@ def setup_export_dir():
         for file in files:
             if file == "release_public.py": continue
             if file.startswith("."): continue
+            
+            # Extension filter
+            _, ext = os.path.splitext(file)
+            if ext in IGNORE_EXTENSIONS: continue
             
             src_file = os.path.join(root, file)
             dst_file = os.path.join(target_dir, file)
