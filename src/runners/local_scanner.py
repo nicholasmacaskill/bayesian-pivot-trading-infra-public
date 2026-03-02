@@ -190,8 +190,7 @@ class LocalScannerRunner:
                     logger.info(f"🧠 Memory Context retrieved ({'Found history' if 'Found similar' in memory_context else 'No history'})")
                     
                     # ── Security Context (Sovereign Guard enrichment) ────
-                    security_context = self.guard.get_security_context()
-                    enriched_memory  = f"{memory_context}\n\n[Guard] {security_context}"
+                    security_status = self.guard.get_security_context()
                     # ────────────────────────────────────────────────────────
 
                     # AI Validation (Vision Proxy + RAG Active)
@@ -202,7 +201,7 @@ class LocalScannerRunner:
                         image_path=generated_chart,
                         df=df,
                         exchange=self.scanner.exchange,
-                        memory_context=enriched_memory
+                        memory_context=memory_context  # Reverted back to original memory context
                     )
                     
                     live = ai_result.get('live_execution', ai_result)
@@ -280,7 +279,8 @@ class LocalScannerRunner:
                                 reasoning=live.get('reasoning', ''),
                                 verdict=live.get('verdict', 'N/A'),
                                 risk_calc=risk_calc,
-                                shadow_insights=shadow
+                                shadow_insights=shadow,
+                                security_status=security_status
                             )
                             # Append signal_id to the alert message as a separate line
                             if signal_id != 'UNSIGNED' and ledger_tag:

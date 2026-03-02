@@ -15,7 +15,7 @@ class TelegramNotifier:
         self.last_alerts = {} 
         self.COOLDOWN_MINUTES = 60
 
-    def send_alert(self, symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None):
+    def send_alert(self, symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None, security_status=None):
         """Sends a formatted high-priority alert with optional execution buttons and shadow insights."""
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram credentials not found. Skipping alert.")
@@ -81,6 +81,14 @@ class TelegramNotifier:
                 f"• Position Value: `${position_value:,.2f}`\n\n"
             )
         
+        # Add Security Status (vibrant confirmation)
+        if security_status:
+            if "CLEAN" in security_status.upper() or "SECURE" in security_status.upper():
+                status_formatted = "🛡️ *Security:* Environment confirmed as secure"
+            else:
+                status_formatted = f"⚠️ *Security:* {security_status}"
+            message += f"{status_formatted}\n\n"
+
         # Add Shadow Optimizer Insights (if available)
         if shadow_insights:
             regime = shadow_insights.get('regime_classification', 'Unknown')
@@ -165,9 +173,9 @@ class TelegramNotifier:
             logger.error(f"Failed to send Telegram message: {e}")
 
 # Standalone helper
-def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None):
+def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None, security_status=None):
     notifier = TelegramNotifier()
-    notifier.send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict, risk_calc, buttons=buttons, shadow_insights=shadow_insights)
+    notifier.send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict, risk_calc, buttons=buttons, shadow_insights=shadow_insights, security_status=security_status)
 
 def send_system_error(component, error):
     notifier = TelegramNotifier()
