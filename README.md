@@ -82,12 +82,34 @@ Trading is biological. This engine protects the system from the trader.
 
 ---
 
+## 🧬 The Evolution Layer (SFT & Rogue Audit)
+The system functions as a **Synthetic Consciousness** that learns from both its successes and the trader's failures.
+
+### 1. Auto-Contextualization (Zero-Input Audit)
+When a discretionary/manual trade is executed ("Rogue Trade"), the system immediately triggers a **Forensic Reconstruction**. Without human input, it fetches historical 5m/1h data to determine:
+- The exact price position within the Asian Range.
+- The 4H EMA Trend Bias and Intermarket SMT status at entry.
+- Whether the trade was a "Fomoc" (Fear of Missing Out) entry into a liquidity vacuum or a high-alpha sweep.
+
+### 2. Delta Analysis: System vs. Rogue
+The infrastructure maintains two distinct ledgers:
+- **System Signals**: 9-Gate approved setups with high probabilistic edge.
+- **Rogue Trades**: Discretionary entries that bypassed the funnel.
+The **Delta Engine** compares the outcomes of these two paths, identifying "Alpha Leakage" (where the trader was right but the system was too conservative) and "Impulse Traps" (where the trader was wrong and the system correctly rejected).
+
+### 3. SFT Retraining Loop (Vertex AI)
+Every Sunday at 00:00 UTC, the system executes an **Automated Retraining Cycle**:
+- **Soft Training**: Updates the in-memory few-shot context window for Gemini with the past week's "Ground Truth" outcomes.
+- **Hard Training**: Exports a JSONL dataset for deep **Supervised Fine-Tuning (SFT)** on Google Vertex AI. This ensures the 9-Gate math evolves to match shifting market regimes.
+
+---
+
 ## 🔒 Security & Operations (OPSEC Layer)
 The **Guard Engine** runs as a background daemon to protect the workstation:
+- **RSA Provenance Chain**: Every signal is cryptographically signed using a local 2048-bit RSA key. This creates a tamper-evident audit trail for every trade, proving it originated from the system's logic and not a manual override.
 - **Clipboard Sentry**: Detects crypto address hijacking.
 - **Process Audit**: Whitelist-based process monitoring for process injection detection.
-- **Root CA Scan**: Periodically validates the OS trust store for MITM intercepts.
-- **Zero-Trust Logic**: All credentials secured via `.env.local` with hardware-awake persistence via `caffeinate`.
+- **Zero-Trust Logic**: All credentials secured via `.env.local` with hardware-awake persistence.
 
 ---
 
