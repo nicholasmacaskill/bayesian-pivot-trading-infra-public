@@ -42,30 +42,18 @@ class PsychologyEngine:
         if not self.client:
             return {"tilt_score": 0, "sentiment": "Neutral", "reasoning": "AI Unavailable"}
 
-        prompt = """
-        You are the SOVEREIGN PSYCHOLOGIST. Your role is to analyze a trader's emotional state.
-        TRADERS FAIL because of TILT (Frustration, Revenge Trading, Over-confidence).
-        
-        Analyze the provided input (text and/or audio) for:
-        1. **Tilt Level** (1-10): 
-            - 1-3: Calm, analytical, objective.
-            - 4-6: Agitated, slight bias, impatient.
-            - 7-8: Emotional, high risk of bad decisions.
-            - 9-10: FULL TILT. Revenge trading, irrational.
-        2. **Sentiment**: One word (Calm, Frustrated, Aggressive, Fearful, Euphoric).
-        3. **Tone Analysis**: Key emotional triggers found.
-        
-        INPUT CONTEXT:
-        Text: {text}
-        
-        Return valid JSON:
-        {{
-            "tilt_score": int,
-            "sentiment": str,
-            "tone_analysis": str,
-            "gatekeeper_advice": str
-        }}
-        """
+        # Load Sovereign Prompts (Private IP)
+        try:
+            from src.sovereign_core.prompts.psychology_prompts import SOVEREIGN_PSYCHOLOGY_PROMPT
+            sovereign_prompt = SOVEREIGN_PSYCHOLOGY_PROMPT
+        except ImportError:
+            sovereign_prompt = None
+
+        if sovereign_prompt:
+            prompt = sovereign_prompt.format(text=current_text or "No text provided")
+        else:
+            # Public Lite Version
+            prompt = f"Analyze the following trader text for emotional state (1-10 score): {current_text}"
         
         contents = [prompt.format(text=current_text or "No text provided")]
         
