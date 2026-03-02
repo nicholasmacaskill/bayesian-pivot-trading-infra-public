@@ -157,9 +157,23 @@ def _init_ledger_table():
             trade_id      TEXT,
             pnl           REAL,
             is_rogue      INTEGER DEFAULT 0,
+            volume_spike  REAL DEFAULT 1.0,
+            true_smt      TEXT,
+            shadow_regime TEXT,
             notes         TEXT
         )
     """)
+    # Migrations
+    try:
+        c.execute("ALTER TABLE signed_ledger ADD COLUMN volume_spike REAL DEFAULT 1.0")
+    except sqlite3.OperationalError: pass
+    try:
+        c.execute("ALTER TABLE signed_ledger ADD COLUMN true_smt TEXT")
+    except sqlite3.OperationalError: pass
+    try:
+        c.execute("ALTER TABLE signed_ledger ADD COLUMN shadow_regime TEXT")
+    except sqlite3.OperationalError: pass
+    
     conn.commit()
     conn.close()
 
@@ -209,6 +223,9 @@ class TradeLedger:
             'entry_price': setup.get('entry', 0.0),
             'stop_loss':   setup.get('stop_loss', 0.0),
             'take_profit': setup.get('target', setup.get('tp1', 0.0)),
+            'volume_spike': setup.get('volume_spike', 1.0),
+            'true_smt':     setup.get('true_smt'),
+            'shadow_regime': setup.get('shadow_regime', 'Unknown')
         }
 
         payload_hash = hashlib.sha256(
@@ -222,8 +239,9 @@ class TradeLedger:
             conn.execute("""
                 INSERT INTO signed_ledger
                 (signal_id, timestamp, symbol, direction, pattern, ai_score,
-                 entry_price, stop_loss, take_profit, payload_hash, signature)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 entry_price, stop_loss, take_profit, payload_hash, signature,
+                 volume_spike, true_smt, shadow_regime)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 signal_id,
                 payload['timestamp'],
@@ -236,6 +254,9 @@ class TradeLedger:
                 payload['take_profit'],
                 payload_hash,
                 signature,
+                payload['volume_spike'],
+                payload['true_smt'],
+                payload['shadow_regime']
             ))
             conn.commit()
         finally:
@@ -328,6 +349,9 @@ class TradeLedger:
             'entry_price': row['entry_price'],
             'stop_loss':   row['stop_loss'],
             'take_profit': row['take_profit'],
+            'volume_spike': row.get('volume_spike', 1.0),
+            'true_smt':     row.get('true_smt'),
+            'shadow_regime': row.get('shadow_regime', 'Unknown')
         }
 
         # If it was logged as ROGUE, no signature to verify
