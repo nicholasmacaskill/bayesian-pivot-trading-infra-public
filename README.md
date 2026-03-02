@@ -8,40 +8,69 @@ Bayesian Pivot Trading Infra is a professional-grade trading OS that synthesizes
 
 ---
 
-## 🛡️ The Signal Funnel (7-Gate Architecture)
+## 🛡️ The 9-Gate Signal Funnel (Deterministic Gauntlet)
 No trade is executed in isolation. Every signal must survive a sequential "Gauntlet" to filter for institutional backing.
 
-### Gate 0: Regime Calibration (Dual-Regime Hurst)
-The system calculates a **200-candle rolling Hurst Exponent** to classify the market "State."
-- **H < 0.45 (Mean-Reverting)**: Activates *Reversal Mode* (Fading liquidity sweeps).
-- **0.45 – 0.55 (Transition)**: **SKIP**. No directional edge detected.
-- **H > 0.55 (Trending)**: Activates *Trending Mode* (Pullbacks into Fair Value Gaps).
+```mermaid
+graph TD
+    A[Market Pulsing] --> G0[Gate 0: Killzones]
+    G0 --> G1[Gate 1: Hurst Physics]
+    G1 --> G2[Gate 2: Intermarket SMT]
+    G2 --> G3[Gate 3: Liquidity Magnets]
+    G3 --> G4[Gate 4: Alpha Quality]
+    G4 --> G5[Gate 5: MSS + Displacement]
+    G5 --> G6[Gate 6: Dual-Track AI]
+    G6 --> G7[Gate 7: Biometric Lock]
+    G7 --> G8[Gate 8: Forensic Audit]
+    G8 --> J[EXECUTION]
+```
 
-### Gate 1: Institutional Timing (Killzones)
-Trading is restricted to high-liquidity windows:
-- **Asian Session**: 00-04 UTC (Asian Fade)
-- **London Open**: 07-10 UTC
-- **NY Open**: 12-17 UTC
+### Gate 0: Institutional Timing (Killzones)
+Trading is restricted to high-liquidity windows where central bank algorithms are most active.
+- **Asian Range**: 00:00 - 04:00 UTC (The "Anchor" for the day's expansion).
+- **London Open**: 07:00 - 10:00 UTC (Search for the "Judas Swing").
+- **NY Open**: 12:00 - 17:00 UTC (Final distribution or Reversal).
 
-### Gate 2: High-Timeframe Sponsorship (4H Bias)
-A dual-EMA stack (EMA 20/50) on the 4H timeframe determines the "Institutional Flow." Counter-trend trades are rejected by default.
+### Gate 1: Market Physics (Dual-Regime Hurst)
+The system calculates a **200-candle rolling Hurst Exponent** to classify the market "State":
+- **Efficiency (H < 0.45)**: Mean-Reverting. Activates *Reversal Mode* targeting liquidity sweeps.
+- **Chaos (0.45 – 0.55)**: **SKIP**. No directional advantage detected.
+- **Persistence (H > 0.55)**: Trending. Activates *Expansion Mode* targeting Fair Value Gaps.
 
-### Gate 3: Macro Volatility (News Blackout)
-Automated blackout windows (±30m) around "Red Folder" high-impact events.
+### Gate 2: Intermarket Confluence (Vectorized SMT)
+Real-time correlation audit between correlated assets (e.g., DXY/BTC/ETH).
+- **SMT Divergence**: If the Dollar makes a Lower Low but the Asset fails to make a Higher High, institutional accumulation is confirmed.
+- **Divergence Threshold**: Requires a >2.0 standard deviation separation to clear the gate.
 
-### Gate 4: Alpha Precision (Stop Cascade Detection)
-A three-pronged mathematical model for filtering retail "fake-outs":
-- **EQL Pool Mapping**: Detects Equal Highs/Lows as high-conviction liquidity magnets.
-- **Sweep Exhaustion**: Requires 2+ sweeps (cascade depth) before acknowledging a level.
-- **Wick Ratio Gate**: Scores sweep quality (>0.8 ATR) to ensure stop-run clearance.
+### Gate 3: Liquidity Magnets (EQL/Sweep Pools)
+Identification of high-conviction targets before entry.
+- **EQL/EQH Mapping**: Detects "Retail Support/Resistance" as targets for institutional stop-clearing.
+- **Order Flow Depth**: Scans for historical liquidity clusters where large orders are "hidden."
+
+### Gate 4: HFT Alpha Precision (Wick Ratio Gating)
+A mathematical filter for the quality of a liquidity sweep.
+- **Cascade Depth**: Requires price to clear at least 2 levels of stop-liquidity before acknowledging a "Hunt."
+- **Wick Quality**: Scores the rejection speed (>0.8 ATR) to ensure the move was a sweep, not a breakout.
 
 ### Gate 5: Structure Shift (MSS + Displacement)
-The system requires **Institutional Momentum** candles (Body > 1.5x ATR) and a **Market Structure Shift (MSS)** on 5-minute charts to confirm a shift in intent.
+Confirmation of intent shift on lower timeframes (1m-5m).
+- **MSS**: A close beyond the most recent swing point.
+- **Displacement**: Requires candles with bodies >1.5x the average volume/size to confirm a "V-shape" recovery or departure.
 
 ### Gate 6: Dual-Track AI Validation
-Final approval via **Gemini 2.0 SFT Analysis**:
-- **Gatekeeper Track**: Reject-by-default persona analyzing chart footprints for inducement traps.
-- **Shadow Optimizer Track**: Dynamic risk-adjustment (0.5x – 1.33x) based on setup quality.
+Final logic audit via **Gemini 2.0 SFT Analysis** using a bifurcated review:
+- **Control Track**: A "Reject-by-Default" persona analyzing the chart for retail inducement traps.
+- **Shadow Track**: Experimental risk-adjustment (0.5x – 1.3x) based on setup-memory correlation.
+
+### Gate 7: Biometric Physiological Lock
+Biologically-aware execution gating via **Apple Health Integration**.
+- **The Heart-Rate Gate**: If BPM > 100 or HRV < 25ms, the system detects "Trader Tilt" and restricts risk by 50-100%.
+- **Physio-Gated Alpha**: Trading is only permitted when the practitioner is in a state of analytical coherence.
+
+### Gate 8: Forensic Prop-Audit
+Compliance auditing for institutional and funded account providers.
+- **Loop Detection**: Scans for "Adversarial Loops" in rule documents (e.g., trailing equity drawdown).
+- **Safety Margin**: Forces a hard stop if the session's projected risk exceeds firm-specific "Consistency Rule" thresholds.
 
 ---
 
