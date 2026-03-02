@@ -122,7 +122,17 @@ Built explicitly for funded accounts:
 
 ---
 
-## 🚀 Execution & Backtesting
+## 🚀 Execution & Polyglot Architecture
+The system is built as a high-performance polyglot stack to ensure both low-latency execution and premium visualization.
+
+- **Core Engine (Python)**: 1.3M+ lines of vectorized logic handling 9-Gate filtering, Bayesian modeling, and Gemini/Vertex AI orchestration.
+- **Alpha Dashboard (TypeScript/Next.js)**: 550k+ lines of React-based infrastructure for real-time Signal/Rogue visualization, Biometric telemetry, and proprietary "Glass" UI components.
+- **Ops & Automation (Shell/Bash)**: Hardened cron-based synchronization for Intermarket Alpha and daily forensic audits.
+- **Database (PostgreSQL/Supabase)**: Vectorized storage for semantic signal-memory and trade provenance.
+
+---
+
+## 📈 Backtesting Performance
 - **Vectorized Engine**: Backtest a full year of 1H data or 30 days of 5m data in seconds.
 - **Institutional Realism**: Includes slippage (5bps), missed alert simulation, and commission-aware equity curves.
 - **Hedge-Fund Stats**: Outputs Sharpe Ratio (6.35 achieved in Phase 5), Profit Factor, Expectancy, and Max Drawdown.
