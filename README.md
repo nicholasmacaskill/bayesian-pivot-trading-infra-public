@@ -29,16 +29,26 @@ Every trade signal must survive a 4-tier "Gauntlet" before execution. If a setup
   - **Longs**: Only valid in **Deep Discount** (Bottom 25-50% of the range).
   - **Shorts**: Only valid in **High Premium** (Top 25-50% of the range).
 - **Intersymbol Sponsorship (SMT Divergence)**: No trade is taken in isolation.
-  - **BTC vs. ETH**: Requiring divergence at key liquidity pools (e.g., BTC makes a Lower Low while ETH makes a Higher Low).
+  - **BTC vs. ETH**: Requiring divergence at key liquidity pools.
   - **DXY Integration**: Cross-asset confirmation from the US Dollar Index.
-- **Level 2 Liquidity Filter**: The `validate_sweep_depth` logic spiders the exchange Order Book. A liquidity sweep is only considered "Smart Money" if the engine detects significant **Order Absorption** (>5.0 BTC volume depth) at the level.
+- **Level 2 Liquidity Filter**: The `validate_sweep_depth` logic spiders the exchange Order Book. A liquidity sweep is only considered "Smart Money" if the engine detects significant **Order Absorption** (>5.0 BTC volume depth).
 
 ### Tier 4: The AI Gatekeeper (Gemini 2.0 SFT)
-The final decision is made by a **Supervised Fine-Tuned (SFT)** model on Vertex AI:
-- **Footprint Recognition**: The model is trained to identify "Inducement" (Retail Traps) versus "Institutional Displacement."
-- **Institutional Confidence Score**: Ranks setups from 0-10.
+The final decision is made by a **Supervised Fine-Tuned (SFT)** model on Vertex AI. This turns a standard "Math-Based" scanner into an Institutional Intelligence model.
+- **Footprint Recognition**: The model is trained on a proprietary dataset of **Human Alpha** (discretionary winning trades) to identify "Inducement" (Retail Traps) versus "Institutional Displacement."
+- **Institutional Confidence Score**: Ranks setups from 0-10. 
   - `AI_THRESHOLD`: 8.0/10 for standard setups.
-  - `AI_THRESHOLD_ASIAN_FADE`: 7.5/10 (higher historical win rate window).
+  - `AI_THRESHOLD_ASIAN_FADE**: 7.5/10 (higher historical win rate window).
+- **Alpha Digitization**: This layer captures the "Instinct" that standard math-based indicators miss.
+
+---
+
+## 🛡️ The Mathematical Moat: Alpha vs. Math
+The Sovereign framework is designed such that the **Raw Scanner Math** (Tier 1-3) identifies *possible* setups, while the **AI Gatekeeper** (Tier 4) identifies *profitable* ones.
+- **Raw Math Win-Rate**: ~19.9% (Market Liquidity Traps)
+- **AI-Integrated Win-Rate**: Targeted Institutional Alpha (>75% expected).
+
+*Note: The public code provides the 'Engine' (The Math), but the 'Sovereign Intelligence' (The Fine-Tuned Weights) is hosted in an encrypted enclave and refreshed weekly via Human-in-the-Loop training.*
 
 ---
 
@@ -58,7 +68,8 @@ Targets are dynamically calculated based on the "Path of Least Resistance":
 ---
 
 ## 🔒 Security
-- **Confidential Release**: Core "Geometric Alpha" constants are redacted in this public export.
+- **Confidential Release**: Geometric Alpha constants and proprietary CSV training datasets are redacted in this public export.
 - **Zero-Trust Keys**: All credentials stored in `.env.local` (Never committed to Git).
+- **The "Leaked" Trap**: Trading the raw math signals without the AI Gatekeeper is a negative expectancy system.
 
 *Sovereign SMC: Built for the 1% who trade with the 0.1%.*

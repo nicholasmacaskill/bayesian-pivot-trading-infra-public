@@ -115,10 +115,19 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
         outcome = scan.get('outcome')
         narrative = build_narrative(scan)
         example = {
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": narrative},
-                {"role": "model", "content": outcome}
+            "system_instruction": {
+                "role": "system",
+                "parts": [{"text": SYSTEM_PROMPT}]
+            },
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": narrative}]
+                },
+                {
+                    "role": "model",
+                    "parts": [{"text": outcome}]
+                }
             ]
         }
         examples.append(example)
@@ -135,10 +144,19 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
             f"AI Analysis: {trade.get('mentor_feedback', 'High performance manual trade.')[:300]}"
         )
         example = {
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": narrative},
-                {"role": "model", "content": "WIN"}
+            "system_instruction": {
+                "role": "system",
+                "parts": [{"text": SYSTEM_PROMPT}]
+            },
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": narrative}]
+                },
+                {
+                    "role": "model",
+                    "parts": [{"text": "WIN"}]
+                }
             ]
         }
         examples.append(example)

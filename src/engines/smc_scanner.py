@@ -1,9 +1,5 @@
 import numpy as np
 import pandas as pd
-import numpy as np
-import pandas as pd
-# from smartmoneyconcepts import smc  <-- Removed unused dependency
-import ccxt
 import ccxt
 import time
 from datetime import datetime, time as time_obj
@@ -65,6 +61,10 @@ class SMCScanner:
         self.intermarket = IntermarketEngine()
         self.news = NewsFilter()
         self.order_book_enabled = True  # Can be disabled if exchange doesn't support
+        # Deduplication cache: prevents firing the same signal multiple times per candle window
+        # Key: (symbol, pattern_type) | Value: timestamp of last signal
+        self._signal_cache = {}
+        self._signal_cooldown_mins = 15  # Minimum minutes between signals for the same symbol
 
     def get_hurst_exponent(self, time_series):
         """
@@ -712,7 +712,16 @@ class SMCScanner:
         """
         # 1. HARD GATE: Time (Killzone)
         if not self.is_killzone(current_time=current_time_override):
-            return None 
+            return None
+
+        # DEDUPLICATION GATE: Prevent the same symbol from firing multiple times per candle window
+        now_ts = (current_time_override or datetime.utcnow()).timestamp()
+        cache_key = symbol
+        last_fired = self._signal_cache.get(cache_key, 0)
+        cooldown_secs = self._signal_cooldown_mins * 60
+        if (now_ts - last_fired) < cooldown_secs:
+            logger.debug(f"🔇 Deduplicated signal for {symbol} (cooldown: {int(cooldown_secs - (now_ts - last_fired))}s remaining)")
+            return None
 
         # 2. SOFT GATE: News Context (Use Cache or Live)
         if cached_context and 'news' in cached_context:
@@ -936,6 +945,8 @@ class SMCScanner:
 
 
         if setup:
+            # Stamp cache so this symbol is deduplicated for the next cooldown window
+            self._signal_cache[cache_key] = now_ts
             return setup, df
         return None
 

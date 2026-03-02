@@ -440,10 +440,9 @@ class AIValidator:
 
             # NEXT-GEN MULTI-TRY LOGIC
             models_to_try = [
-                'gemini-2.0-flash', 
-                'gemini-3-flash-preview', 
-                'gemini-2.5-flash-lite', 
-                'gemini-1.5-flash'
+                'gemini-2.0-flash',     # Confirmed working
+                'gemini-2.5-flash',     # Latest generation fallback
+                'gemini-1.5-flash',     # Reliable last resort
             ]
             
             text = None
@@ -516,10 +515,9 @@ class AIValidator:
             
             # NEXT-GEN MULTI-TRY LOGIC (VISION)
             models_to_try = [
-                'gemini-2.0-flash', 
-                'gemini-3-flash-preview', 
-                'gemini-2.5-flash-lite', 
-                'gemini-1.5-flash'
+                'gemini-2.0-flash',     # Confirmed working, vision-capable
+                'gemini-2.5-flash',     # Latest generation fallback
+                'gemini-1.5-flash',     # Reliable last resort
             ]
             
             verdict = "NEUTRAL"

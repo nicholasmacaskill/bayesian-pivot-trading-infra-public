@@ -30,3 +30,9 @@ build/
 # Modal
 .modal/
 *.log
+
+# Sovereign Trade Ledger (NEVER commit the private key)
+~/.sovereign_keys/sovereign_private.pem
+
+# Retraining data (contains trade outcomes — keep local)
+data/training/

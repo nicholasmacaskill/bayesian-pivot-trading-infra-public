@@ -23,12 +23,12 @@ class TradeLockerHelper:
         
     def resolve_symbol(self, instrument_id):
         """Maps internal IDs to human-readable symbols."""
-        # Definitive fallbacks based on Modal DB audit and TradeLocker standards
         mapping = {
-            "206": "BTC/USDT",
-            "207": "ETH/USDT",
-            "214": "ETH/USDT",
-            "208": "SOL/USDT",
+            "206": "BTC/USD",
+            "207": "ETH/USD",
+            "214": "ETH/USD",
+            "208": "SOL/USD",
+            "221": "SOL/USD",
             "1": "EUR/USD",
             "2": "GBP/USD"
         }
@@ -166,47 +166,99 @@ class TradeLockerHelper:
             return []
 
     def get_recent_history(self, hours=24):
-        """Fetches closed positions from the last N hours."""
+        """
+        Fetches filled orders from the ordersHistory endpoint.
+        Pairs BUY/SELL orders by position_id to calculate per-trade PnL.
+        """
         if not self.access_token and not self.login(): return []
         
         try:
-            # Try getting history (generic endpoint, may vary by broker version)
-            # We look for 'positions' with 'status' closed.
-            # endpoint found in previous scraping: /backend-api/trade/history
-            url = f"{self.base_url}/backend-api/trade/history?timeRange=last{hours}h" 
-            # Fallback to general history if timeRange not supported
+            # Correct endpoint for Upcomers/TradeLocker
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/ordersHistory"
+            resp = requests.get(url, headers=self._get_headers(auth=True), params={'limit': 500}, timeout=15)
             
-            # Note: For many TL installs, use /backend-api/trade/orders/history or /trade/accounts/{id}/history
-            # We will try the most common one: 
-            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/history"
-            
-            resp = requests.get(url, headers=self._get_headers(auth=True), params={'limit': 100}, timeout=10)
-            
-            if resp.status_code == 200:
-                data = resp.json()
-                # Normalized list of closed trades
-                trades = []
-                positions = data.get('d', {}).get('positions', []) # TL often wraps in 'd'
-                if not positions and isinstance(data, list): positions = data # direct list
-                
-                for p in positions:
-                    # Filter for closed positions within timeframe
-                    close_time_str = p.get('closeDate') or p.get('filledAt')
-                    if not close_time_str: continue
-                    
-                    # Basic parsing
-                    trades.append({
-                        'id': p.get('id'),
-                        'symbol': self.resolve_symbol(p.get('instrumentId')), # map to valid symbol
-                        'side': 'BUY' if p.get('side') == 'buy' else 'SELL',
-                        'pnl': float(p.get('profit') or 0.0),
-                        'close_time': close_time_str,
-                        'price': float(p.get('avgClosePrice') or 0.0)
-                    })
-                return trades
-            else:
-                 # Try alternative endpoint
-                 return []
+            if resp.status_code != 200:
+                logger.error(f"ordersHistory failed: {resp.status_code} - {resp.text[:200]}")
+                return []
+
+            data = resp.json()
+            raw_orders = data.get('d', {}).get('ordersHistory', [])
+
+            from datetime import datetime, timedelta
+            cutoff_ms = (datetime.utcnow() - timedelta(hours=hours)).timestamp() * 1000
+
+            # Parse filled orders into normalized dicts
+            # List format: [order_id, instrument_id, acc_num, qty, side, type, status,
+            #               fill_qty, fill_price, limit_price, ..., created_ms, filled_ms, ..., position_id, ...]
+            filled = {}
+            for o in raw_orders:
+                if not isinstance(o, list) or len(o) < 17:
+                    continue
+                status = o[6]
+                if status != 'Filled':
+                    continue
+                filled_ms = int(o[14]) if o[14] else 0
+                if filled_ms < cutoff_ms:
+                    continue
+
+                position_id = str(o[16]) if o[16] else None
+                if not position_id:
+                    continue
+
+                side = str(o[4]).upper()  # 'buy' or 'sell'
+                fill_price = float(o[8]) if o[8] else 0.0
+                qty = float(o[3]) if o[3] else 0.0
+                symbol = self.resolve_symbol(o[1])
+                created_ms = int(o[13]) if o[13] else filled_ms
+
+                if position_id not in filled:
+                    filled[position_id] = {
+                        'id': position_id,
+                        'symbol': symbol,
+                        'orders': []
+                    }
+                filled[position_id]['orders'].append({
+                    'side': side,
+                    'price': fill_price,
+                    'qty': qty,
+                    'time_ms': filled_ms,
+                })
+
+            # Build normalized trade list from position groups
+            trades = []
+            for pos_id, pos in filled.items():
+                orders = pos['orders']
+                buys  = [o for o in orders if o['side'] == 'BUY']
+                sells = [o for o in orders if o['side'] == 'SELL']
+
+                if not buys or not sells:
+                    # Position still open, skip
+                    continue
+
+                avg_buy  = sum(o['price'] * o['qty'] for o in buys)  / sum(o['qty'] for o in buys)
+                avg_sell = sum(o['price'] * o['qty'] for o in sells) / sum(o['qty'] for o in sells)
+                total_qty = min(sum(o['qty'] for o in buys), sum(o['qty'] for o in sells))
+
+                pnl = (avg_sell - avg_buy) * total_qty
+                side = 'BUY'  # Net side (opened as a BUY, closed as a SELL)
+                close_time_ms = max(o['time_ms'] for o in orders)
+                close_time = datetime.utcfromtimestamp(close_time_ms / 1000).isoformat()
+
+                trades.append({
+                    'id': pos_id,
+                    'symbol': pos['symbol'],
+                    'side': side,
+                    'pnl': round(pnl, 2),
+                    'close_time': close_time,
+                    'price': round(avg_sell, 2),
+                    'entry_price': round(avg_buy, 2),
+                    'qty': total_qty,
+                    'status': 'CLOSED',
+                })
+
+            logger.info(f"ordersHistory: {len(raw_orders)} raw orders → {len(trades)} closed trades")
+            return trades
+
         except Exception as e:
             logger.error(f"History Fetch Error: {e}")
             return []

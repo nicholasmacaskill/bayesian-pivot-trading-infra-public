@@ -150,7 +150,7 @@ def check_job_status():
     job = sft.SupervisedTuningJob(job_info['resource_name'])
     
     logger.info(f"Job: {job_info['job_name']}")
-    logger.info(f"State: {job.state}")
+    logger.info(f"State: {job.state} ({job.state.name if hasattr(job.state, 'name') else 'N/A'})")
     
     if job.state.name == "JOB_STATE_SUCCEEDED":
         endpoint = job.tuned_model_endpoint_name
@@ -160,6 +160,14 @@ def check_job_status():
         job_info['endpoint'] = endpoint
         with open(job_file, 'w') as f:
             json.dump(job_info, f, indent=2)
+    elif job.state.name == "JOB_STATE_FAILED":
+        logger.error(f"❌ Job FAILED. Error: {job.error}")
+        job_info['status'] = 'FAILED'
+        job_info['error'] = str(job.error)
+        with open(job_file, 'w') as f:
+            json.dump(job_info, f, indent=2)
+    else:
+        logger.info(f"⏳ Job is still in state: {job.state.name}")
 
 def main():
     logger.info("🧠 Vertex AI Fine-Tuning Launcher")

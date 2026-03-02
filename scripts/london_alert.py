@@ -21,7 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("london_alert.log"),
+        logging.FileHandler("logs/london_alert.log"),
         logging.StreamHandler(sys.stdout)
     ]
 )
