@@ -175,6 +175,9 @@ class LocalScannerRunner:
                     # Adjust position size for regime
                     regime_size_mult = regime_result.suggested_size_mult
                     logger.info(f"🌎 Regime: {regime_result.regime.value} | Size mult: {regime_size_mult:.1f}x")
+                    
+                    # PHASE 2: Inject regime into setup for ledger/retraining
+                    setup['shadow_regime'] = regime_result.regime.value
 
                     # Sentiment & Whales
                     market_data = self.sentiment_engine.get_market_sentiment(symbol)
