@@ -86,10 +86,11 @@ Trading is biological. This engine protects the system from the trader.
 The system functions as a **Synthetic Consciousness** that learns from both its successes and the trader's failures.
 
 ### 1. Auto-Contextualization (Zero-Input Audit)
-When a discretionary/manual trade is executed ("Rogue Trade"), the system immediately triggers a **Forensic Reconstruction**. Without human input, it fetches historical 5m/1h data to determine:
-- The exact price position within the Asian Range.
-- The 4H EMA Trend Bias and Intermarket SMT status at entry.
-- Whether the trade was a "Fomoc" (Fear of Missing Out) entry into a liquidity vacuum or a high-alpha sweep.
+When a discretionary/manual trade is executed ("Rogue Trade"), the system immediately triggers a **Forensic Reconstruction**. Without human input, it fetches historical 5m/1h data to determine the full **Institutional Footprint** at the moment of entry:
+- **HTF Bias Alignment**: Was the 4H/Daily trend (EMA 20/50) supportive of the move?
+- **Liquidity Integrity**: Did the entry occur after a sweep of the Previous Day High/Low (PDH/PDL) or a key Swing point?
+- **Intermarket SMT**: Were correlated assets (DXY/BTC) providing divergence confirmation?
+- **Asian Volatility Window**: Price position relative to the Asian Range (Premium/Discount) and Session Timing.
 
 ### 2. Delta Analysis: System vs. Rogue
 The infrastructure maintains two distinct ledgers:
