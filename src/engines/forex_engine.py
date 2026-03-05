@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 

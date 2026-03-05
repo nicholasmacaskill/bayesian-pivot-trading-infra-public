@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from src.core.config import Config
 from src.core.supabase_client import supabase
 

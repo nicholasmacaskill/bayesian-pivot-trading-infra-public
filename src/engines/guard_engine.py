@@ -33,7 +33,7 @@ import logging
 import platform
 import threading
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 
 logger = logging.getLogger("GuardEngine")
@@ -170,6 +170,9 @@ class GuardEngine:
                 logger.warning(f"Deep-scan module init failed: {_init_e}")
                 self.deep_scan_enabled = False
         # ─────────────────────────────────────────────────────────────────────
+
+        # Establish initial persistence baseline (stop "NEW" alerts for existing files)
+        self._check_persistence()
 
         logger.info("🛡️  Guard Engine initialised.")
 

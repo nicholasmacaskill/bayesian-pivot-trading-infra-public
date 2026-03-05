@@ -4,7 +4,7 @@
 VENV_PATH="./venv/bin/activate"
 RUNNER_PATH="src/runners/local_scanner.py"
 
-echo "🦁 Sovereign SMC: Local Runner (Anti-Sleep Mode)"
+echo "🫧 Bayesian Pivot Trading Infra: Local Runner (Anti-Sleep Mode)"
 echo "-----------------------------------------------"
 
 # Check for venv

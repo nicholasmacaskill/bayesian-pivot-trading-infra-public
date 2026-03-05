@@ -1,7 +1,7 @@
 import os
 import subprocess
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger("VoiceEngine")
 
@@ -55,5 +55,5 @@ class VoiceEngine:
 if __name__ == "__main__":
     # Test
     ve = VoiceEngine()
-    path = ve.generate_voice_note("Sovereign Gatekeeper online. I am monitoring your tilt levels.")
+    path = ve.generate_voice_note("Bayesian Pivot Gatekeeper online. I am monitoring your tilt levels.")
     print(f"Test audio saved to: {path}")

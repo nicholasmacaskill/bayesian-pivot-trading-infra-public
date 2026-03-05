@@ -30,7 +30,7 @@ import os
 import json
 import logging
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -81,7 +81,7 @@ class RetrainingLoop:
     def _save_run_log(self, summary: dict):
         """Persists retraining run metadata."""
         log = {
-            'last_run_utc': datetime.utcnow().isoformat(),
+            'last_run_utc': datetime.now(timezone.utc).isoformat(),
             'runs': []
         }
         if RETRAINING_LOG_PATH.exists():
@@ -91,7 +91,7 @@ class RetrainingLoop:
             except Exception:
                 pass
 
-        log['last_run_utc'] = datetime.utcnow().isoformat()
+        log['last_run_utc'] = datetime.now(timezone.utc).isoformat()
         log.setdefault('runs', []).append(summary)
         log['runs'] = log['runs'][-52:]  # Keep 52 weeks of history
 
@@ -102,7 +102,7 @@ class RetrainingLoop:
         """Returns True if 7+ days have passed since last retrain."""
         if self._last_run is None:
             return True
-        elapsed = datetime.utcnow() - self._last_run
+        elapsed = datetime.now(timezone.utc) - self._last_run
         return elapsed.total_seconds() >= 7 * 24 * 3600
 
     def _fetch_recent_outcomes(self, days_back: int = 7) -> list[dict]:
@@ -112,7 +112,7 @@ class RetrainingLoop:
         """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        cutoff = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days_back)).isoformat()
         try:
             rows = conn.execute("""
                 SELECT *
@@ -188,7 +188,7 @@ class RetrainingLoop:
         Exports training examples in Vertex AI fine-tuning JSONL format.
         Optimized for Phase 2 instruction-tuning.
         """
-        date_str = datetime.utcnow().strftime('%Y%m%d_%H%M')
+        date_str = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')
         out_path = TRAINING_DATA_DIR / f"training_{date_str}.jsonl"
 
         with open(out_path, 'w') as f:
@@ -292,12 +292,12 @@ class RetrainingLoop:
             Summary dict
         """
         if not force and not self._is_due():
-            days_until = 7 - (datetime.utcnow() - self._last_run).days if self._last_run else 0
+            days_until = 7 - (datetime.now(timezone.utc) - self._last_run).days if self._last_run else 0
             logger.info(f"[Retraining] ⏭️ Not due yet. Next retrain in ~{days_until} day(s).")
             return {'status': 'skipped', 'reason': 'not_due'}
 
         logger.info("🔁 [Retraining] Starting automated retraining cycle...")
-        start = datetime.utcnow()
+        start = datetime.now(timezone.utc)
 
         # 1. Fetch recent outcomes from signed ledger
         records = self._fetch_recent_outcomes(days_back=7)
@@ -326,7 +326,7 @@ class RetrainingLoop:
         if export_jsonl:
             jsonl_path = str(self._export_jsonl(examples))
 
-        elapsed = (datetime.utcnow() - start).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - start).total_seconds()
 
         summary = {
             'status':         'success',

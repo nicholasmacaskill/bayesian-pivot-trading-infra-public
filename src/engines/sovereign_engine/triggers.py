@@ -49,7 +49,7 @@ def check_triggers_loop():
 def start_trigger_thread():
     t = threading.Thread(target=check_triggers_loop, daemon=True)
     t.start()
-    print("[+] Sovereign Trigger Listener Active.")
+    print("[+] Bayesian Pivot Trigger Listener Active.")
 
 def check_triggers():
     """Obsolete but kept for signature compatibility."""

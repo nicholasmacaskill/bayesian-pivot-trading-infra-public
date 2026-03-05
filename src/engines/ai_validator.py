@@ -369,9 +369,13 @@ class AIValidator:
             ### GOAL: Identify if this setup aligns with institutional expansion or retail inducement.
             
             - Pattern: {setup.get('pattern', 'SMC Logic')}
-            - SMT Strength: {setup.get('smt_strength', 0)}
+            - SMT Strength: {setup.get('smt_strength', 0)} (Institutional Divergence Score)
+            - True SMT Type: {setup.get('true_smt', 'None detected')}
             - Regime: {regime}
             - Confluences: {oracle_rules}
+            
+            NOTE: SMT Strength > 0.35 indicates a 'Crack in Correlation' (Institutional Sponsorship). 
+            Even if direct trend alignment is neutral, a strong SMT suggests institutions are actively masking their move.
             
             Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
             """
@@ -431,30 +435,48 @@ class AIValidator:
                 img = Image.open(image_path)
                 contents.append(img)
 
-            # NEXT-GEN MULTI-TRY LOGIC
+            import time
+            max_retries = 3
+            base_delay = 5
+            
+            text = None
+            last_err = None
+            
+            # NEXT-GEN MULTI-TRY LOGIC WITH EXPONENTIAL BACKOFF
             models_to_try = [
                 'gemini-2.0-flash',     # Confirmed working
                 'gemini-2.5-flash',     # Latest generation fallback
                 'gemini-1.5-flash',     # Reliable last resort
             ]
             
-            text = None
-            last_err = None
             for model_name in models_to_try:
-                try:
-                    response = self.client.models.generate_content(
-                        model=model_name, 
-                        contents=contents
-                    )
-                    text = response.text
-                    break
-                except Exception as e:
-                    last_err = e
-                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
-                        break
+                for attempt in range(max_retries):
+                    try:
+                        response = self.client.models.generate_content(
+                            model=model_name, 
+                            contents=contents
+                        )
+                        text = response.text
+                        break # Success for this model
+                    except Exception as e:
+                        last_err = e
+                        err_str = str(e)
+                        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                            if attempt < max_retries - 1:
+                                delay = base_delay * (2 ** attempt)
+                                print(f"⚠️ AI Validator 429 Rate Limit ({model_name}). Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                                time.sleep(delay)
+                                continue
+                        
+                        # If not a 429 or max retries reached, break out of the retry loop to try the next model
+                        if "404" not in err_str and "NOT_FOUND" not in err_str:
+                            break
+                            
+                if text:
+                    break # Success overall
             
             if not text:
-                raise last_err or Exception("All Gemini models failed")
+                raise last_err or Exception("All Gemini models failed even with retries")
             
             # Extract JSON from response (Robust extraction)
             import re
@@ -506,7 +528,11 @@ class AIValidator:
             from PIL import Image
             img = Image.open(image_path)
             
-            # NEXT-GEN MULTI-TRY LOGIC (VISION)
+            import time
+            max_retries = 3
+            base_delay = 5
+            
+            # NEXT-GEN MULTI-TRY LOGIC (VISION) WITH EXPONENTIAL BACKOFF
             models_to_try = [
                 'gemini-2.0-flash',     # Confirmed working, vision-capable
                 'gemini-2.5-flash',     # Latest generation fallback
@@ -514,17 +540,31 @@ class AIValidator:
             ]
             
             verdict = "NEUTRAL"
+            success = False
             for model_name in models_to_try:
-                try:
-                    response = self.client.models.generate_content(
-                        model=model_name, 
-                        contents=[prompt, img]
-                    )
-                    verdict = response.text.upper().strip()
-                    break
-                except Exception as e:
-                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
+                for attempt in range(max_retries):
+                    try:
+                        response = self.client.models.generate_content(
+                            model=model_name, 
+                            contents=[prompt, img]
+                        )
+                        verdict = response.text.upper().strip()
+                        success = True
                         break
+                    except Exception as e:
+                        err_str = str(e)
+                        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                            if attempt < max_retries - 1:
+                                delay = base_delay * (2 ** attempt)
+                                print(f"⚠️ Visual Bias Rate Limit ({model_name}). Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                                time.sleep(delay)
+                                continue
+                                
+                        if "404" not in err_str and "NOT_FOUND" not in err_str:
+                            break
+                            
+                if success:
+                    break
             
             if "BULLISH" in verdict: return 1
             if "BEARISH" in verdict: return -1

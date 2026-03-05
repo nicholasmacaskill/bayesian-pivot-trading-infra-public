@@ -2,7 +2,7 @@ import os
 import subprocess
 import logging
 import psutil
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 

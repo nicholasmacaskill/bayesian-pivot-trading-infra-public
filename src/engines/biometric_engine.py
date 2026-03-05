@@ -73,22 +73,30 @@ class BiometricEngine:
                 "bpm": self.current_bpm,
                 "hrv": self.current_hrv,
                 "last_update_age": time.time() - self.last_update if self.last_update > 0 else -1,
-                "physio_tilt": self.calculate_physio_tilt()
+                "physio_tilt": self.calculate_physio_tilt(),
+                "bpm_spike": self.current_bpm > 100
             }
 
-    def calculate_physio_tilt(self) -> float:
+    def calculate_physio_tilt(self) -> dict:
         """
         Calculates a 1-10 tilt score purely from physiology.
-        Uses Sovereign Logic if available; otherwise uses a basic threshold.
+        Returns a dict with score and metadata (bpm_spike).
         """
+        tilt_score = 1.0
         try:
             from src.sovereign_core.logic.biometric_math import calculate_sovereign_physio_tilt
-            return calculate_sovereign_physio_tilt(self.current_bpm, self.current_hrv)
+            tilt_score = calculate_sovereign_physio_tilt(self.current_bpm, self.current_hrv)
         except ImportError:
             # Public Lite Fallback
             if self.current_bpm > 100 or self.current_hrv < 25:
-                return 7.0
-            return 1.0
+                tilt_score = 7.0
+            else:
+                tilt_score = 1.0
+        
+        return {
+            "score": tilt_score,
+            "bpm_spike": self.current_bpm > 100
+        }
 
     def start_server(self):
         """Runs the FastAPI server in a background thread."""
