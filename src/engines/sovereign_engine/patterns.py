@@ -10,7 +10,7 @@ def _run(f):    return os.path.join(SMC_ROOT, 'run_data', f)
 
 # "Offline AI" Knowledge Base (Heuristic Safe List - FALLBACK DEFAULTS)
 DEFAULT_SAFE_LIST = [
-    'Antigravity', 'Code Helper', 'Google Chrome Helper', 'secd', 'trustedpeershelper',
+    'Antigravity', 'Code Helper', 'Google Chrome Helper', 'Google', 'secd', 'trustedpeershelper',
     'callservicesd', 'AudioComponentRegistrar', 'PowerChime', 'loginwindow', 'distnoted',
     'cfprefsd', 'UserEventAgent', 'sharingd', 'commcenter', 'notification_center'
 ]
@@ -244,7 +244,7 @@ PROTECTED_SESSION_DOMAINS = [
 
 # Process name substrings considered legitimate session-cookie holders.
 SESSION_MONITOR_BROWSERS = [
-    'chrome', 'brave', 'edge', 'arc', 'safari', 'firefox', 'opera', 'vivaldi',
+    'chrome', 'brave', 'edge', 'arc', 'safari', 'firefox', 'opera', 'vivaldi', 'Google',
 ]
 
 # Trusted Root Certificate Authority patterns to avoid false positives.

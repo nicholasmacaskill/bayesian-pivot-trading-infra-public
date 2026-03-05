@@ -1,10 +1,10 @@
 # Bayesian Pivot Trading Infra 🧠💎
 
-**An institutional-grade synthetic consciousness for price discovery. The infrastructure replaces speculative liability with the certainty of a 9-Gate Bayesian funnel, orchestrating market physics (Hurst), intermarket confluence (SMT), and prop-firm forensic auditing. Leveraging specialized Vertex AI SFT models and biometric-gated OPSEC, the system enforces a high-fidelity probabilistic model of risk that transforms global liquidity volatility into a disciplined, sovereign advantage.**
+**An institutional-grade synthetic consciousness for price discovery. The infrastructure replaces speculative liability with the certainty of a 9-Gate Bayesian funnel, orchestrating market physics (Hurst), intermarket confluence (SMT), and prop-firm forensic auditing. Leveraging specialized Vertex AI SFT models, autonomic physiological guardrails, and hardened OPSEC, the system enforces a high-fidelity probabilistic model of risk that transforms global liquidity volatility into a disciplined, sovereign advantage.**
 
 Bayesian Pivot Trading Infra is a professional-grade trading OS that synthesizes Inner Circle Trader (ICT) concepts with high-frequency execution filters, multimodal trader sentiment analysis, and a tiered security architecture.
 
-**"Bayesian institutional alpha. Replacing liability with 9-Gate probabilistic certainty: Vertex AI SFT, SMT, Hurst physics, biometrics, forensics & secure OPSEC."**
+**"Bayesian institutional alpha. Replacing liability with 9-Gate probabilistic certainty: Vertex AI SFT, SMT, Hurst physics, autonomic physiological risk models, and securely decoupled OPSEC."**
 
 ---
 
@@ -106,10 +106,11 @@ Every Sunday at 00:00 UTC, the system executes an **Automated Retraining Cycle**
 ---
 
 ## 🔒 Security & Operations (OPSEC Layer)
-The **Guard Engine** runs as a background daemon to protect the workstation:
+The **Guard Engine** runs as a background daemon to monitor workstation integrity. **Crucially, OPSEC anomalies do not trigger a hard lock on the trading gates; they operate strictly as a discretionary alert system** to ensure potential security false-positives never interrupt a high-probability institutional setup.
+
 - **RSA Provenance Chain**: Every signal is cryptographically signed using a local 2048-bit RSA key. This creates a tamper-evident audit trail for every trade, proving it originated from the system's logic and not a manual override.
-- **Clipboard Sentry**: Detects crypto address hijacking.
-- **Process Audit**: Whitelist-based process monitoring for process injection detection.
+- **Clipboard Sentry**: Discretionary monitoring that actively flags potential crypto address hijacking (e.g., via Telegram alerts), without forcefully halting the execution engine.
+- **Process Audit**: Whitelist-based scanning for process injection detection. Designed to provide passive intelligence rather than execution blocks.
 - **Zero-Trust Logic**: All credentials secured via `.env.local` with hardware-awake persistence.
 
 ---

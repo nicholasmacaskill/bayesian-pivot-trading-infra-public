@@ -1,7 +1,7 @@
 import requests
 import os
 import logging
-from datetime import datetime, date
+from datetime import datetime, timezone, date, timedelta
 from dotenv import load_dotenv
 
 load_dotenv('.env.local')
@@ -20,6 +20,9 @@ class TradeLockerHelper:
         self.access_token = None
         self.account_id = None
         self.acc_num = None # New Field for 'accNum' header
+        # Rate limit protection (TTL Cache)
+        self._history_cache = None
+        self._history_last_fetch = 0
         
     def resolve_symbol(self, instrument_id):
         """Maps internal IDs to human-readable symbols."""
@@ -55,6 +58,23 @@ class TradeLockerHelper:
             
         return headers
 
+    def _make_request(self, method, url, auth=True, **kwargs):
+        """Wrapper to handle automatic re-login on 401 Unauthorized."""
+        headers = self._get_headers(auth=auth)
+        if 'headers' in kwargs:
+            headers.update(kwargs.pop('headers'))
+        
+        resp = requests.request(method, url, headers=headers, **kwargs)
+        
+        # Auto-retry once on 401 if we were trying to be authenticated
+        if resp.status_code == 401 and auth:
+            logger.warning(f"⚠️ JWT Expired for {self.email}. Attempting re-login...")
+            if self.login():
+                headers = self._get_headers(auth=True) # Refresh headers with new token
+                resp = requests.request(method, url, headers=headers, **kwargs)
+        
+        return resp
+
     def login(self):
         """User-provided login logic with corrected /backend-api prefix."""
         try:
@@ -83,7 +103,7 @@ class TradeLockerHelper:
         """User-provided account discovery logic via corrected /backend-api."""
         try:
             url = f"{self.base_url}/backend-api/auth/jwt/all-accounts"
-            resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
+            resp = self._make_request("GET", url)
             if resp.status_code == 200:
                 accounts = resp.json().get('accounts', [])
                 if accounts:
@@ -103,7 +123,7 @@ class TradeLockerHelper:
         
         try:
             url = f"{self.base_url}/backend-api/auth/jwt/all-accounts"
-            resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
+            resp = self._make_request("GET", url)
             if resp.status_code == 200:
                 accounts = resp.json().get('accounts', [])
                 total_equity = 0.0
@@ -122,7 +142,7 @@ class TradeLockerHelper:
         
         try:
             url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions"
-            resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
+            resp = self._make_request("GET", url)
             
             if resp.status_code == 200:
                 data = resp.json()
@@ -131,7 +151,6 @@ class TradeLockerHelper:
                 if not positions and isinstance(data, list): positions = data
                 
                 for p in positions:
-                    print(f"DEBUG LOOP: Type={type(p)}, p={p}")
                     # Parse Active Position
                     if isinstance(p, list) and len(p) >= 10:
                         try:
@@ -146,8 +165,7 @@ class TradeLockerHelper:
                                 'status': 'OPEN'
                             })
                         except Exception as e:
-                            print(f"❌ PARSE ERROR: {e} | DATA: {p}")
-                            logger.error(f"Failed to parse list position: {e}")
+                            logger.error(f"❌ PARSE ERROR: {e} | DATA: {p}")
                     else:
                         trades.append({
                             'id': p.get('id'),
@@ -172,20 +190,33 @@ class TradeLockerHelper:
         """
         if not self.access_token and not self.login(): return []
         
+        # 1. Check TTL Cache (Protect against 429)
+        import time
+        now = time.time()
+        if self._history_cache is not None and (now - self._history_last_fetch) < 300: # 5 minute cache
+            # Filter cached trades by hours requested
+            from datetime import datetime, timezone, timedelta
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+            return [t for t in self._history_cache if t['close_time'] > cutoff]
+
         try:
             # Correct endpoint for Upcomers/TradeLocker
             url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/ordersHistory"
-            resp = requests.get(url, headers=self._get_headers(auth=True), params={'limit': 500}, timeout=15)
+            resp = self._make_request("GET", url, params={'limit': 500}, timeout=15)
             
             if resp.status_code != 200:
+                # If we get a 429, serve from stale cache if available
+                if resp.status_code == 429 and self._history_cache is not None:
+                    logger.warning(f"TradeLocker 429 (Too Many Requests). Serving STALE cache.")
+                    return self._history_cache
                 logger.error(f"ordersHistory failed: {resp.status_code} - {resp.text[:200]}")
                 return []
 
             data = resp.json()
             raw_orders = data.get('d', {}).get('ordersHistory', [])
 
-            from datetime import datetime, timedelta
-            cutoff_ms = (datetime.utcnow() - timedelta(hours=hours)).timestamp() * 1000
+            from datetime import datetime, timezone, timedelta
+            cutoff_ms = (datetime.now(timezone.utc) - timedelta(hours=hours)).timestamp() * 1000
 
             # Parse filled orders into normalized dicts
             # List format: [order_id, instrument_id, acc_num, qty, side, type, status,
@@ -242,7 +273,7 @@ class TradeLockerHelper:
                 pnl = (avg_sell - avg_buy) * total_qty
                 side = 'BUY'  # Net side (opened as a BUY, closed as a SELL)
                 close_time_ms = max(o['time_ms'] for o in orders)
-                close_time = datetime.utcfromtimestamp(close_time_ms / 1000).isoformat()
+                close_time = datetime.fromtimestamp(close_time_ms / 1000, timezone.utc).isoformat()
 
                 trades.append({
                     'id': pos_id,
@@ -257,6 +288,8 @@ class TradeLockerHelper:
                 })
 
             logger.info(f"ordersHistory: {len(raw_orders)} raw orders → {len(trades)} closed trades")
+            self._history_cache = trades
+            self._history_last_fetch = time.time()
             return trades
 
         except Exception as e:
@@ -312,25 +345,21 @@ class TradeLockerClient:
                 
             try:
                 url = f"{helper.base_url}/backend-api/auth/jwt/all-accounts"
-                resp = requests.get(url, headers=helper._get_headers(auth=True), timeout=10)
+                resp = helper._make_request("GET", url)
                 
                 if resp.status_code == 200:
                     accounts = resp.json().get('accounts', [])
                     for acc in accounts:
                         acc_id = acc['id']
-                        if acc_id in seen_account_ids:
-                            print(f"   Skipping duplicate account {acc_id} (already counted)")
-                            continue
-                            
                         equity = float(acc.get('projectedEquity') or acc.get('accountBalance', 0.0))
-                        print(f"   Account {acc_id}: ${equity:,.2f}")
+                        logger.info(f"   Account {acc_id}: ${equity:,.2f}")
                         total_equity += equity
                         seen_account_ids.add(acc_id)
                 else:
-                    print(f"Account {i+1} ({helper.email}) check failed: {resp.status_code}")
+                    logger.error(f"Account {i+1} ({helper.email}) check failed: {resp.status_code}")
                     
             except Exception as e:
-                print(f"Error checking account {i+1}: {e}")
+                logger.error(f"Error checking account {i+1}: {e}")
         
         return total_equity
 

@@ -16,7 +16,7 @@ import json
 import socket
 import subprocess
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import path_utils
 

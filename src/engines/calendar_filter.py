@@ -14,7 +14,7 @@ Window: 30 minutes before → 30 minutes after each event.
 import logging
 import requests
 import pytz
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -26,15 +26,21 @@ CRYPTO_BLACKOUT_DATES = {
     # "03-08": "Bitcoin ETF Rebalancing Window",   # example
 }
 
-# High-impact event title keywords that trigger a blackout even if impact != 'High'
+# High-impact event title keywords that trigger a blackout — USD / global macro only.
+# ⚠️  Keep this list tight: only events with PROVEN BTC price correlation.
+#     EUR/GBP regional events (e.g. Spanish Unemployment) have no meaningful
+#     BTC correlation and should NOT block crypto trades.
 KEYWORD_OVERRIDES = [
-    "fomc", "fed ", "interest rate", "nonfarm", "nfp", "cpi", "inflation",
-    "gdp", "unemployment", "payroll", "jerome powell", "yellen", "ecb",
-    "boe", "rba", "boj", "snb rate"
+    "fomc", "fed meeting", "federal reserve", "interest rate decision",
+    "nonfarm", "nfp", "cpi", "core cpi", "pce",
+    "us gdp", "us unemployment", "initial jobless",
+    "jerome powell", "yellen",
+    "btc etf", "bitcoin etf", "sec ruling"
 ]
 
-# Currencies to monitor (crypto trades inverse to USD, so USD is primary)
-MONITORED_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD']
+# Only USD events are gated by default — USD is the dominant BTC pricing currency.
+# All other currencies require a KEYWORD_OVERRIDE match to trigger a block.
+MONITORED_CURRENCIES = ['USD']  # Narrow: non-USD regional prints don't move BTC
 
 BLACKOUT_MINUTES = 30  # Minutes before AND after an event to block trading
 
@@ -61,7 +67,7 @@ class CalendarFilter:
     def _should_refresh(self) -> bool:
         if not self._last_fetch:
             return True
-        return (datetime.utcnow() - self._last_fetch).total_seconds() > self._fetch_interval_hours * 3600
+        return (datetime.now(timezone.utc) - self._last_fetch).total_seconds() > self._fetch_interval_hours * 3600
 
     def _fetch_events(self):
         """Fetch and cache high-impact events from ForexFactory."""
@@ -93,20 +99,23 @@ class CalendarFilter:
                             logger.debug(f"CalendarFilter: Could not parse date '{date_str}': {parse_err}")
 
                 self._events = events
-                self._last_fetch = datetime.utcnow()
+                self._last_fetch = datetime.now(timezone.utc)
                 logger.info(f"[CalendarFilter] Loaded {len(events)} high-impact events for the week.")
         except Exception as e:
             logger.warning(f"[CalendarFilter] Failed to fetch calendar: {e}. Using cached/empty list.")
 
     def _check_crypto_blackout(self) -> tuple[bool, str]:
         """Check static crypto-specific blackout dates."""
-        today_key = datetime.utcnow().strftime('%m-%d')
+        today_key = datetime.now(timezone.utc).strftime('%m-%d')
         if today_key in CRYPTO_BLACKOUT_DATES:
             reason = f"Crypto blackout date: {CRYPTO_BLACKOUT_DATES[today_key]}"
             return False, reason
         return True, "OK"
 
     def is_safe_to_trade(self, symbol: str = None) -> tuple[bool, str]:
+        # NEWS FILTERING DISABLED — always trade regardless of macro events.
+        # Re-enable by removing the two lines below.
+        return True, "News filter disabled"
         """
         Returns (is_safe: bool, reason: str).
         is_safe=False means BLOCK the signal.
@@ -122,7 +131,7 @@ class CalendarFilter:
             return False, reason
 
         # 2. Check ForexFactory events
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(timezone.utc)
         window = timedelta(minutes=self.blackout_minutes)
 
         for event in self._events:
@@ -150,7 +159,7 @@ class CalendarFilter:
         if self._should_refresh():
             self._fetch_events()
 
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(timezone.utc)
         upcoming = [
             e for e in self._events
             if 0 < (e['time_utc'] - now_utc).total_seconds() / 3600 < 24

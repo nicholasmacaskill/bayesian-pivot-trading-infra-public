@@ -3,6 +3,9 @@ import os
 import json
 from src.core.config import Config
 
+import logging
+logger = logging.getLogger(__name__)
+
 class AIAuditEngine:
     def __init__(self, api_key=None):
         # Try explicit -> Config -> Env
@@ -22,10 +25,10 @@ class AIAuditEngine:
     def get_text_embedding(self, text):
         """Generates a 768-dimensional vector for the given text."""
         if not self.model: 
-            print("DEBUG: Model not initialized")
+            logger.debug("AI Model not initialized for embedding.")
             return []
         try:
-            print(f"DEBUG: Generating embedding for text len={len(text)}")
+            logger.debug(f"Generating embedding for text len={len(text)}")
             result = genai.embed_content(
                 model="models/gemini-embedding-001",
                 content=text,
@@ -34,10 +37,10 @@ class AIAuditEngine:
                 output_dimensionality=768
             )
             emb = result.get('embedding', [])
-            print(f"DEBUG: Embedding result len={len(emb)}")
+            logger.debug(f"Embedding result len={len(emb)}")
             return emb
         except Exception as e:
-            print(f"DEBUG EMBED ERROR: {e}")
+            logger.error(f"EMBED ERROR: {e}")
             return []
 
     def audit_trade(self, manual_trade, system_data, zen_mode=False):

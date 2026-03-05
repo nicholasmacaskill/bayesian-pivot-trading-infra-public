@@ -43,7 +43,7 @@ def run_report():
             msg += f"- {issue}\n"
             
     msg += (
-        f"\n🚀 *Execution Profile:* `Yard Mode (Local)`\n"
+        f"\n🚀 *Execution Profile:* `Bayesian Pivot (Local)`\n"
         f"🎯 *Expected ROI:* `+139.3% / year`"
     )
 
