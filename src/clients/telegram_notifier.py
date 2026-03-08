@@ -176,8 +176,8 @@ class TelegramNotifier:
         """Fetches the latest text message from the chat."""
         try:
             url = f"{self.base_url}/getUpdates"
-            # We use a large limit but only look at the last one
-            params = {"limit": 10, "allowed_updates": ["message"]}
+            # We use a large limit to catch any bursts
+            params = {"limit": 100, "allowed_updates": ["message"]}
             response = requests.get(url, params=params, timeout=5)
             response.raise_for_status()
             data = response.json()
