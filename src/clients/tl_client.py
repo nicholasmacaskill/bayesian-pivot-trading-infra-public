@@ -93,10 +93,13 @@ class TradeLockerHelper:
                 # CRITICAL: Fetch account details to avoid 404s
                 return self.get_account_details()
             else:
-                logger.error(f"Login Failed: {resp.status_code} - {resp.text[:100]}")
+                logger.error(f"Login Failed: {resp.status_code} - {resp.text[:50]}...")
                 return False
+        except requests.exceptions.Timeout:
+            logger.warning("TL Login Timeout: Service might be down.")
+            return False
         except Exception as e:
-            logger.error(f"TL Connection Error: {e}")
+            logger.warning(f"TL Connection Error: {e}")
             return False
 
     def get_account_details(self):
@@ -105,7 +108,15 @@ class TradeLockerHelper:
             url = f"{self.base_url}/backend-api/auth/jwt/all-accounts"
             resp = self._make_request("GET", url)
             if resp.status_code == 200:
-                accounts = resp.json().get('accounts', [])
+                try:
+                    data = resp.json()
+                    accounts = data.get('accounts', [])
+                except Exception:
+                    # Silent failure during known downtime if it's HTML
+                    if "<html" not in resp.text.lower():
+                        logger.error(f"Invalid JSON from account details: {resp.text[:50]}...")
+                    return False
+
                 if accounts:
                     # Capture both ID and AccNum
                     self.account_id = accounts[0]['id']
@@ -205,14 +216,19 @@ class TradeLockerHelper:
             resp = self._make_request("GET", url, params={'limit': 500}, timeout=15)
             
             if resp.status_code != 200:
-                # If we get a 429, serve from stale cache if available
-                if resp.status_code == 429 and self._history_cache is not None:
-                    logger.warning(f"TradeLocker 429 (Too Many Requests). Serving STALE cache.")
+                # If we get a 429 or 503, serve from stale cache if available
+                if resp.status_code in [429, 503] and self._history_cache is not None:
+                    logger.warning(f"TradeLocker {resp.status_code}. Serving STALE cache.")
                     return self._history_cache
                 logger.error(f"ordersHistory failed: {resp.status_code} - {resp.text[:200]}")
                 return []
 
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception:
+                logger.error(f"Failed to decode history JSON: {resp.text[:100]}")
+                return []
+                
             raw_orders = data.get('d', {}).get('ordersHistory', [])
 
             from datetime import datetime, timezone, timedelta
@@ -348,7 +364,14 @@ class TradeLockerClient:
                 resp = helper._make_request("GET", url)
                 
                 if resp.status_code == 200:
-                    accounts = resp.json().get('accounts', [])
+                    try:
+                        data = resp.json()
+                        accounts = data.get('accounts', [])
+                    except Exception:
+                        if "<html" not in resp.text.lower():
+                            logger.error(f"Invalid JSON from account check: {resp.text[:50]}...")
+                        continue
+
                     for acc in accounts:
                         acc_id = acc['id']
                         equity = float(acc.get('projectedEquity') or acc.get('accountBalance', 0.0))
@@ -356,10 +379,16 @@ class TradeLockerClient:
                         total_equity += equity
                         seen_account_ids.add(acc_id)
                 else:
-                    logger.error(f"Account {i+1} ({helper.email}) check failed: {resp.status_code}")
+                    if resp.status_code not in [500, 502, 503, 504]: # Don't spam during downtime
+                        logger.error(f"Account {i+1} ({helper.email}) check failed: {resp.status_code}")
                     
             except Exception as e:
-                logger.error(f"Error checking account {i+1}: {e}")
+                # Silence expected connection errors
+                err_str = str(e)
+                if "Expecting value: line 1 column 1 (char 0)" in err_str:
+                    pass # Handled by the try/except block above
+                elif "503" not in err_str and "timed out" not in err_str.lower():
+                    logger.error(f"Error checking account {i+1}: {e}")
         
         return total_equity
 

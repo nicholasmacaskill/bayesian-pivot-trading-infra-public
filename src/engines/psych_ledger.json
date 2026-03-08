@@ -1,7 +1,7 @@
 {
   "sessions": [
     {
-      "timestamp": "2026-03-04T18:17:28.804690",
+      "timestamp": "2026-03-07T21:31:53.997812",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -9,7 +9,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:18:31.276384",
+      "timestamp": "2026-03-07T21:32:54.061807",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -17,7 +17,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:19:29.018664",
+      "timestamp": "2026-03-07T21:33:54.143061",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -25,7 +25,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:20:29.098542",
+      "timestamp": "2026-03-07T21:34:54.114920",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -33,7 +33,295 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:21:29.939881",
+      "timestamp": "2026-03-07T21:35:54.094349",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:36:54.022556",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:37:54.177992",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:38:54.145293",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:39:54.094518",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:40:54.103397",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:41:54.069057",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:42:54.035404",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:43:54.078694",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:44:53.997321",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:45:54.207974",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:46:54.020697",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:47:53.977059",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:48:54.150406",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:49:54.438116",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:50:54.107226",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:51:54.222844",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:52:54.095674",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:53:54.282276",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:54:56.540662",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:55:54.131533",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:56:54.352658",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:57:54.307070",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:58:54.106602",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T21:59:54.126964",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:00:54.201248",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:01:54.208761",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:02:54.083386",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:03:54.162068",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:04:54.281215",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:05:54.117719",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:06:54.162502",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:07:54.320082",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:08:54.276726",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:09:54.414267",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:10:54.367071",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0,
+      "bpm_spike": false
+    },
+    {
+      "timestamp": "2026-03-07T22:11:54.150700",
       "tilt_score": 2,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -41,7 +329,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:22:30.766199",
+      "timestamp": "2026-03-07T22:12:54.563402",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -49,7 +337,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:23:29.554899",
+      "timestamp": "2026-03-07T22:13:54.305937",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -57,7 +345,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:24:29.394389",
+      "timestamp": "2026-03-07T22:14:54.201484",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -65,63 +353,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:25:30.590519",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:26:31.975925",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:27:29.881251",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:28:30.905206",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:29:30.531767",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:30:30.458038",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:31:30.523296",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:32:30.617997",
+      "timestamp": "2026-03-07T22:15:54.157512",
       "tilt_score": 2,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -129,15 +361,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:33:31.003346",
-      "tilt_score": 2,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:34:32.330207",
+      "timestamp": "2026-03-07T22:16:54.157050",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -145,7 +369,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:35:31.275647",
+      "timestamp": "2026-03-07T22:17:54.408398",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -153,7 +377,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:36:31.146805",
+      "timestamp": "2026-03-07T22:18:54.276228",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -161,7 +385,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:37:31.242103",
+      "timestamp": "2026-03-07T22:19:54.403980",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
@@ -169,231 +393,7 @@
       "bpm_spike": false
     },
     {
-      "timestamp": "2026-03-04T18:38:32.707893",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:39:31.405537",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:40:31.425252",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:41:31.138118",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:42:31.761205",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:43:32.625730",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:44:31.868804",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:45:32.882511",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:46:32.169484",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:47:34.437144",
-      "tilt_score": 2,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:48:32.384339",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:49:32.607127",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:50:32.694957",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:51:32.902408",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T18:52:35.851507",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T19:57:25.441329",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T19:58:18.896682",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T19:59:19.392314",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:00:19.352438",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:01:19.771304",
-      "tilt_score": 2,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:02:21.437067",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:03:24.571332",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:04:21.317835",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:05:23.103350",
-      "tilt_score": 2,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:06:21.939450",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:07:24.391491",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:08:31.140415",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:09:28.949754",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0,
-      "bpm_spike": false
-    },
-    {
-      "timestamp": "2026-03-04T20:10:31.111819",
+      "timestamp": "2026-03-07T22:20:01.990557",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",

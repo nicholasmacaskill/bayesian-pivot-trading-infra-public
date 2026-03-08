@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 import os
 import json
 from src.core.config import Config
@@ -17,26 +17,23 @@ class AIAuditEngine:
              self.api_key = os.environ.get("GEMINI_API_KEY")
 
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
+            self.client = genai.Client(api_key=self.api_key)
+            self.model_name = 'gemini-2.0-flash'
         else:
-            self.model = None
+            self.client = None
 
     def get_text_embedding(self, text):
         """Generates a 768-dimensional vector for the given text."""
-        if not self.model: 
+        if not self.client: 
             logger.debug("AI Model not initialized for embedding.")
             return []
         try:
             logger.debug(f"Generating embedding for text len={len(text)}")
-            result = genai.embed_content(
+            result = self.client.models.embed_content(
                 model="models/gemini-embedding-001",
-                content=text,
-                task_type="retrieval_document",
-                title="Trade Logic",
-                output_dimensionality=768
+                contents=text
             )
-            emb = result.get('embedding', [])
+            emb = result.embeddings[0].values if result.embeddings else []
             logger.debug(f"Embedding result len={len(emb)}")
             return emb
         except Exception as e:
@@ -49,7 +46,7 @@ class AIAuditEngine:
         manual_trade: {trade_id, timestamp, symbol, side, entry, exit, pnl}
         system_data: {patterns_found: [], bias: str}
         """
-        if not self.model:
+        if not self.client:
             return {
                 "score": 5.0, 
                 "feedback": "AI Auditor offline. Trade logged without analysis.",
@@ -104,7 +101,10 @@ class AIAuditEngine:
                     "is_lucky_failure": True
                 }
             
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             # Find the JSON part
             text = response.text
             start = text.find('{')
@@ -122,7 +122,7 @@ class AIAuditEngine:
         Analyzes a trade taken WITHOUT a system signal.
         Goal: Identify 'Alpha' (Human intuition/missed setup) vs 'Rogue' (Gambling).
         """
-        if not self.model:
+        if not self.client:
             return {"score": 5.0, "feedback": "Auditor offline.", "is_alpha": False}
 
         prompt = f"""
@@ -153,7 +153,10 @@ class AIAuditEngine:
         """
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             text = response.text
             start = text.find('{')
             end = text.rfind('}') + 1
