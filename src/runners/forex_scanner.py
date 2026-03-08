@@ -1,7 +1,7 @@
 import sys
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 # Add the project root to the python path
 sys.path.append(os.getcwd())

@@ -204,10 +204,9 @@ class VectorizedIndicators:
         """
         Hurst Exponent regime detection with a 200-candle window for noise reduction.
 
-        H < 0.50  → MEAN_REVERTING (range/chop) → Use Reversal Mode
-        H ≥ 0.50  → TRENDING (momentum)         → Use Continuation Mode
-
-        Dead zone eliminated — every candle routes to a regime.
+        H < 0.45  → MEAN_REVERTING (range/chop) → Use Reversal Mode
+        H 0.45-0.55 → TRANSITION (dead zone)    → Skip
+        H > 0.55  → TRENDING (momentum)         → Use Continuation Mode
         """
         def hurst(ts):
             lags = range(2, 20)
@@ -217,7 +216,11 @@ class VectorizedIndicators:
 
         print("📈 Calculating Hurst Regimes (200-candle window)...")
         df['hurst'] = df['close'].rolling(window=period).apply(hurst, raw=True)
-        df['regime'] = np.where(df['hurst'] < 0.50, 'MEAN_REVERTING', 'TRENDING')
+        df['regime'] = np.select(
+            [(df['hurst'] < 0.45), (df['hurst'] > 0.55)],
+            ['MEAN_REVERTING', 'TRENDING'],
+            default='TRANSITION'
+        )
         return df
 
     @staticmethod

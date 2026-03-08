@@ -29,7 +29,7 @@ import uuid
 import hashlib
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -211,11 +211,11 @@ class TradeLedger:
         Creates a cryptographically signed record for a new signal.
         Returns the unique signal_id (embed this in your Telegram alert + order comment).
         """
-        signal_id = f"SIG-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{setup['symbol'].replace('/', '')}-{setup.get('direction', 'X')[:1]}-{uuid.uuid4().hex[:6].upper()}"
+        signal_id = f"SIG-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{setup['symbol'].replace('/', '')}-{setup.get('direction', 'X')[:1]}-{uuid.uuid4().hex[:6].upper()}"
 
         payload = {
             'signal_id':   signal_id,
-            'timestamp':   datetime.now(timezone.utc).isoformat(),
+            'timestamp':   datetime.utcnow().isoformat(),
             'symbol':      setup.get('symbol', ''),
             'direction':   setup.get('direction', setup.get('bias', '')),
             'pattern':     setup.get('pattern', ''),
@@ -294,7 +294,7 @@ class TradeLedger:
         Flags a trade that appeared in TradeLocker with NO matching signal.
         This is the 'rogue trade' detector.
         """
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.utcnow().isoformat()
         rogue_id = f"ROGUE-{trade_id}-{uuid.uuid4().hex[:6]}"
 
         # Create a ROGUE record with no signature (the absence IS the evidence)
@@ -412,7 +412,7 @@ class TradeLedger:
 ╠══════════════════════════════════════════════╣
   Signature    : ✅ VALID
   Key Print    : {result['key_fingerprint']}
-  Verified At  : {datetime.now(timezone.utc).isoformat()} UTC
+  Verified At  : {datetime.utcnow().isoformat()} UTC
 ╚══════════════════════════════════════════════╝
         """.strip()
 

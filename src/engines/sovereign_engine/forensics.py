@@ -4,7 +4,7 @@ import sqlite3
 import shutil
 import tempfile
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from . import patterns
 
 def scan_browser_history():

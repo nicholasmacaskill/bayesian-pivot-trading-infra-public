@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import ccxt
 import time
-from datetime import datetime, timezone, time as time_obj
+from datetime import datetime, time as time_obj
 from src.core.config import Config
 from src.engines.intermarket_engine import IntermarketEngine
 from src.engines.news_filter import NewsFilter
@@ -50,26 +50,21 @@ def safe_scan(component):
 class SMCScanner:
     def __init__(self):
         # Initialize public exchange for data fetching (free tier)
+        # Using Coinbase (Advanced Trade) to avoid Binance geo-restrictions
         try:
-            import certifi
-            self.exchange = ccxt.coinbase({
-                'enableRateLimit': True,
-                'caBundle': certifi.where()
-            })
-        except Exception:
             self.exchange = ccxt.coinbase({'enableRateLimit': True})
-
-        self.last_bias_score = 0
+        except Exception:
+            # Fallback to standard coinbase if 'coinbase' alias refers to old API in this version
+            # But usually 'coinbase' is the correct one for public market data now
+            self.exchange = ccxt.coinbasepro({'enableRateLimit': True})
+            
         self.intermarket = IntermarketEngine()
         self.news = NewsFilter()
-        
-        # Bias Cache (Protect against Gemini 429)
-        self.bias_cache = {} # {symbol: {'score': float, 'label': str, 'timestamp': float}}
-        
-        self.order_book_enabled = True
-        # Deduplication cache
+        self.order_book_enabled = True  # Can be disabled if exchange doesn't support
+        # Deduplication cache: prevents firing the same signal multiple times per candle window
+        # Key: (symbol, pattern_type) | Value: timestamp of last signal
         self._signal_cache = {}
-        self._signal_cooldown_mins = 15  
+        self._signal_cooldown_mins = 15  # Minimum minutes between signals for the same symbol
 
     def get_hurst_exponent(self, time_series):
         """
@@ -137,25 +132,6 @@ class SMCScanner:
                 df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
                 return df
         except Exception as e:
-            # Special handling for Coinbase '4h' timeframe which isn't natively supported
-            if timeframe == '4h' and 'coinbase' in str(type(self.exchange)).lower():
-                try:
-                    logger.debug(f"CCXT {symbol} natively missing 4h. Fetching 1h to resample...")
-                    ohlcv = self.exchange.fetch_ohlcv(symbol, '1h', limit=limit * 4)
-                    if ohlcv:
-                        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-                        df.set_index('timestamp', inplace=True)
-                        resampled = df.resample('4h').agg({
-                            'open': 'first',
-                            'high': 'max',
-                            'low': 'min',
-                            'close': 'last',
-                            'volume': 'sum'
-                        }).dropna().reset_index()
-                        return resampled.tail(limit)
-                except Exception as resample_e:
-                    logger.warning(f"CCXT 1h resample to 4h failed for {symbol}: {resample_e}")
             logger.warning(f"CCXT Fetch failed for {symbol} ({e}). Falling back to yfinance.")
 
         # Fallback to yfinance
@@ -171,12 +147,7 @@ class SMCScanner:
             
             # Fetch data (5 days is safe buffer for indicators)
             import yfinance as yf
-            try:
-                # yfinance >= 0.2.40 can return None or throw exceptions inside download
-                df = yf.download(yf_symbol, period='5d', interval=yf_interval, progress=False, ignore_tz=True)
-            except Exception as e:
-                logger.error(f"yfinance download exception for {yf_symbol}: {e}")
-                return None
+            df = yf.download(yf_symbol, period='5d', interval=yf_interval, progress=False)
             
             if df is None or len(df) < 50:
                 logger.error(f"yfinance fetched insufficient data for {symbol}")
@@ -236,7 +207,7 @@ class SMCScanner:
 
     def is_killzone(self, current_time=None):
         """Checks if current time (or override) is within any active trading session."""
-        now_utc = current_time.time() if current_time else datetime.now(timezone.utc).time()
+        now_utc = current_time.time() if current_time else datetime.utcnow().time()
         hour = now_utc.hour
         
         # Check Asian Fade Prime Window (⭐ Highest priority)
@@ -263,7 +234,7 @@ class SMCScanner:
     def is_asian_fade_window(self, hour=None):
         """Returns True if we are in the 11 PM – 2 AM EST (4–7 AM UTC) Asian Fade prime window."""
         if hour is None:
-            hour = datetime.now(timezone.utc).hour
+            hour = datetime.utcnow().hour
         fade = Config.KILLZONE_ASIAN_FADE
         return fade is not None and (fade[0] <= hour < fade[1])
 
@@ -369,23 +340,20 @@ class SMCScanner:
     def get_detailed_bias(self, symbol, index_context=None, visual_check=False):
         """
         MULTI-FACTOR BIAS SCORING:
-        ... (omitted docstring for brevity) ...
+        1. 4H Trend (EMA 20 vs 50) - Weight 1
+        2. Daily Trend (EMA 20 vs 50) - Weight 1
+        3. Momentum (4H RSI) - Weight 0.5
+        4. Intermarket (DXY) - Weight 1
+        5. Visual (AI Vision) - Weight 1 (Optional)
+        
+        Returns: 
+        - "STRONG BULLISH" (> 2.5) or (> 3.0 with visual)
+        - "BULLISH" (> 0.5)
+        - "NEUTRAL" (-0.5 to 0.5)
+        - "BEARISH" (< -0.5)
+        - "STRONG BEARISH" (< -2.5)
         """
-        # 0. Check Bias Cache (Protect against Gemini 429)
-        import time
-        now = time.time()
-        if symbol in self.bias_cache:
-            entry = self.bias_cache[symbol]
-            if (now - entry['timestamp']) < 900: # 15 minute cache
-                # If we have a cached bias but user wants visual check, 
-                # only use cache if the cached bias ALREADY had visual check.
-                if not visual_check or 'visual' in entry:
-                    # logger.info(f"Using cached bias for {symbol}: {entry['label']}")
-                    self.last_bias_score = entry['score']
-                    return entry['label']
-
         score = 0
-        price_dist_20 = 0.0  # Track displacement for 1D Drag check
         
         # 1. 4H Trend & Momentum
         df_4h = self.fetch_data(symbol, Config.HTF_TIMEFRAME, limit=100)
@@ -395,34 +363,13 @@ class SMCScanner:
             df_4h['rsi'] = self.calculate_rsi(df_4h)
             
             latest = df_4h.iloc[-1]
+            # Trend Check
+            if latest['ema_20'] > latest['ema_50']: score += 1
+            elif latest['ema_20'] < latest['ema_50']: score -= 1
             
-            # Trend Check (EMA Alignment)
-            score_4h = 0
-            if latest['ema_20'] > latest['ema_50']: score_4h += 1.0
-            elif latest['ema_20'] < latest['ema_50']: score_4h -= 1.0
-            
-            # --- DIRECTIONAL GUARD: Immediate Displacement ---
-            # If price is significantly above EMAs, we are in expansion even without a cross
-            price_dist_20 = (latest['close'] / latest['ema_20'] - 1) * 100
-            if price_dist_20 > 0.5: score_4h += 0.5 # Aggressive Bullish Expansion
-            elif price_dist_20 < -0.5: score_4h -= 0.5 # Aggressive Bearish Expansion
-
-            # --- VOLATILITY GUARD: Volume Surging ---
-            avg_vol = df_4h['volume'].rolling(20).mean().iloc[-1]
-            
-            # Weekend Void Fix: Lower the surge threshold on weekends (Sat/Sun)
-            is_weekend = latest.name.weekday() >= 5 if isinstance(latest.name, pd.Timestamp) else False
-            vol_multiplier = 1.2 if is_weekend else 1.5
-            
-            if latest['volume'] > avg_vol * vol_multiplier:
-                # Volume surging in direction of price movement adds conviction
-                if latest['close'] > latest['open']: score_4h += 0.5
-                else: score_4h -= 0.5
-
             # Momentum Check
-            if latest['rsi'] > 55: score_4h += 0.5
-            elif latest['rsi'] < 45: score_4h -= 0.5
-            score += score_4h
+            if latest['rsi'] > 55: score += 0.5
+            elif latest['rsi'] < 45: score -= 0.5
             
         # 2. Daily Trend (HTF Alignment)
         df_1d = self.fetch_data(symbol, '1d', limit=50)
@@ -430,34 +377,16 @@ class SMCScanner:
             df_1d['ema_20'] = df_1d['close'].ewm(span=20).mean()
             df_1d['ema_50'] = df_1d['close'].ewm(span=50).mean()
             
-            
-            score_1d = 0
             latest_d = df_1d.iloc[-1]
-            
-            # 1D Drag Anchor Fix: Skip 1D drag if 4H is in aggressive expansion
-            is_strong_expansion = abs(price_dist_20) > 0.5
-            
-            if latest_d['ema_20'] > latest_d['ema_50']: 
-                score_1d += 1
-            elif latest_d['ema_20'] < latest_d['ema_50']: 
-                # Don't penalize a new bullish expansion with old bearish daily data
-                if not (is_strong_expansion and price_dist_20 > 0):
-                    score_1d -= 1
-                    
-            # Mirror for strong bearish expansion resisting strong daily bull
-            if latest_d['ema_20'] > latest_d['ema_50'] and is_strong_expansion and price_dist_20 < 0:
-                score_1d -= 1 # Nullify the +1
-                
-            score += score_1d
+            if latest_d['ema_20'] > latest_d['ema_50']: score += 1
+            elif latest_d['ema_20'] < latest_d['ema_50']: score -= 1
             
         # 3. Intermarket (DXY Trend)
         if index_context and 'DXY' in index_context:
             dxy_trend = index_context['DXY']['trend']
-            score_dxy = 0
             # Inverse Correlation: DXY Down = Bullish Crypto
-            if dxy_trend == 'DOWN': score_dxy += 1
-            elif dxy_trend == 'UP': score_dxy -= 1
-            score += score_dxy
+            if dxy_trend == 'DOWN': score += 1
+            elif dxy_trend == 'UP': score -= 1
 
         # 4. Visual Bias (AI Vision)
         if visual_check and df_4h is not None:
@@ -476,24 +405,12 @@ class SMCScanner:
         threshold_strong = 3.0 if visual_check else 2.5
         threshold_weak = 1.0 if visual_check else 0.5
         
-        # Component details for the pulse
-        details = f" [4H:{score_4h if 'score_4h' in locals() else 0}, D:{score_1d if 'score_1d' in locals() else 0}, DXY:{score_dxy if 'score_dxy' in locals() else 0}]"
+        if score >= threshold_strong: return f"STRONG BULLISH ({score})"
+        if score >= threshold_weak: return f"BULLISH ({score})"
+        if score <= -threshold_strong: return f"STRONG BEARISH ({score})"
+        if score <= -threshold_weak: return f"BEARISH ({score})"
         
-        if score >= threshold_strong: label = f"STRONG BULLISH ({score}){details}"
-        elif score >= threshold_weak: label = f"BULLISH ({score}){details}"
-        elif score <= -threshold_strong: label = f"STRONG BEARISH ({score}){details}"
-        elif score <= -threshold_weak: label = f"BEARISH ({score}){details}"
-        else: label = f"NEUTRAL ({score}){details}"
-        
-        # Save to Cache
-        self.bias_cache[symbol] = {
-            'score': score,
-            'label': label,
-            'timestamp': time.time()
-        }
-        if visual_check: self.bias_cache[symbol]['visual'] = True
-        
-        return label
+        return "NEUTRAL"
 
     def get_4h_bias(self, symbol):
         # Legacy wrapper
@@ -504,7 +421,7 @@ class SMCScanner:
         Calculates the current ICT Session Quartile (90-minute cycles).
         Identifies the phase: Accumulation, Manipulation, Distribution, or X.
         """
-        now_utc = current_time if current_time else datetime.now(timezone.utc)
+        now_utc = current_time if current_time else datetime.utcnow()
         hour = now_utc.hour
         minute = now_utc.minute
         total_minutes_today = hour * 60 + minute
@@ -868,7 +785,7 @@ class SMCScanner:
             return None
 
         # DEDUPLICATION GATE: Prevent the same symbol from firing multiple times per candle window
-        now_ts = (current_time_override or datetime.now(timezone.utc)).timestamp()
+        now_ts = (current_time_override or datetime.utcnow()).timestamp()
         cache_key = symbol
         last_fired = self._signal_cache.get(cache_key, 0)
         cooldown_secs = self._signal_cooldown_mins * 60
@@ -947,17 +864,9 @@ class SMCScanner:
                     if Config.MIN_PRICE_QUARTILE <= price_position <= Config.MAX_PRICE_QUARTILE:
                         in_deep_discount = True
             
-            # TIER 1: SMT (Multi-Asset Sponsorship) - LEGACY CROSS-ASSET DIV (Trend Matching)
-            legacy_smt = self.intermarket.calculate_cross_asset_divergence('LONG', index_context)
-            
-            # PHASE 2: True SMT (ICT Divergence) - THIS IS THE PRIMARY SPONSORSHIP SIGNAL
-            true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
-            
-            # Use True SMT if detected, otherwise fallback to legacy divergence
-            smt_strength = true_smt_strength if true_smt_strength > 0 else legacy_smt
+            # TIER 1: SMT (Multi-Asset Sponsorship)
+            smt_strength = self.intermarket.calculate_cross_asset_divergence('LONG', index_context)
             has_strong_smt = smt_strength >= Config.MIN_SMT_STRENGTH
-            has_true_smt = true_smt_type is not None
-            true_smt = true_smt_type # for setup dict compatibility
             
             # LOGIC A: JUDAS SWEEP (High Alpha)
             swept_pdl = current['low'] < recent_low and current['close'] > recent_low
@@ -969,7 +878,8 @@ class SMCScanner:
 
             # PHASE 2: Volume & SMT Confirmation
             vol_spike = self.calculate_volume_cluster(df)
-            # detect_true_smt already called above
+            true_smt = self.intermarket.detect_true_smt(df, "DXY")
+            has_true_smt = true_smt is not None
             
             # PHASE 2: 90-Minute Cycle Logic (Q2 Manipulation Window)
             is_q2 = time_quartile.get('num') == 2
@@ -994,7 +904,7 @@ class SMCScanner:
 
             if entry_type:
                 # ATR-DYNAMIC TARGETING
-                ref_range_target = london_range or (price_quartiles or {}).get("Asian Range")
+                ref_range_target = london_range or price_quartiles.get("Asian Range")
                 target = self.get_volatility_adjusted_target(df, 'LONG', current['close'], ref_range_target)
                 
                 if not target:
@@ -1048,16 +958,9 @@ class SMCScanner:
                     price_position = (current['close'] - ref_range['low']) / (ref_range['high'] - ref_range['low'])
                     if Config.MIN_PRICE_QUARTILE_SHORT <= price_position <= Config.MAX_PRICE_QUARTILE_SHORT:
                         in_premium = True
-            # TIER 1: SMT (Sponsorship)
-            legacy_smt = self.intermarket.calculate_cross_asset_divergence('SHORT', index_context)
-            
-            # PHASE 2: True SMT (Divergence)
-            true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
-            
-            smt_strength = true_smt_strength if true_smt_strength > 0 else legacy_smt
+            # TIER 1: SMT (Multi-Asset Sponsorship)
+            smt_strength = self.intermarket.calculate_cross_asset_divergence('SHORT', index_context)
             has_strong_smt = smt_strength >= Config.MIN_SMT_STRENGTH
-            has_true_smt = true_smt_type is not None
-            true_smt = true_smt_type
             
             # LOGIC A: JUDAS SWEEP (High Alpha)
             swept_pdh = current['high'] > recent_high and current['close'] < recent_high
@@ -1069,6 +972,8 @@ class SMCScanner:
 
             # PHASE 2: Volume & SMT Confirmation (Bearish)
             vol_spike = self.calculate_volume_cluster(df)
+            true_smt = self.intermarket.detect_true_smt(df, "DXY")
+            has_true_smt = true_smt is not None
             is_q2 = time_quartile.get('num') == 2
 
             entry_type = None
@@ -1089,7 +994,7 @@ class SMCScanner:
                         entry_type = "Trend Pullback (Medium Alpha)"
 
             if entry_type:
-                ref_range_target = london_range or (price_quartiles or {}).get("Asian Range")
+                ref_range_target = london_range or price_quartiles.get("Asian Range")
                 target = self.get_volatility_adjusted_target(df, 'SHORT', current['close'], ref_range_target)
                 
                 if not target:
@@ -1186,12 +1091,18 @@ class SMCScanner:
         # Entry: Mean Threshold (50% of OB) or Open of OB
         entry_price = ob_setup['mean_threshold']
         stop_loss = ob_setup['invalidation_level']
-        risk = abs(entry_price - stop_loss)
         target = self.get_next_institutional_target(df, direction, current['close'])
         
-        # TIER 1: Sponsorship for Order Flow
-        true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
-        cross_asset_div = self.intermarket.calculate_cross_asset_divergence(direction, index_context)
+        # Calculate Distance to Entry
+        dist_percent = abs(current['close'] - entry_price) / current['close']
+        
+        # If price is too far away (> 0.5% away from OB), ignore
+        if dist_percent > 0.005: 
+            return None
+            
+        # 6. Construct Setup
+        risk = abs(entry_price - stop_loss)
+        if risk == 0: return None
         
         setup = {
             "timestamp": current['timestamp'].isoformat() if hasattr(current['timestamp'], 'isoformat') else str(current['timestamp']),
@@ -1206,13 +1117,12 @@ class SMCScanner:
             "time_quartile": self.get_session_quartile(),
             "price_quartiles": self.get_price_quartiles(symbol),
             "index_context": index_context,
-            "smt_strength": round(true_smt_strength, 2) if true_smt_strength > 0 else 0.0,
-            "cross_asset_divergence": round(cross_asset_div, 2),
+            "smt_strength": 0.0, # Not core to this strategy
+            "cross_asset_divergence": 0.0,
             "news_context": "Checked",
             "is_discount": True, # Assumed if retracing to OB
             'risk_reward': 3.0,
-            'quality': 'HIGH',
-            'true_smt': true_smt_type
+            'quality': 'HIGH'
         }
         
         return setup, df

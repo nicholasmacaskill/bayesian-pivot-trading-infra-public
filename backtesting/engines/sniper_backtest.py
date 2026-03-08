@@ -76,15 +76,15 @@ class SniperBacktest:
         reversal_count = 0
         trending_count = 0
         
-        # Killzones: widened by 1h each side to capture early/late session volatility
-        # Asia: 23-05 UTC, London: 06-11 UTC, NY: 11-20 UTC
-        killzones = [23, 0,1,2,3,4,5, 6,7,8,9,10,11, 12,13,14,15,16,17,18,19,20]
+        # Killzones (shared for both modes)
+        killzones = [0,1,2,3,4, 7,8,9,10, 12,13,14,15,16,17,18,19]
         
-        # Pre-filter: session + bias (news blackout removed — disabled in live system too)
+        # Pre-filter: session + bias + news (shared gates)
         candidates = df[
             (df['hour'].isin(killzones)) &
-            (df['bias'] != 'NEUTRAL')
-            # regime != TRANSITION removed — widened Hurst eliminates dead zone
+            (df['bias'] != 'NEUTRAL') &
+            (df['news_blackout'] == False) &
+            (df['regime'] != 'TRANSITION')   # Skip ambiguous zone
         ]
         
         print(f"⚙️  {len(candidates)} candidates across both regimes...")
@@ -106,8 +106,8 @@ class SniperBacktest:
                 if pd.isna(ref_high) or ref_high == ref_low: continue
                 
                 price_pos = (row['close'] - ref_low) / (ref_high - ref_low)
-                if bias == 'BULLISH' and price_pos > 0.40: continue   # Must be in lower 40%
-                if bias == 'BEARISH' and price_pos < 0.60: continue   # Must be in upper 40%
+                if bias == 'BULLISH' and price_pos > 0.25: continue
+                if bias == 'BEARISH' and price_pos < 0.75: continue
                 
                 # Sweep intent
                 has_intent = (bias == 'BULLISH' and (row['low'] < row['recent_low'] or smt_bull)) or \
@@ -135,8 +135,8 @@ class SniperBacktest:
                 has_quality = is_liquidity_pool or cascade_exhausted or strong_wick
                 if not has_quality: continue
                 
-                # MSS + Displacement confirmation (widened to 12 candles)
-                confirmation = df.iloc[idx:idx+12]
+                # MSS + Displacement confirmation
+                confirmation = df.iloc[idx:idx+6]
                 if confirmation.empty: continue
                 is_confirmed = any(
                     (bias == 'BULLISH' and (r['mss_bullish'] or r['displaced'])) or
@@ -155,7 +155,7 @@ class SniperBacktest:
                 # Gate: only trade WITH the trend direction
                 if bias == 'BULLISH' and smt_bear: continue   # SMT divergence = abort
                 if bias == 'BEARISH' and smt_bull: continue
-
+                
                 # Entry: price has pulled back INTO an active FVG
                 if bias == 'BULLISH':
                     fvg_top = row.get('fvg_bull_top', float('nan'))
@@ -167,25 +167,13 @@ class SniperBacktest:
                     fvg_bot = row.get('fvg_bear_bot', float('nan'))
                     if pd.isna(fvg_top) or pd.isna(fvg_bot): continue
                     in_fvg = fvg_bot <= row['close'] <= fvg_top
-
+                
                 if not in_fvg: continue
-
-                # Quality gate: require DISPLACEMENT + MSS + SMT confluence
-                # SMT ensures the broader macro environment supports the continuation
-                lookback_start = max(0, idx - 12)
-                recent_window = df.iloc[lookback_start:idx+1]
-                had_displacement = recent_window['displaced'].any()
-                if not had_displacement: continue
-
-                if bias == 'BULLISH':
-                    had_mss = recent_window['mss_bullish'].any()
-                    has_smt = smt_bull   # DXY diverging = macro tailwind for BTC long
-                else:
-                    had_mss = recent_window['mss_bearish'].any()
-                    has_smt = smt_bear
-                if not had_mss: continue
-                if not has_smt: continue  # SMT required for all trending entries
-
+                
+                # Require MSS in TREND direction (confirms continuation)
+                if bias == 'BULLISH' and not row['mss_bullish']: continue
+                if bias == 'BEARISH' and not row['mss_bearish']: continue
+                
                 if np.random.random() < 0.10: continue  # missed alert
                 entry = row['close'] * (1 + slip if bias == 'BULLISH' else 1 - slip)
                 tp1_r, tp2_r = tp1_r_trn, tp2_r_trn
@@ -316,10 +304,9 @@ if __name__ == "__main__":
     import json
 
     print("=" * 60)
-    print("   BAYESIAN PIVOT — 1 YEAR WALK-FORWARD (Phase 5)")
+    print("   SOVEREIGN SNIPER — 1 YEAR WALK-FORWARD (Phase 5)")
     print("   Cascade Filter: EQL + Sweep Exhaustion + Wick Ratio")
     print("   Timeframe: 1H | Period: 365 Days | Risk: 0.5%")
-    print("   Filter Level: CALIBRATED (wider quartile + 12-candle MSS window)")
     print("=" * 60)
 
     backtest = SniperBacktest(symbol='BTC/USDT', days=365, timeframe='1h')

@@ -194,12 +194,6 @@ class PropGuardian:
             try:
                 print(f"--- COMMENCING AUDIT: {info['name']} ---")
                 audit = self.analyze_rules(info['url'])
-                
-                if isinstance(audit, list) and len(audit) > 0:
-                    audit = audit[0]
-                elif not isinstance(audit, dict):
-                    audit = {"risk_score": 0, "traps": [], "verdict": "Invalid Format Structure"}
-                    
                 # Ensure firm_name is correct
                 audit['firm_name'] = info['name']
                 log_prop_audit(audit)

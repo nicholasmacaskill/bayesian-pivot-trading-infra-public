@@ -102,23 +102,18 @@ class AIValidator:
             range_pct = (recent_high - recent_low) / recent_low if recent_low > 0 else 0
             
             # Classification logic
-            if vol_ratio > 1.3: # Loosened from 1.5
-                if ema_20 > ema_50 * 1.01 or ema_20 < ema_50 * 0.99:
-                    return "Trending Expansion" # Renamed for clarity
+            if vol_ratio > 1.5:
+                if ema_20 > ema_50 * 1.02 or ema_20 < ema_50 * 0.98:
+                    return "High-Volatility Trending"
                 else:
                     return "High-Volatility Expansion"
-            elif vol_ratio < 0.9:
-                # --- REGIME GUARD: Strict Consolidation Check ---
-                # Even if vol is low, if we broke a 20-candle high, we are NOT in consolidation
-                if close.iloc[-1] > recent_high or close.iloc[-1] < recent_low:
-                    return "Consolidation Breakout (Expansion)"
-
-                if range_pct < 0.015:  # Tightened from 2%
+            elif vol_ratio < 1.0:
+                if range_pct < 0.02:  # Less than 2% range
                     return "Low-Volatility Consolidation"
                 else:
                     return "Low-Volatility Ranging"
             else:
-                if abs(ema_20 - ema_50) / ema_50 < 0.005: # Tightened from 0.01
+                if abs(ema_20 - ema_50) / ema_50 < 0.01:
                     return "Normal-Volatility Choppy"
                 else:
                     return "Normal-Volatility Trending"
@@ -308,7 +303,7 @@ class AIValidator:
             }
         }
 
-    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, regime_str=None):
+    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
         """
         Calls Gemini API to validate the setup with DUAL-TRACK analysis.
         
@@ -320,7 +315,6 @@ class AIValidator:
             df: Optional dataframe for regime detection
             exchange: Optional CCXT exchange for slippage estimation
             memory_context: Optional historical context from RAG
-            regime_str: Optional pre-calculated regime override (Ground Truth)
         
         Returns:
             dict: Dual-track analysis with live_execution and shadow_optimizer sections
@@ -332,8 +326,8 @@ class AIValidator:
         # Dynamic Oracle Grounding
         oracle_rules = self._get_oracle_prompt(setup.get('pattern', 'PO3'))
         
-        # Detect market regime for shadow track (Use override if provided)
-        regime = regime_str if regime_str else (self.detect_market_regime(df) if df is not None else "Unknown")
+        # Detect market regime for shadow track
+        regime = self.detect_market_regime(df) if df is not None else "Unknown"
         
         # Calculate slippage estimate
         entry_price = setup.get('entry', 0)
@@ -375,13 +369,9 @@ class AIValidator:
             ### GOAL: Identify if this setup aligns with institutional expansion or retail inducement.
             
             - Pattern: {setup.get('pattern', 'SMC Logic')}
-            - SMT Strength: {setup.get('smt_strength', 0)} (Institutional Divergence Score)
-            - True SMT Type: {setup.get('true_smt', 'None detected')}
-            - TECHNICAL REGIME: {regime} (THIS IS GROUND TRUTH - DO NOT HALLUCINATE CONSOLIDATION IF THIS SAYS TRENDING/EXPANSION)
+            - SMT Strength: {setup.get('smt_strength', 0)}
+            - Regime: {regime}
             - Confluences: {oracle_rules}
-            
-            NOTE: SMT Strength > 0.35 indicates a 'Crack in Correlation' (Institutional Sponsorship). 
-            Even if direct trend alignment is neutral, a strong SMT suggests institutions are actively masking their move.
             
             Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
             """
@@ -441,48 +431,30 @@ class AIValidator:
                 img = Image.open(image_path)
                 contents.append(img)
 
-            import time
-            max_retries = 3
-            base_delay = 5
-            
-            text = None
-            last_err = None
-            
-            # NEXT-GEN MULTI-TRY LOGIC WITH EXPONENTIAL BACKOFF
+            # NEXT-GEN MULTI-TRY LOGIC
             models_to_try = [
                 'gemini-2.0-flash',     # Confirmed working
                 'gemini-2.5-flash',     # Latest generation fallback
                 'gemini-1.5-flash',     # Reliable last resort
             ]
             
+            text = None
+            last_err = None
             for model_name in models_to_try:
-                for attempt in range(max_retries):
-                    try:
-                        response = self.client.models.generate_content(
-                            model=model_name, 
-                            contents=contents
-                        )
-                        text = response.text
-                        break # Success for this model
-                    except Exception as e:
-                        last_err = e
-                        err_str = str(e)
-                        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                            if attempt < max_retries - 1:
-                                delay = base_delay * (2 ** attempt)
-                                print(f"⚠️ AI Validator 429 Rate Limit ({model_name}). Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
-                                time.sleep(delay)
-                                continue
-                        
-                        # If not a 429 or max retries reached, break out of the retry loop to try the next model
-                        if "404" not in err_str and "NOT_FOUND" not in err_str:
-                            break
-                            
-                if text:
-                    break # Success overall
+                try:
+                    response = self.client.models.generate_content(
+                        model=model_name, 
+                        contents=contents
+                    )
+                    text = response.text
+                    break
+                except Exception as e:
+                    last_err = e
+                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
+                        break
             
             if not text:
-                raise last_err or Exception("All Gemini models failed even with retries")
+                raise last_err or Exception("All Gemini models failed")
             
             # Extract JSON from response (Robust extraction)
             import re
@@ -534,11 +506,7 @@ class AIValidator:
             from PIL import Image
             img = Image.open(image_path)
             
-            import time
-            max_retries = 3
-            base_delay = 5
-            
-            # NEXT-GEN MULTI-TRY LOGIC (VISION) WITH EXPONENTIAL BACKOFF
+            # NEXT-GEN MULTI-TRY LOGIC (VISION)
             models_to_try = [
                 'gemini-2.0-flash',     # Confirmed working, vision-capable
                 'gemini-2.5-flash',     # Latest generation fallback
@@ -546,31 +514,17 @@ class AIValidator:
             ]
             
             verdict = "NEUTRAL"
-            success = False
             for model_name in models_to_try:
-                for attempt in range(max_retries):
-                    try:
-                        response = self.client.models.generate_content(
-                            model=model_name, 
-                            contents=[prompt, img]
-                        )
-                        verdict = response.text.upper().strip()
-                        success = True
-                        break
-                    except Exception as e:
-                        err_str = str(e)
-                        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                            if attempt < max_retries - 1:
-                                delay = base_delay * (2 ** attempt)
-                                print(f"⚠️ Visual Bias Rate Limit ({model_name}). Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
-                                time.sleep(delay)
-                                continue
-                                
-                        if "404" not in err_str and "NOT_FOUND" not in err_str:
-                            break
-                            
-                if success:
+                try:
+                    response = self.client.models.generate_content(
+                        model=model_name, 
+                        contents=[prompt, img]
+                    )
+                    verdict = response.text.upper().strip()
                     break
+                except Exception as e:
+                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
+                        break
             
             if "BULLISH" in verdict: return 1
             if "BEARISH" in verdict: return -1
@@ -580,7 +534,7 @@ class AIValidator:
             print(f"⚠️ Visual Bias Check Failed: {e}")
             return 0
 
-def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, regime_str=None):
+def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
     """
     Main entry point for trade validation with dual-track analysis.
     
@@ -592,10 +546,9 @@ def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=
         df: Optional dataframe for regime detection
         exchange: Optional CCXT exchange for slippage estimation
         memory_context: Optional historical context from RAG
-        regime_str: Optional pre-calculated regime override
     
     Returns:
         dict: Dual-track analysis result
     """
     validator = AIValidator()
-    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context, regime_str)
+    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context)
