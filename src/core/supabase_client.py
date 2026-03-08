@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -24,58 +24,6 @@ class SupabaseBridge:
                 self.client = None
                 logger.error(f"Failed to initialize Supabase client: {e}")
 
-    def _format_timestamp(self, ts):
-        """Ensures timestamp is in ISO format for Supabase/Postgres."""
-        if not ts:
-            return datetime.now(timezone.utc).isoformat()
-        
-        try:
-            # 1. If already a datetime object
-            if isinstance(ts, datetime):
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
-                return ts.isoformat()
-
-            # 2. String/Numeric Unix Detection
-            if not isinstance(ts, (str, int, float)):
-                return datetime.now(timezone.utc).isoformat()
-
-            str_ts = str(ts).strip()
-            
-            # Try to handle numeric timestamps (seconds or milliseconds)
-            try:
-                # Use float conversion to handle strings like '123456789.0' or '1772655313000'
-                val = float(str_ts)
-                if val > 1e11: # Milliseconds detection
-                    val /= 1000.0
-                
-                # Sanity check: Ensure it's in a reasonable date range
-                if 1e9 < val < 4e9: # ~2001 to ~2096
-                    return datetime.fromtimestamp(val, tz=timezone.utc).isoformat()
-            except (ValueError, TypeError):
-                pass
-
-            # 3. ISO String Detection
-            if 'T' in str_ts or ('-' in str_ts and ':' in str_ts):
-                if str_ts.endswith('Z'):
-                    str_ts = str_ts.replace('Z', '+00:00')
-                # If we have a timezone offset, we're good. If not, append UTC
-                if '+' not in str_ts and str_ts.count(':') >= 1:
-                    # Basic check for offset; if missing, Postgres might complain
-                    pass
-                return str_ts
-                
-            # 4. Last resort: Try parsing
-            try:
-                return datetime.fromisoformat(str_ts).isoformat()
-            except:
-                pass
-
-            return datetime.now(timezone.utc).isoformat() # Fallback to now rather than raw number string
-        except Exception as e:
-            logger.warning(f"CRITICAL: Timestamp formatting failed for {ts}: {e}")
-            return datetime.now(timezone.utc).isoformat()
-
     def log_journal_entry(self, trade_id, symbol, side, pnl, ai_grade, mentor_feedback, strategy="ROGUE", status="OPEN", price=0.0, timestamp=None, deviations=None, is_lucky_failure=False, notes=None, embedding=None):
         """Pushes a trade entry to the Supabase 'journal' table."""
         if not self.client: return False
@@ -94,7 +42,8 @@ class SupabaseBridge:
                 "deviations": deviations or "",
                 "is_lucky_failure": bool(is_lucky_failure),
                 "notes": notes or "",
-                "timestamp": self._format_timestamp(timestamp),
+                "notes": notes or "",
+                "timestamp": timestamp or datetime.utcnow().isoformat(),
                 "embedding": embedding
             }
             
@@ -115,7 +64,7 @@ class SupabaseBridge:
             verdict = scan_data.get('verdict', 'N/A')
             
             data = {
-                "timestamp": self._format_timestamp(scan_data.get('timestamp')),
+                "timestamp": scan_data.get('timestamp', datetime.utcnow().isoformat()),
                 "symbol": scan_data['symbol'],
                 "timeframe": scan_data.get('timeframe', "5m"),
                 "pattern": scan_data['pattern'],
@@ -143,7 +92,7 @@ class SupabaseBridge:
         """Pushes equity and trade count to a 'sync_state' tracking table in Supabase"""
         if not self.client: return False
         try:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.utcnow().isoformat()
             # We use an upsert on 'key' to maintain current state
             data = [
                 {"key": "total_equity", "value": str(total_equity), "last_updated": now},

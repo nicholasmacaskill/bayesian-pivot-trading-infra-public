@@ -3,7 +3,7 @@ matplotlib.use('Agg')
 import mplfinance as mpf
 import pandas as pd
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 
 def generate_ict_chart(df, setup, output_path="setup_chart.png"):
     """

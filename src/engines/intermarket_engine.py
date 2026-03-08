@@ -31,18 +31,19 @@ class IntermarketEngine:
                     if isinstance(data.columns, pd.MultiIndex):
                         data.columns = data.columns.get_level_values(0)
                         
-                    # TREND PROTECTION: Check trend over last 12 candles (1 hour) instead of 1
-                    window = 12
-                    subset = data.tail(window)
-                    current_close = float(subset['Close'].iloc[-1])
-                    prev_close = float(subset['Close'].iloc[0])
+                    current = data.iloc[-1]
+                    prev = data.iloc[-2]
+                    
+                    # Ensure we have scalar values
+                    current_close = float(current['Close'])
+                    prev_close = float(prev['Close'])
                     
                     change = (current_close - prev_close) / prev_close * 100
-                    trend = "UP" if change > 0.005 else "DOWN" if change < -0.005 else "NEUTRAL"
+                    trend = "UP" if change > 0 else "DOWN"
                     
                     context[key] = {
                         "price": current_close,
-                        "change_5m": round(float(data['Close'].iloc[-1] - data['Close'].iloc[-2]) / data['Close'].iloc[-2] * 100, 3),
+                        "change_5m": round(change, 3),
                         "trend": trend,
                         "high_1h": float(data['High'].iloc[-12:].max()),
                         "low_1h": float(data['Low'].iloc[-12:].min())
@@ -79,17 +80,19 @@ class IntermarketEngine:
         ⭐ PHASE 2: True SMT Divergence Detection.
         Institutional Logic: A 'crack' in correlation reveals the real move.
         
-        Returns: (smt_type_str, strength_score) or (None, 0.0)
+        Example (Bullish SMT): 
+          DXY makes a Higher High (Sweep), but BTC makes a Higher Low (Refusal to drop).
+          This reveals BTC strength despite USD strength.
         """
         correlated_ticker = self.symbols.get(correlated_symbol_key)
         if not correlated_ticker:
-            return None, 0.0
+            return None
 
         try:
             # 1. Fetch historical data for correlation (last 50 candles, 5m)
             corr_df = yf.download(correlated_ticker, period="1d", interval="5m", progress=False)
             if corr_df is None or len(corr_df) < 20:
-                return None, 0.0
+                return None
             
             if isinstance(corr_df.columns, pd.MultiIndex):
                 corr_df.columns = corr_df.columns.get_level_values(0)
@@ -106,7 +109,6 @@ class IntermarketEngine:
 
             smt_detected = False
             smt_type = None
-            strength = 0.0
 
             # 🟢 BULLISH SMT: Correlated asset (DXY/NQ) sweeps, but BTC holds (or vice-versa)
             if correlated_symbol_key == "DXY":
@@ -114,18 +116,11 @@ class IntermarketEngine:
                 if corr_h2 > corr_h1 and btc_l2 > btc_l1:
                     smt_detected = True
                     smt_type = "BULLISH_SMT (DXY Sweep vs BTC Hold)"
-                    # Calculate strength based on divergence magnitude (0.5 to 0.95)
-                    dxy_sweep_pct = (corr_h2 - corr_h1) / corr_h1
-                    btc_hold_pct = (btc_l2 - btc_l1) / btc_l1
-                    strength = min(0.95, 0.5 + (dxy_sweep_pct + btc_hold_pct) * 100)
             else:
                 # Direct (NQ/ES): NQ makes Lower Low while BTC makes Higher Low
                 if corr_l2 < corr_l1 and btc_l2 > btc_l1:
                     smt_detected = True
                     smt_type = "BULLISH_SMT (NQ/ES Sweep vs BTC Hold)"
-                    nq_sweep_pct = (corr_l1 - corr_l2) / corr_l1
-                    btc_hold_pct = (btc_l2 - btc_l1) / btc_l1
-                    strength = min(0.95, 0.5 + (nq_sweep_pct + btc_hold_pct) * 100)
 
             # 🔴 BEARISH SMT
             if not smt_detected:
@@ -134,27 +129,21 @@ class IntermarketEngine:
                     if corr_l2 < corr_l1 and btc_h2 < btc_h1:
                         smt_detected = True
                         smt_type = "BEARISH_SMT (DXY Sweep vs BTC Hold)"
-                        dxy_sweep_pct = (corr_l1 - corr_l2) / corr_l1
-                        btc_hold_pct = (btc_h1 - btc_h2) / btc_h1
-                        strength = min(0.95, 0.5 + (dxy_sweep_pct + btc_hold_pct) * 100)
                 else:
                     # NQ makes Higher High while BTC makes Lower High
                     if corr_h2 > corr_h1 and btc_h2 < btc_h1:
                         smt_detected = True
                         smt_type = "BEARISH_SMT (NQ/ES Sweep vs BTC Hold)"
-                        nq_sweep_pct = (corr_h2 - corr_h1) / corr_h1
-                        btc_hold_pct = (btc_h1 - btc_h2) / btc_h1
-                        strength = min(0.95, 0.5 + (nq_sweep_pct + btc_hold_pct) * 100)
 
             if smt_detected:
-                logger.info(f"⚡ TRUE SMT DETECTED: {smt_type} | Strength: {strength:.2f}")
-                return smt_type, round(strength, 2)
+                logger.info(f"⚡ TRUE SMT DETECTED: {smt_type}")
+                return smt_type
             
-            return None, 0.0
+            return None
 
         except Exception as e:
             logger.error(f"Error in detect_true_smt: {e}")
-            return None, 0.0
+            return None
 
 if __name__ == "__main__":
     engine = IntermarketEngine()

@@ -15,14 +15,14 @@ class TelegramNotifier:
         self.last_alerts = {} 
         self.COOLDOWN_MINUTES = 60
 
-    def send_alert(self, symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None, security_status=None, tilt_detected=False):
+    def send_alert(self, symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None, security_status=None):
         """Sends a formatted high-priority alert with optional execution buttons and shadow insights."""
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram credentials not found. Skipping alert.")
             return
             
         # DEDUPLICATION CHECK
-        from datetime import datetime, timezone
+        from datetime import datetime
         current_time = datetime.now()
         alert_key = f"{symbol}_{pattern}"
         
@@ -53,11 +53,8 @@ class TelegramNotifier:
         else:
              signal_type = "⚠️ MED ALPHA ALERT"
         
-        tilt_warning = "⚠️ *TILT DETECTED (High Heart Rate)*\n\n" if tilt_detected else ""
-        
         message = (
             f"{emoji} *{signal_type}*\n\n"
-            f"{tilt_warning}"
             f"🪙 *Symbol:* `{symbol}`\n"
             f"⚖️ *Verdict:* `{verdict}`\n"
             f"⏱️ *Timeframe:* `{timeframe}`\n"
@@ -174,25 +171,6 @@ class TelegramNotifier:
             response.raise_for_status()
         except Exception as e:
             logger.error(f"Failed to send Telegram message: {e}")
-
-    def send_photo(self, photo_path, caption=None):
-        """Sends a photo to the Telegram channel."""
-        if not self.bot_token or not self.chat_id or not os.path.exists(photo_path):
-            return
-        
-        try:
-            url = f"{self.base_url}/sendPhoto"
-            with open(photo_path, "rb") as photo:
-                files = {"photo": photo}
-                payload = {
-                    "chat_id": self.chat_id,
-                    "caption": caption,
-                    "parse_mode": "Markdown"
-                }
-                response = requests.post(url, data=payload, files=files, timeout=10)
-                response.raise_for_status()
-        except Exception as e:
-            logger.error(f"Failed to send Telegram photo: {e}")
 
 # Standalone helper
 def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None, security_status=None):

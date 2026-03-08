@@ -11,7 +11,7 @@ import os
 import subprocess
 import time
 import signal
-from datetime import datetime, timezone
+from datetime import datetime
 
 # ── SMC-compatible path helpers (replaces path_utils) ────────────────────────
 SMC_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

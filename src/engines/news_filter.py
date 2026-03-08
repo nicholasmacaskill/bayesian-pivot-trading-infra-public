@@ -1,6 +1,6 @@
 import requests
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import pytz
 
 logger = logging.getLogger(__name__)

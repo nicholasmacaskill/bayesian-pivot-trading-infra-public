@@ -33,7 +33,7 @@ import logging
 import platform
 import threading
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
 logger = logging.getLogger("GuardEngine")
@@ -64,7 +64,6 @@ PROTECTED_SESSION_DOMAINS = [
 
 SESSION_MONITOR_BROWSERS = [
     'chrome', 'brave', 'edge', 'arc', 'safari', 'firefox', 'opera', 'vivaldi',
-    'google', 'helper', 'electron', 'msedge'
 ]
 
 SAFE_PROCESSES = [
@@ -171,9 +170,6 @@ class GuardEngine:
                 logger.warning(f"Deep-scan module init failed: {_init_e}")
                 self.deep_scan_enabled = False
         # ─────────────────────────────────────────────────────────────────────
-
-        # Establish initial persistence baseline (stop "NEW" alerts for existing files)
-        self._check_persistence()
 
         logger.info("🛡️  Guard Engine initialised.")
 
@@ -541,9 +537,6 @@ class GuardEngine:
         """
         threats = []
         try:
-            # Use psutil for a 'second opinion' if lsof hits a match
-            import psutil
-            
             result = subprocess.run(
                 ['lsof', '-iTCP:443', '-sTCP:ESTABLISHED', '-n', '-P'],
                 capture_output=True, text=True, timeout=5
@@ -558,10 +551,10 @@ class GuardEngine:
                 if len(parts) < 9:
                     continue
                 proc_name = parts[0]
-                pid       = int(parts[1])
+                pid       = parts[1]
                 name_field = parts[8]
 
-                # 1. Quick initial filter (case-insensitive whitelist)
+                # Skip browsers
                 if any(b in proc_name.lower() for b in SESSION_MONITOR_BROWSERS):
                     continue
 
@@ -572,24 +565,9 @@ class GuardEngine:
                 try:
                     hostname = socket.gethostbyaddr(remote_ip)[0]
                 except (socket.herror, socket.gaierror):
-                    # Fallback to manual check of common domain fragments in IP-based results if needed
-                    # but usually, we want resolved hostnames for this check.
                     continue
 
                 if any(d in hostname for d in PROTECTED_SESSION_DOMAINS):
-                    # 2. Forensic Double-Check (Resolve full process name via psutil)
-                    try:
-                        p = psutil.Process(pid)
-                        full_name = p.name().lower()
-                        full_cmd  = ' '.join(p.cmdline()).lower()
-                        
-                        # Use the whitelist again on the FULL name and command line
-                        if any(b in full_name for b in SESSION_MONITOR_BROWSERS) or \
-                           any(b in full_cmd for b in SESSION_MONITOR_BROWSERS):
-                            continue # It's a browser helper/process reaching out legit
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass # Process gone or we can't see it; proceed to alert on lsof name
-
                     threats.append({
                         'type': 'SESSION_HIJACK_RISK',
                         'severity': 'CRITICAL',
@@ -846,17 +824,7 @@ class GuardEngine:
         title    = threat.get('title', '⚠️ THREAT DETECTED')
         summary  = threat.get('summary', '')
 
-        log_entry = f"[{severity}] {title}: {summary}"
-        logger.warning(log_entry)
-        
-        # ── Persistent Forensic Log ─────────────────────────────────────
-        try:
-            with open("logs/forensic_audit.log", "a") as f:
-                ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                f.write(f"[{ts}] {log_entry}\n")
-        except Exception:
-            pass
-        # ───────────────────────────────────────────────────────────────
+        logger.warning(f"[{severity}] {title}: {summary}")
 
         if self._notifier:
             try:

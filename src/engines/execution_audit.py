@@ -1,10 +1,10 @@
 import logging
 import pandas as pd
 import numpy as np
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from src.core.supabase_client import supabase
 from src.clients.tl_client import TradeLockerClient
-from src.engines.ai_audit_engine import AIAuditEngine
+from ai_audit_engine import AIAuditEngine
 from src.engines.smc_scanner import SMCScanner
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ class ExecutionAuditEngine:
         """Fetches 'HIGH QUALITY' signals from Supabase scans table."""
         if not self.sb.client: return []
         
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
         
         try:
             # We only care about signals that were 'PENDING' (Actionable)
@@ -158,15 +158,12 @@ class ExecutionAuditEngine:
                 t_val = trade.get('entry_time') or trade.get('time')
                 if isinstance(t_val, str):
                     t_iso = t_val.replace('Z', '')
-                    if t_iso.isdigit():
-                        trade_time = datetime.utcfromtimestamp(int(t_iso) / 1000.0)
-                    else:
-                        if 'T' in t_iso:
-                            dp, tp = t_iso.split('T')
-                            if '+' in tp: tp = tp.split('+')[0]
-                            if '-' in tp: tp = tp.split('-')[0]
-                            t_iso = f"{dp}T{tp}"
-                        trade_time = datetime.fromisoformat(t_iso)
+                    if 'T' in t_iso:
+                        dp, tp = t_iso.split('T')
+                        if '+' in tp: tp = tp.split('+')[0]
+                        if '-' in tp: tp = tp.split('-')[0]
+                        t_iso = f"{dp}T{tp}"
+                    trade_time = datetime.fromisoformat(t_iso)
                 elif isinstance(t_val, (int, float)):
                     # Millis
                     trade_time = datetime.utcfromtimestamp(t_val / 1000.0)
@@ -222,7 +219,7 @@ class ExecutionAuditEngine:
 
     def _mark_missed(self, signal):
         """Logs a 'Missed Opportunity'"""
-        logger.info(f"❌ MISSED SIGNAL: {signal['symbol']} {signal['pattern']} at {signal['timestamp']}")
+        logger.warning(f"❌ MISSED SIGNAL: {signal['symbol']} {signal['pattern']} at {signal['timestamp']}")
 
     # ─── Auto-Contextualizer Helpers ──────────────────────────────────────────
 
@@ -243,8 +240,6 @@ class ExecutionAuditEngine:
                 return datetime.utcfromtimestamp(t_val / 1000.0)
             if isinstance(t_val, str):
                 ts = t_val.replace('Z', '')
-                if ts.isdigit(): # Handle numeric string (milliseconds)
-                    return datetime.utcfromtimestamp(int(ts) / 1000.0)
                 if 'T' in ts:
                     dp, tp = ts.split('T')
                     tp = tp.split('+')[0].split('-')[0]
@@ -252,7 +247,7 @@ class ExecutionAuditEngine:
                 return datetime.fromisoformat(ts)
         except Exception:
             pass
-        return datetime.now(timezone.utc)
+        return datetime.utcnow()
 
     def _reconstruct_market_context(self, trade):
         """
@@ -282,25 +277,17 @@ class ExecutionAuditEngine:
             'is_rogue': True,
         }
 
-        if not hasattr(self, '_ohlcv_cache'):
-            self._ohlcv_cache = {}
-
         try:
-            # Fetch ~10h of 5m candles leading up to entry (with simple caching)
-            cache_key = f"{symbol}_{entry_dt.strftime('%H_%d')}"
-            if cache_key in self._ohlcv_cache:
-                df = self._ohlcv_cache[cache_key]
-            else:
-                since_ms = int((entry_dt - timedelta(hours=10)).timestamp() * 1000)
-                norm_symbol = symbol.replace('USD', 'USDT') if 'USDT' not in symbol else symbol
-                ohlcv = self.scanner.exchange.fetch_ohlcv(norm_symbol, '5m', since=since_ms, limit=500)
-                if not ohlcv:
-                    return ctx
+            # Fetch ~10h of 5m candles leading up to entry
+            since_ms = int((entry_dt - timedelta(hours=10)).timestamp() * 1000)
+            norm_symbol = symbol.replace('USD', 'USDT') if 'USDT' not in symbol else symbol
+            ohlcv = self.scanner.exchange.fetch_ohlcv(norm_symbol, '5m', since=since_ms, limit=500)
+            if not ohlcv:
+                return ctx
 
-                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-                df['hour'] = df['timestamp'].dt.hour
-                self._ohlcv_cache[cache_key] = df
+            df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df['hour'] = df['timestamp'].dt.hour
 
             # ── 1. Asian Range ────────────────────────────────────────────────
             asian_df = df[df['hour'].between(0, 3)].tail(48)

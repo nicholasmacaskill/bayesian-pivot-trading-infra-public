@@ -6,11 +6,8 @@ import logging
 import signal
 import sys
 import os
-# Silence underlying C++ gRPC logs (fork_posix.cc etc)
-os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "false"
-os.environ["GRPC_VERBOSITY"] = "ERROR"
 import fcntl
-from datetime import datetime, timezone
+from datetime import datetime
 from src.core.config import Config
 from src.engines.smc_scanner import SMCScanner
 from src.engines.sentiment_engine import SentimentEngine
@@ -31,34 +28,17 @@ from src.engines.trade_ledger      import TradeLedger
 from src.engines.retraining_loop   import RetrainingLoop
 from src.engines.psychology_engine import PsychologyEngine
 from src.engines.biometric_engine  import BiometricEngine
-from src.engines.neuro_modulator   import NeuroModulator
 
-# ── Logging Configuration ─────────────────────────────────────────────────────
-# File handler gets everything; stdout gets a clean, minimal feed.
-_file_handler   = logging.FileHandler("logs/local_runner.log")
-_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
-_stream_handler = logging.StreamHandler(sys.stdout)
-_stream_handler.setFormatter(logging.Formatter('%(message)s'))  # emoji-only for terminal
-
-logging.basicConfig(level=logging.DEBUG, handlers=[_file_handler, _stream_handler])
-
-# Silence noisy third-party loggers (goes to file only, never stdout)
-for _noisy in [
-    "httpx", "httpcore", "urllib3", "requests",
-    "google_genai", "google.api_core", "google.auth",
-    "src.clients.tl_client",          # raw order counts
-    "src.engines.retraining_loop",    # every-cycle skip messages
-    "src.engines.execution_audit",    # no-signal audit noise
-]:
-    logging.getLogger(_noisy).setLevel(logging.WARNING)
-    logging.getLogger(_noisy).propagate = False  # don't bubble to root
-
-# Also kill root DEBUG noise (embeddings etc.)
-logging.getLogger().setLevel(logging.INFO)
-
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("logs/local_runner.log"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger("LocalRunner")
-logger.setLevel(logging.INFO)
 
 # Lock file to prevent duplicate processes
 LOCK_FILE = f"/tmp/smc_scanner.lock"
@@ -70,7 +50,7 @@ def check_single_instance():
         fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return lock_file
     except IOError:
-        print("⚠️  Another instance of Bayesian Pivot is already running. Exiting.")
+        print("⚠️  Another instance of Sovereign SMC is already running. Exiting.")
         sys.exit(0)
 
 class LocalScannerRunner:
@@ -102,10 +82,7 @@ class LocalScannerRunner:
         self.biometrics    = BiometricEngine(port=8080)
         self.biometrics.start_server()
         self.current_tilt_score = 1
-        self.neuro         = NeuroModulator()
         self.risk_multiplier   = 1.0
-        self._cycle_count       = 0
-        self._last_signal_time  = None  # datetime of last fired setup
         # ───────────────────────────────────────────────────────────
         # ───────────────────────────────────────────────────────────
 
@@ -123,8 +100,7 @@ class LocalScannerRunner:
         logger.info("🛑 Shutdown signal received. Cleaning up...")
         self.running = False
         self.guard.stop()
-        self.neuro.stop()
-        logger.info("🛡️  Sovereign Guard and Neuro-Modulator stopped.")
+        logger.info("🛡️  Sovereign Guard stopped.")
 
     def _send_pulse(self):
         """PULSE PROTOCOL: Notify Modal that we are alive."""
@@ -135,117 +111,60 @@ class LocalScannerRunner:
             
             response = requests.post(url, json=payload, timeout=5)
             response.raise_for_status()
-            logger.info("💓 Pulse Sent: Bayesian Pivot is Live.")
+            logger.info("💓 Pulse Sent: Yard Mode is Live.")
         except Exception as e:
             logger.warning(f"⚠️ Pulse Failed (Modal might be throttled): {e}")
 
     def run_cycle(self):
-        if not self.running: return
-        self._cycle_count += 1
-        now_utc = datetime.now(timezone.utc)
-        cycle_time = now_utc.strftime('%H:%M:%S UTC')
-
-        # ── Session + Killzone Context ─────────────────────────────────────
-        hour = now_utc.hour
-        if 0 <= hour < 5:
-            session, kz_active = "🌏 Asia", True
-        elif 5 <= hour < 7:
-            session, kz_active = "🌀 Pre-London", False
-        elif 7 <= hour < 11:
-            session, kz_active = "🇬🇧 London", True
-        elif 11 <= hour < 12:
-            session, kz_active = "🔄 London/NY Overlap", True
-        elif 12 <= hour < 20:
-            session, kz_active = "🗽 New York", True
-        else:
-            session, kz_active = "💤 Dead Zone", False
-
-        kz_icon  = "🟢 KILLZONE" if kz_active else "⚫ DEAD ZONE"
-        quartile = self.scanner.get_session_quartile()
-        q_label  = quartile.get('phase', 'Unknown')
-
-        # ── Time Since Last Signal ─────────────────────────────────────────
-        if self._last_signal_time:
-            delta_mins = int((now_utc - self._last_signal_time).total_seconds() / 60)
-            last_sig_str = f"{delta_mins}m ago"
-        else:
-            last_sig_str = "none yet"
-
-        # --- Mood (Neuro-Modulator) ---
-        mood = self.neuro.current_state
-        mood_icon = {"ALPHA": "🧘 (Flow)", "THETA": "🌊 (Recovery)", "BETA": "⚡ (Alert)", "GAMMA": "🔥 (Intense)"}.get(mood, "🎵")
-
-        # --- Opsec & Mood ---
-        trust = self.guard.get_trust_score()
-        trust_icon = "🛡️" if trust > 90 else "⚠️"
-
-        # --- Active Positions ---
-        active_positions = self.tl.get_open_positions()
-        pos_count = len(active_positions)
-        total_pnl = sum(p['pnl'] for p in active_positions)
-        pnl_icon = "💰" if total_pnl >= 0 else "📉"
-
-        logger.info(f"┌{'\u2500'*53}┐")
-        logger.info(f"│  🚀 CYCLE #{self._cycle_count:<4}  {cycle_time:<22}│")
-        logger.info(f"│  {session:<18}  {kz_icon:<25}│")
-        logger.info(f"│  ⏱  {q_label:<22}  Last signal: {last_sig_str:<7}│")
-        logger.info(f"│  {mood_icon:<27}  {trust_icon} Trust: {trust:<10}/100│")
-        
-        if pos_count > 0:
-            logger.info(f"├{'\u2500'*53}┤")
-            logger.info(f"│  {pnl_icon} ACTIVE POSITIONS ({pos_count})       PnL: ${total_pnl:>+8.2f}  │")
-            for p in active_positions:
-                side_color = "🟢" if p['side'] == 'BUY' else "🔴"
-                logger.info(f"│    {side_color} {p['symbol']:<10} @ ${p['price']:<9.2f} PnL: ${p['pnl']:>+7.2f}   │")
-        
-        logger.info(f"└{'\u2500'*53}┘")
+        logger.info("🚀 Starting SMC Alpha Scan Cycle...")
         self._send_pulse()
         try:
             init_db()
             
             # 0. Biometric & Psychology Audit
-            physio_data = self.biometrics.calculate_physio_tilt()
+            logger.info("🧠 Performing Psychology & Biometric Audit...")
+            physio_tilt = self.biometrics.calculate_physio_tilt()
             psych_state = self.psychology.analyze_user_state(
                 current_text="Periodic scan check.", 
-                physio_data=physio_data
+                physio_tilt=physio_tilt
             )
             self.current_tilt_score = psych_state.get('tilt_score', 1)
-            self.bpm_spike = psych_state.get('bpm_spike', False)
+            self.risk_multiplier = self.psychology.get_risk_multiplier(self.current_tilt_score)
             
-            self.risk_multiplier = self.psychology.get_risk_multiplier(self.current_tilt_score, self.bpm_spike)
-            
-            if self.bpm_spike:
-                logger.warning("☣️  TILT DETECTED (High Heart Rate)")
-                
             if self.risk_multiplier < 1.0:
-                logger.warning(f"⚠️  RISK GATED: Tilt {self.current_tilt_score} | Mult: {self.risk_multiplier}x")
-                
+                logger.warning(f"⚠️ RISK GATED: Tilt Level {self.current_tilt_score} | Multiplier: {self.risk_multiplier}x")
             if self.risk_multiplier == 0:
-                logger.error("🛑 HARD SHUTDOWN: High Tilt. Skipping cycle.")
+                logger.error("🛑 HARD SHUTDOWN: High Tilt detected. Skipping cycle.")
                 return
 
             # 1. Sync Equity
             live_equity = self.tl.get_total_equity()
             if live_equity > 0:
-                logger.info(f"  💰 Equity: ${live_equity:,.2f}")
-                update_sync_state(live_equity, 0)
+                logger.info(f"💰 Equity Synced: ${live_equity:,.2f}")
+                update_sync_state(live_equity, 0) # Watchdog handles trade count
             
-            # 2. Journal Watchdog
+            # 2. Journal Watchdog (Auto-Sync Closed History & Open Positions)
+            logger.info("🐶 Journal Watchdog: Syncing trade history...")
             self._sync_trade_journal(live_equity)
-            
-            # 1b. Market Context (Intermarket HTF)
-            market_context = self.scanner.intermarket.get_market_context()
             
             scan_list = Config.SYMBOLS + Config.ALT_SYMBOLS
             setups_found = 0
             
+            # 3. INTERMARKET CONTEXT BATCHING (Phase 3.5 Fix)
+            # Fetch once per cycle to avoid getting IP-blocked by Yahoo Finance
+            market_context = self.scanner.intermarket.get_market_context()
+            logger.info("📡 Batched Intermarket Context retrieved.")
+            
             for symbol in scan_list:
-                if not self.running: break
+                logger.info(f"🔎 Scanning {symbol}...")
                 
+                # Scan Logic (SMC + Order Flow Fallback)
+                # Pass batched context to avoid redundant network calls
                 cached_ctx = {'intermarket': market_context} if market_context else None
-                # Fetch Bias for compact scan line
+                
+                # Fetch Bias first for logging
                 bias_score = self.scanner.get_detailed_bias(symbol, index_context=market_context)
-                logger.info(f"  🔎 {symbol:<10} │ Bias: {bias_score}")
+                logger.info(f"CAPTURED BIAS: {bias_score} on {symbol}")
 
                 # ── GATE 1: Economic Calendar ────────────────────────────────────
                 cal_safe, cal_reason = self.cal_filter.is_safe_to_trade(symbol)
@@ -309,13 +228,13 @@ class LocalScannerRunner:
                     
                     # Retrieve Memory Context (RAG)
                     memory_context = memory.get_context_for_validator(setup)
-                    has_mem = 'Found similar' in memory_context
+                    logger.info(f"🧠 Memory Context retrieved ({'Found history' if 'Found similar' in memory_context else 'No history'})")
                     
                     # ── Security Context (Sovereign Guard enrichment) ────
                     security_status = self.guard.get_security_context()
                     # ────────────────────────────────────────────────────────
 
-                    # AI Validation (Vision Proxy + RAG Active + Technical Regime Grounding)
+                    # AI Validation (Vision Proxy + RAG Active)
                     ai_result = validate_setup(
                         setup,
                         market_data,
@@ -323,8 +242,7 @@ class LocalScannerRunner:
                         image_path=generated_chart,
                         df=df,
                         exchange=self.scanner.exchange,
-                        memory_context=memory_context,
-                        regime_str=regime_result.regime.value  # Inject Technical Ground Truth
+                        memory_context=memory_context  # Reverted back to original memory context
                     )
                     
                     live = ai_result.get('live_execution', ai_result)
@@ -357,8 +275,7 @@ class LocalScannerRunner:
                     # Alert if threshold met
                     if live_score >= threshold:
                         setups_found += 1
-                        self._last_signal_time = datetime.now(timezone.utc)  # track for cycle header
-                        logger.info(f"🔔 HIGH QUALITY SETUP [{symbol}] — Score: {live_score}/10")
+                        logger.info(f"🔔 HIGH QUALITY SETUP! Sending alert for {symbol}")
                         
                         # 💰 Risk Calculation (with regime size multiplier applied)
                         calc_equity = live_equity if live_equity > 0 else 100000.0
@@ -407,8 +324,7 @@ class LocalScannerRunner:
                                 verdict=live.get('verdict', 'N/A'),
                                 risk_calc=risk_calc,
                                 shadow_insights=shadow,
-                                security_status=security_status,
-                                tilt_detected=self.bpm_spike
+                                security_status=security_status
                             )
                             # Append signal_id to the alert message as a separate line
                             if signal_id != 'UNSIGNED' and ledger_tag:
@@ -416,21 +332,9 @@ class LocalScannerRunner:
                         except Exception as e:
                             logger.error(f"❌ Failed to send Telegram alert: {e}")
             
-            if not self.running: return
-            
             # 4. Rogue Execution Audit (The Policeman)
             logger.info("👮‍♂️ Running Rogue Execution Audit...")
             self.audit_engine.run_audit(hours_back=12)
-
-            # 4c. Sovereign Neuro-Modulation (Psychological Regulation)
-            # Frequencies: Alpha (Flow), Theta (Stress), Beta (Alertness), Gamma (Intensity)
-            avg_bias = market_context.get('bias_strength', 1.0) if market_context else 1.0
-            self.neuro.modulate_by_metrics(
-                bpm=self.biometrics.current_bpm,
-                win_rate=0.5, # Default to neutral for now
-                bias_strength=avg_bias,
-                setups_found=setups_found
-            )
 
             # 4b. Rogue Trade Ledger Check (Feature 5)
             # Any trade in the journal with strategy='ROGUE' and no matching signed signal
@@ -458,58 +362,20 @@ class LocalScannerRunner:
                 # HEARTBEAT: Log a silent scan to Supabase to keep Dashboard "Green"
                 logger.info("💓 Heartbeat: System pulse sent to dashboard.")
                 try:
-                    # Get actual bias for heartbeat
-                    btc_bias = self.scanner.get_detailed_bias("BTC/USD", index_context=market_context)
                     hb_data = {
                         'timestamp': datetime.now().isoformat(),
                         'symbol': 'HEARTBEAT',
                         'pattern': 'System Active',
-                        'bias': btc_bias, # Use real bias
+                        'bias': 'NEUTRAL',
                         'verdict': 'SCAN_HEARTBEAT'
                     }
                     log_scan(hb_data, {'score': 0, 'reasoning': 'Active Polling'})
-                    
-                    # ── MARKET PULSE: Send Visual Summary every 4 hours or on Strong Bias ──
-                    if (time.time() - getattr(self, 'last_market_pulse', 0) > 14400) or ("STRONG" in btc_bias):
-                        self._send_market_pulse("BTC/USD", btc_bias)
-                        self.last_market_pulse = time.time()
                 except: pass
                 
         except Exception as e:
             logger.error(f"💥 Cycle Crash: {e}", exc_info=True)
             log_system_event("LocalRunner", str(e), level="ERROR")
             send_system_error("Local Runner", str(e))
-
-    def _send_market_pulse(self, symbol, bias_str):
-        """Sends a visual market pulse (Chart + Bias) to Telegram."""
-        logger.info(f"📊 Sending Market Pulse for {symbol}...")
-        try:
-            df_4h = self.scanner.fetch_data(symbol, '4h', limit=100)
-            if df_4h is None: return
-            
-            # Ensure charts directory exists
-            os.makedirs(os.path.join("data", "charts"), exist_ok=True)
-            chart_path = os.path.join("data", "charts", f"pulse_{int(time.time())}.png")
-            
-            # Use generate_bias_chart for the visual pulse
-            generate_bias_chart(df_4h, symbol, timeframe="4h", output_path=chart_path)
-            
-            caption = (
-                f"📊 *SOVEREIGN MARKET PULSE*\n\n"
-                f"🪙 *Symbol:* `{symbol}`\n"
-                f"📉 *Current Bias:* `{bias_str}`\n"
-                f"🧠 *Mood:* `{self.neuro.current_state}`\n\n"
-                f"🛡️ *Trust Score:* `{self.guard.get_trust_score()}/100`"
-            )
-            
-            if os.path.exists(chart_path):
-                self.notifier.send_photo(chart_path, caption=caption)
-                # Keep it for a bit then cleanup? Or just leave it in data/charts
-            else:
-                self.notifier._send_message(caption)
-                
-        except Exception as e:
-            logger.error(f"Failed to send market pulse: {e}")
 
     def _sync_trade_journal(self, live_equity):
         """Replicates cloud watchdog logic: Syncs history and positions to DB."""
@@ -602,8 +468,10 @@ class LocalScannerRunner:
                     )
                     logger.warning(f"🚨 ROGUE TRADE DETECTED: {symbol} | trade_id={trade_id} | PnL={pnl}")
 
+                    # Alert via Telegram
                     try:
-                        self.notifier._send_message(
+                        self.notifier.bot.send_message(
+                            chat_id=self.notifier.chat_id,
                             text=(
                                 f"🚨 *ROGUE TRADE DETECTED*\n\n"
                                 f"A trade appeared in your account with *no matching signed signal*.\n\n"
@@ -625,7 +493,7 @@ class LocalScannerRunner:
             logger.error(f"[RogueLedgerAudit] Error: {e}")
 
     def main_loop(self):
-        logger.info("⚙️  Bayesian Pivot Trading Infra — Local Runner Initialized.")
+        logger.info("⚙️ Sovereign SMC Local Runner Initialized.")
         logger.info(f"⏱️  Interval: {Config.get('RUN_INTERVAL_MINS', 5)} minutes")
         
         while self.running:

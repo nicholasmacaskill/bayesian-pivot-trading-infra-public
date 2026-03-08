@@ -1,8 +1,8 @@
 import logging
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from src.core.config import Config
-from src.engines.ai_audit_engine import AIAuditEngine
+from ai_audit_engine import AIAuditEngine
 from src.core.supabase_client import supabase
 
 logger = logging.getLogger(__name__)

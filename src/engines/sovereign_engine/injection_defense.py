@@ -12,7 +12,7 @@ import subprocess
 import hashlib
 import psutil
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from . import patterns
 
 # State tracking for behavioral analysis

@@ -90,9 +90,9 @@ class ScannerBacktest:
     def resample_data(self, df, timeframe):
         """Resamples 5m data to higher timeframes."""
         # map '4h' -> '4H', '1d' -> '1D'
-        rule = timeframe.lower().replace('m', 't') # generic mapper if needed, but we know inputs
-        if timeframe == '4h': rule = '4h'
-        if timeframe == '1d': rule = '1d'
+        rule = timeframe.upper().replace('M', 'T') # generic mapper if needed, but we know inputs
+        if timeframe == '4h': rule = '4H'
+        if timeframe == '1d': rule = '1D'
         
         # Aggregation rules
         agg_dict = {
@@ -319,8 +319,8 @@ class ScannerBacktest:
 if __name__ == "__main__":
     engine = ScannerBacktest(
         symbol='BTC/USDT',
-        start_date='2024-01-01',
-        end_date='2024-03-31' # 3 months for a quick but solid sample size
+        start_date='2025-11-01',
+        end_date='2025-11-04'
     )
     
     results = engine.run_backtest()

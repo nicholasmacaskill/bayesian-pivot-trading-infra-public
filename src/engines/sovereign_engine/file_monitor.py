@@ -4,7 +4,7 @@ import subprocess
 import logging
 import signal
 import psutil
-from datetime import datetime, timezone
+from datetime import datetime
 
 # Whitelist of processes allowed to touch Identity Files
 # We use partial matches for resilience, but in a stricter version we would check binary signatures.

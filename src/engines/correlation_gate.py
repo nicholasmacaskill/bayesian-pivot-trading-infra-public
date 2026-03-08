@@ -12,7 +12,7 @@ Rules:
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class CorrelationGate:
 
     def _purge_expired(self):
         """Remove signals that have been active past their TTL."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         expired = [sid for sid, s in self._active.items() if s['expires_at'] < now]
         for sid in expired:
             logger.debug(f"[CorrelationGate] Auto-expiring slot for signal {sid} ({self._active[sid]['symbol']})")
@@ -105,8 +105,8 @@ class CorrelationGate:
             'symbol': symbol,
             'direction': direction.upper(),
             'basket': basket,
-            'registered_at': datetime.now(timezone.utc),
-            'expires_at': datetime.now(timezone.utc) + timedelta(hours=self.expiry_hours),
+            'registered_at': datetime.utcnow(),
+            'expires_at': datetime.utcnow() + timedelta(hours=self.expiry_hours),
         }
         logger.info(
             f"[CorrelationGate] Registered {direction} slot for {symbol} "
