@@ -65,6 +65,7 @@ class SMCScanner:
         # Key: (symbol, pattern_type) | Value: timestamp of last signal
         self._signal_cache = {}
         self._signal_cooldown_mins = 15  # Minimum minutes between signals for the same symbol
+        self.bias_cache = {} # Protect against redundant calls
 
     def get_hurst_exponent(self, time_series):
         """
@@ -126,7 +127,12 @@ class SMCScanner:
         """
         # Try CCXT First (Real-Time)
         try:
-            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+            ccxt_timeframe = timeframe
+            if 'coinbase' in str(self.exchange.id).lower() and timeframe == '4h':
+                # Coinbase Advanced Trade does NOT support 4h. Use 1h as best proxy.
+                ccxt_timeframe = '1h'
+
+            ohlcv = self.exchange.fetch_ohlcv(symbol, ccxt_timeframe, limit=limit)
             if ohlcv:
                 df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
@@ -206,30 +212,37 @@ class SMCScanner:
         return is_high, is_low
 
     def is_killzone(self, current_time=None):
-        """Checks if current time (or override) is within any active trading session."""
-        now_utc = current_time.time() if current_time else datetime.utcnow().time()
-        hour = now_utc.hour
-        
-        # Check Asian Fade Prime Window (⭐ Highest priority)
-        if self.is_asian_fade_window(hour):
-            return True
+        """Checks if current time is within any active trading session and NOT during blackout."""
+        from datetime import datetime
+        now = current_time or datetime.utcnow()
+        hour = now.hour
 
-        # Check London Session
-        london = Config.KILLZONE_LONDON
-        if london and (london[0] <= hour < london[1]):
-            return True
+        # 1. Check NY Lunch Blackout (12:00 - 13:00 EST / 17:00 - 18:00 UTC)
+        lunch_start, lunch_end = Config.get('NY_LUNCH_BLACKOUT', (17, 18))
+        if hour >= lunch_start and hour < lunch_end:
+            return False, "NY_LUNCH_BLACKOUT"
 
-        # Check continuous NY session
-        ny_session = Config.KILLZONE_NY_CONTINUOUS
-        if ny_session and (ny_session[0] <= hour < ny_session[1]):
-            return True
-            
-        # Check Asia Session
-        asia = Config.KILLZONE_ASIA
-        if asia and (asia[0] <= hour < asia[1]):
-            return True
-        
-        return False
+        # 2. London Session (7 - 10 UTC)
+        lon_start, lon_end = Config.KILLZONE_LONDON
+        if lon_start <= hour < lon_end:
+            return True, "LONDON"
+
+        # 3. Asian session (0 - 4 UTC)
+        asia_start, asia_end = Config.KILLZONE_ASIA
+        if asia_start <= hour < asia_end:
+            return True, "ASIA"
+
+        # 4. Asian Fade prime window (4 - 7 UTC)
+        fade_start, fade_end = Config.KILLZONE_ASIAN_FADE
+        if fade_start <= hour < fade_end:
+            return True, "ASIAN_FADE"
+
+        # 5. NY continuous session (12 - 20 UTC)
+        ny_start, ny_end = Config.KILLZONE_NY_CONTINUOUS
+        if ny_start <= hour < ny_end:
+            return True, "NY_CONTINUOUS"
+
+        return False, None
 
     def is_asian_fade_window(self, hour=None):
         """Returns True if we are in the 11 PM – 2 AM EST (4–7 AM UTC) Asian Fade prime window."""
@@ -339,78 +352,98 @@ class SMCScanner:
 
     def get_detailed_bias(self, symbol, index_context=None, visual_check=False):
         """
-        MULTI-FACTOR BIAS SCORING:
+        MULTI-FACTOR BIAS SCORING (Institutional Only):
         1. 4H Trend (EMA 20 vs 50) - Weight 1
         2. Daily Trend (EMA 20 vs 50) - Weight 1
-        3. Momentum (4H RSI) - Weight 0.5
-        4. Intermarket (DXY) - Weight 1
-        5. Visual (AI Vision) - Weight 1 (Optional)
-        
-        Returns: 
-        - "STRONG BULLISH" (> 2.5) or (> 3.0 with visual)
-        - "BULLISH" (> 0.5)
-        - "NEUTRAL" (-0.5 to 0.5)
-        - "BEARISH" (< -0.5)
-        - "STRONG BEARISH" (< -2.5)
+        3. Intermarket (DXY) - Weight 1
+        4. Visual (AI Vision) - Weight 1 (Optional)
         """
-        score = 0
+        cache_key = f"bias_{symbol}"
+        now = time.time()
         
-        # 1. 4H Trend & Momentum
+        # 0. Check Bias Cache
+        if not hasattr(self, '_bias_cache'): self._bias_cache = {}
+        if symbol in self._bias_cache:
+            entry = self._bias_cache[symbol]
+            if (now - entry['timestamp']) < 900: # 15 minute cache
+                if not visual_check or 'visual' in entry:
+                    self.last_bias_score = entry['score']
+                    return entry['label']
+
+        score = 0.0
+        price_dist_20 = 0.0
+        
+        # 1. 4H Trend (Using 1h as proxy if needed)
         df_4h = self.fetch_data(symbol, Config.HTF_TIMEFRAME, limit=100)
-        if df_4h is not None:
+        if df_4h is not None and len(df_4h) > 50:
             df_4h['ema_20'] = df_4h['close'].ewm(span=20).mean()
             df_4h['ema_50'] = df_4h['close'].ewm(span=50).mean()
-            df_4h['rsi'] = self.calculate_rsi(df_4h)
-            
             latest = df_4h.iloc[-1]
-            # Trend Check
-            if latest['ema_20'] > latest['ema_50']: score += 1
-            elif latest['ema_20'] < latest['ema_50']: score -= 1
             
-            # Momentum Check
-            if latest['rsi'] > 55: score += 0.5
-            elif latest['rsi'] < 45: score -= 0.5
+            if latest['ema_20'] > latest['ema_50']: score += 1.0
+            elif latest['ema_20'] < latest['ema_50']: score -= 1.0
             
-        # 2. Daily Trend (HTF Alignment)
+            # Displacement Guard
+            price_dist_20 = (latest['close'] / latest['ema_20'] - 1) * 100
+            if price_dist_20 > 0.5: score += 0.5
+            elif price_dist_20 < -0.5: score -= 0.5
+
+        # 2. Daily Trend
         df_1d = self.fetch_data(symbol, '1d', limit=50)
-        if df_1d is not None:
+        if df_1d is not None and len(df_1d) > 20:
             df_1d['ema_20'] = df_1d['close'].ewm(span=20).mean()
             df_1d['ema_50'] = df_1d['close'].ewm(span=50).mean()
-            
             latest_d = df_1d.iloc[-1]
-            if latest_d['ema_20'] > latest_d['ema_50']: score += 1
-            elif latest_d['ema_20'] < latest_d['ema_50']: score -= 1
             
+            is_strong_expansion = abs(price_dist_20) > 0.5
+            
+            if latest_d['ema_20'] > latest_d['ema_50']:
+                score += 1.0
+            elif latest_d['ema_20'] < latest_d['ema_50']:
+                if not (is_strong_expansion and price_dist_20 > 0):
+                    score -= 1.0
+
         # 3. Intermarket (DXY Trend)
         if index_context and 'DXY' in index_context:
             dxy_trend = index_context['DXY']['trend']
-            # Inverse Correlation: DXY Down = Bullish Crypto
-            if dxy_trend == 'DOWN': score += 1
-            elif dxy_trend == 'UP': score -= 1
+            if dxy_trend == 'DOWN': score += 1.0
+            elif dxy_trend == 'UP': score -= 1.0
 
-        # 4. Visual Bias (AI Vision)
-        if visual_check and df_4h is not None:
-            # Generate temporary chart
-            chart_path = f"/tmp/{symbol.replace('/', '_')}_bias.png"
-            if generate_bias_chart(df_4h, symbol, "4h", chart_path):
-                validator = AIValidator()
-                v_score = validator.get_visual_bias(chart_path)
-                score += v_score
-                # Cleanup
-                try: os.remove(chart_path)
-                except: pass
-            
+        # 5. HTF Gravity Points (Order Blocks / FVGs)
+        try:
+            htf_pois = self.detect_htf_pois(symbol)
+            for poi in htf_pois:
+                # If we are BULLISH but trading into a BEARISH HTF POI, penalize
+                if score > 0 and 'BEARISH' in poi['type']:
+                    # Only penalize if price is very close to the POI (within 0.5%)
+                    if abs(latest['close'] - poi['level']) / poi['level'] < 0.005:
+                        score -= 1.0
+                # If we are BEARISH but trading into a BULLISH HTF POI, penalize
+                if score < 0 and 'BULLISH' in poi['type']:
+                    if abs(latest['close'] - poi['level']) / poi['level'] < 0.005:
+                        score += 1.0
+        except Exception as e:
+            logger.error(f"HTF POI Bias Integration Error: {e}")
+
         self.last_bias_score = score
         
         threshold_strong = 3.0 if visual_check else 2.5
-        threshold_weak = 1.0 if visual_check else 0.5
+        threshold_weak = 0.5
         
-        if score >= threshold_strong: return f"STRONG BULLISH ({score})"
-        if score >= threshold_weak: return f"BULLISH ({score})"
-        if score <= -threshold_strong: return f"STRONG BEARISH ({score})"
-        if score <= -threshold_weak: return f"BEARISH ({score})"
+        label = "NEUTRAL"
+        if score >= threshold_strong: label = f"STRONG BULLISH ({score})"
+        elif score >= threshold_weak: label = f"BULLISH ({score})"
+        elif score <= -threshold_strong: label = f"STRONG BEARISH ({score})"
+        elif score <= -threshold_weak: label = f"BEARISH ({score})"
         
-        return "NEUTRAL"
+        self._bias_cache[symbol] = {
+            'timestamp': now,
+            'score': score,
+            'label': label
+        }
+        if visual_check: self._bias_cache[symbol]['visual'] = True
+        
+        return label
 
     def get_4h_bias(self, symbol):
         # Legacy wrapper
@@ -482,6 +515,70 @@ class SMCScanner:
         
         return ranges
     
+    def detect_htf_pois(self, symbol):
+        """
+        INSTITUTIONAL PRECISION: Detects 1D and 1W Order Blocks and FVGs.
+        These act as 'HTF Gravity Points'—trading into them is high-risk.
+        """
+        pois = []
+        for tf in ['1d', '1wk']:
+            df = self.fetch_data(symbol, tf, limit=100)
+            if df is None or len(df) < 10:
+                continue
+                
+            # 1. Detect FVGs
+            for i in range(2, len(df)):
+                # Bullish FVG
+                if df['low'].iloc[i] > df['high'].iloc[i-2]:
+                    pois.append({
+                        'tf': tf,
+                        'type': 'FVG_BULLISH',
+                        'top': df['low'].iloc[i],
+                        'bottom': df['high'].iloc[i-2],
+                        'level': (df['low'].iloc[i] + df['high'].iloc[i-2]) / 2
+                    })
+                # Bearish FVG
+                if df['high'].iloc[i] < df['low'].iloc[i-2]:
+                    pois.append({
+                        'tf': tf,
+                        'type': 'FVG_BEARISH',
+                        'top': df['low'].iloc[i-2],
+                        'bottom': df['high'].iloc[i],
+                        'level': (df['low'].iloc[i-2] + df['high'].iloc[i]) / 2
+                    })
+
+            # 2. Detect Order Blocks (Last candle before impulsive move)
+            # Simplified: Look for engulfing after a sweep or expansion
+            for i in range(10, len(df)-1):
+                body_prev = abs(df['close'].iloc[i] - df['open'].iloc[i])
+                body_curr = abs(df['close'].iloc[i+1] - df['open'].iloc[i+1])
+                
+                # Bullish Engulfing (Potential Bullish OB)
+                if df['close'].iloc[i+1] > df['high'].iloc[i] and body_curr > body_prev * 2:
+                    pois.append({
+                        'tf': tf,
+                        'type': 'OB_BULLISH',
+                        'top': df['high'].iloc[i],
+                        'bottom': df['low'].iloc[i],
+                        'level': (df['high'].iloc[i] + df['low'].iloc[i]) / 2
+                    })
+                # Bearish Engulfing
+                if df['close'].iloc[i+1] < df['low'].iloc[i] and body_curr > body_prev * 2:
+                    pois.append({
+                        'tf': tf,
+                        'type': 'OB_BEARISH',
+                        'top': df['high'].iloc[i],
+                        'bottom': df['low'].iloc[i],
+                        'level': (df['high'].iloc[i] + df['low'].iloc[i]) / 2
+                    })
+        
+        # Filter for 'Fresh' POIs (Not yet mitigated)
+        current_price = self.fetch_data(symbol, '1m', limit=1).iloc[-1]['close']
+        fresh_pois = [p for p in pois if (p['type'].endswith('BULLISH') and current_price > p['bottom']) or 
+                                       (p['type'].endswith('BEARISH') and current_price < p['top'])]
+        
+        return fresh_pois
+
     def validate_sweep_depth(self, symbol, swept_level, direction):
         """
         Level 2 Depth Filter: Validates that liquidity sweep had actual institutional absorption.
@@ -878,8 +975,11 @@ class SMCScanner:
 
             # PHASE 2: Volume & SMT Confirmation
             vol_spike = self.calculate_volume_cluster(df)
-            true_smt = self.intermarket.detect_true_smt(df, "DXY")
-            has_true_smt = true_smt is not None
+            true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
+            has_true_smt = true_smt_type is not None
+            
+            # Merge SMT strengths (Divergence Score + True SMT magnitude)
+            combined_smt = max(smt_strength, true_smt_strength)
             
             # PHASE 2: 90-Minute Cycle Logic (Q2 Manipulation Window)
             is_q2 = time_quartile.get('num') == 2
@@ -935,7 +1035,7 @@ class SMCScanner:
                     "time_quartile": time_quartile,
                     "price_quartiles": price_quartiles,
                     "index_context": index_context,
-                    "smt_strength": round(smt_strength, 2),
+                    "smt_strength": round(combined_smt, 2),
                     "hurst_exponent": round(hurst, 2),
                     "adf_p_value": round(adf_p, 4),
                     "is_mean_reverting": bool(is_mean_reverting),
@@ -945,7 +1045,7 @@ class SMCScanner:
                     'risk_reward': Config.TP2_R_MULTIPLE,
                     'quality': 'HIGH' if 'Judas' in entry_type else 'MEDIUM',
                     'volume_spike': vol_spike,
-                    'true_smt': true_smt
+                    'true_smt': true_smt_type
                 }
 
         # BEARISH Setup (OPTIMIZED: Require bias for quality - Only if no Long found yet)
@@ -972,8 +1072,12 @@ class SMCScanner:
 
             # PHASE 2: Volume & SMT Confirmation (Bearish)
             vol_spike = self.calculate_volume_cluster(df)
-            true_smt = self.intermarket.detect_true_smt(df, "DXY")
-            has_true_smt = true_smt is not None
+            true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
+            has_true_smt = true_smt_type is not None
+            
+            # Merge SMT
+            combined_smt_short = max(smt_strength, true_smt_strength)
+            
             is_q2 = time_quartile.get('num') == 2
 
             entry_type = None
@@ -1022,7 +1126,7 @@ class SMCScanner:
                     "time_quartile": time_quartile,
                     "price_quartiles": price_quartiles,
                     "index_context": index_context,
-                    "smt_strength": round(smt_strength, 2),
+                    "smt_strength": round(combined_smt_short, 2),
                     "hurst_exponent": round(hurst, 2),
                     "adf_p_value": round(adf_p, 4),
                     "is_mean_reverting": bool(is_mean_reverting),
@@ -1032,7 +1136,7 @@ class SMCScanner:
                     'risk_reward': Config.TP2_R_MULTIPLE,
                     'quality': 'HIGH' if 'Judas' in entry_type else 'MEDIUM',
                     'volume_spike': vol_spike,
-                    'true_smt': true_smt
+                    'true_smt': true_smt_type
                 }
 
 
@@ -1104,6 +1208,10 @@ class SMCScanner:
         risk = abs(entry_price - stop_loss)
         if risk == 0: return None
         
+        # TIER 1: Sponsorship & SMT
+        true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
+        cross_asset_div = self.intermarket.calculate_cross_asset_divergence(direction, index_context)
+        
         setup = {
             "timestamp": current['timestamp'].isoformat() if hasattr(current['timestamp'], 'isoformat') else str(current['timestamp']),
             "symbol": symbol,
@@ -1117,12 +1225,13 @@ class SMCScanner:
             "time_quartile": self.get_session_quartile(),
             "price_quartiles": self.get_price_quartiles(symbol),
             "index_context": index_context,
-            "smt_strength": 0.0, # Not core to this strategy
-            "cross_asset_divergence": 0.0,
+            "smt_strength": round(true_smt_strength, 2),
+            "cross_asset_divergence": round(cross_asset_div, 2),
             "news_context": "Checked",
             "is_discount": True, # Assumed if retracing to OB
             'risk_reward': 3.0,
-            'quality': 'HIGH'
+            'quality': 'HIGH',
+            'true_smt': true_smt_type
         }
         
         return setup, df

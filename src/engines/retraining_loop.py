@@ -107,22 +107,41 @@ class RetrainingLoop:
 
     def _fetch_recent_outcomes(self, days_back: int = 7) -> list[dict]:
         """
-        Queries signed_ledger for closed, non-rogue trades in the last N days.
-        Returns only records with a known outcome (WIN/LOSS/BREAKEVEN).
+        Queries signed_ledger for closed bot trades AND journal for discretionary ALPHA trades.
         """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cutoff = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
+        all_data = []
+
         try:
+            # 1. Fetch System Signals (Bot Trades)
             rows = conn.execute("""
-                SELECT *
+                SELECT timestamp, symbol, direction, pattern, ai_score, outcome, pnl, signal_id, 
+                       volume_spike, true_smt, shadow_regime, 0 as is_discretionary
                 FROM signed_ledger
                 WHERE is_rogue = 0
                   AND outcome NOT IN ('PENDING', 'UNKNOWN')
                   AND timestamp >= ?
                 ORDER BY timestamp DESC
             """, (cutoff,)).fetchall()
-            return [dict(r) for r in rows]
+            all_data.extend([dict(r) for r in rows])
+
+            # 2. Fetch Human Alpha (Discretionary Trades)
+            # Filter for strategy = 'ALPHA' (Human insight the bot missed)
+            rogue_rows = conn.execute("""
+                SELECT timestamp, symbol, side as direction, deviations as pattern, ai_grade as ai_score, 
+                       CASE WHEN pnl > 0 THEN 'WIN' WHEN pnl < 0 THEN 'LOSS' ELSE 'BREAKEVEN' END as outcome,
+                       pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt, 
+                       notes as shadow_regime, 1 as is_discretionary
+                FROM journal
+                WHERE strategy = 'ALPHA'
+                  AND timestamp >= ?
+                ORDER BY timestamp DESC
+            """, (cutoff,)).fetchall()
+            all_data.extend([dict(r) for r in rogue_rows])
+            
+            return all_data
         except Exception as e:
             logger.warning(f"[Retraining] Could not fetch outcomes: {e}")
             return []
@@ -131,43 +150,46 @@ class RetrainingLoop:
 
     def _build_few_shot_example(self, record: dict) -> dict:
         """
-        Converts a ledger record into a few-shot training example.
-        Format matches what AIValidator sends to Gemini.
+        Converts a ledger or journal record into a few-shot training example.
         """
         outcome = record.get('outcome', 'UNKNOWN')
         pnl     = record.get('pnl', 0.0) or 0.0
+        is_disc = record.get('is_discretionary', 0)
         
-        # Phase 2: Extract enriched context
-        vol_spike = record.get('volume_spike', 1.0)
-        smt = record.get('true_smt') or "None"
-        regime = record.get('shadow_regime') or "Unknown"
-
-        # Build a compact prompt/completion pair
-        prompt = (
-            f"Symbol: {record['symbol']} | "
-            f"Direction: {record['direction']} | "
-            f"Pattern: {record['pattern']} | "
-            f"AI Score: {record['ai_score']}/10 | "
-            f"Regime: {regime} | "
-            f"Vol Spike: {vol_spike}x | "
-            f"SMT: {smt}"
-        )
-
-        # What actually happened — this is the ground truth label
-        if outcome == 'WIN':
-            label = f"Trade was a WINNER. PnL: +${pnl:.2f}. Signal validated by live market. Volume/SMT confluence confirmed institutional sponsorship."
-            score_adjustment = +0.5  # Upvote
-        elif outcome == 'LOSS':
-            label = f"Trade was a LOSS. PnL: -${abs(pnl):.2f}. Pattern failed. Check if volume spike or SMT was insufficient for this regime."
-            score_adjustment = -0.5  # Downvote
-        elif outcome == 'BREAKEVEN':
-            label = f"Trade broke even. PnL: ${pnl:.2f}. Partial validation."
-            score_adjustment = 0.0
+        # Build prompt logic
+        if is_disc:
+            # DISCRETIONARY: Use human 'notes' (interview reasoning) if available, otherwise fallback to 'pattern' (auto-narrative)
+            reasoning = record.get('shadow_regime') # We mapped 'notes' to 'shadow_regime' in _fetch_recent_outcomes
+            if not reasoning or reasoning == 'None' or reasoning == '':
+                reasoning = record.get('pattern', 'Context unavailable')
+                
+            prompt = (
+                f"SITUATION: Discretionary 'Human Alpha' trade | "
+                f"Symbol: {record['symbol']} | Direction: {record['direction']} | "
+                f"Analyst Reasoning: {reasoning} | AI Auditor Score: {record['ai_score']}/10"
+            )
         else:
-            return None
+            # SYSTEM: Use standard bot logic
+            prompt = (
+                f"SITUATION: System Signal | Symbol: {record['symbol']} | "
+                f"Direction: {record['direction']} | Pattern: {record['pattern']} | "
+                f"AI Score: {record['ai_score']}/10 | Regime: {record.get('shadow_regime', 'Unknown')} | "
+                f"SMT: {record.get('true_smt', 'N/A')}"
+            )
+
+        # Labels based on outcome
+        if outcome == 'WIN':
+            label = f"SUCCESS. PnL: +${pnl:.2f}. " + ("The human analyst successfully identified an edge the system missed." if is_disc else "System signal validated.")
+            score_adjustment = +0.5
+        elif outcome == 'LOSS':
+            label = f"FAILURE. PnL: -${abs(pnl):.2f}. " + ("Even human intuition failed in this environment." if is_disc else "System trap.")
+            score_adjustment = -0.5
+        else:
+            label = f"BREAKEVEN. PnL: ${pnl:.2f}."
+            score_adjustment = 0.0
 
         return {
-            'signal_id':        record['signal_id'],
+            'signal_id':        record.get('signal_id', 'ROGUE'),
             'timestamp':        record['timestamp'],
             'symbol':           record['symbol'],
             'direction':        record['direction'],
@@ -178,9 +200,7 @@ class RetrainingLoop:
             'prompt':           prompt,
             'label':            label,
             'score_adjustment': score_adjustment,
-            'regime':           regime,
-            'vol_spike':        vol_spike,
-            'true_smt':         smt
+            'is_discretionary': is_disc
         }
 
     def _export_jsonl(self, examples: list[dict]) -> Path:

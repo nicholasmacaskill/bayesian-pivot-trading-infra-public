@@ -38,6 +38,12 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+# Silence Noisy Third-Party Loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("google_genai").setLevel(logging.WARNING)
+logging.getLogger("requests").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 logger = logging.getLogger("LocalRunner")
 
 # Lock file to prevent duplicate processes
@@ -83,6 +89,15 @@ class LocalScannerRunner:
         self.biometrics.start_server()
         self.current_tilt_score = 1
         self.risk_multiplier   = 1.0
+        self.last_psych_state  = {"tilt_score": 1, "sentiment": "Neutral", "reasoning": "Standard Start"}
+        self.awaiting_psych_response = False
+        self.last_psych_prompt_time = 0
+        
+        # Discretionary Alpha Interview State
+        self.awaiting_alpha_interview = False
+        self.interview_trade_id = None
+        self.last_interview_prompt_time = 0
+        self.processed_interviews = set() # Track IDs in-memory to avoid re-prompting
         # ───────────────────────────────────────────────────────────
         # ───────────────────────────────────────────────────────────
 
@@ -91,6 +106,10 @@ class LocalScannerRunner:
         self.guard.start()
         logger.info("🛡️  Sovereign Guard active — securing your edge.")
         # ────────────────────────────────────────────────────────────────────
+        
+        self.last_market_pulse = 0
+        self._cycle_count = 0
+        self._last_signal_time = None
 
         # Shutdown handler
         signal.signal(signal.SIGINT, self.shutdown)
@@ -115,26 +134,141 @@ class LocalScannerRunner:
         except Exception as e:
             logger.warning(f"⚠️ Pulse Failed (Modal might be throttled): {e}")
 
+    def _print_cycle_header(self):
+        """Prints a high-fidelity dashboard of the current system state."""
+        self._cycle_count += 1
+        now = datetime.now()
+        cycle_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Determine Session
+        hour = now.hour
+        session = "NY/LONDON" if 12 <= hour < 20 else ("LONDON" if 7 <= hour < 12 else "ASIA")
+        
+        # Get Quartile
+        q_data = self.scanner.get_session_quartile()
+        q_label = f"{q_data['phase']}"
+        
+        # KZ Icons
+        kz_icon = "🔵 KILLZONE ACTIVE" if self.scanner.is_killzone() else "⚪️ OUTSIDE KILLZONE"
+        if self.scanner.is_asian_fade_window(): kz_icon = "⭐ PRIME WINDOW (FADE)"
+        
+        # Last Signal
+        last_sig_str = "None"
+        if self._last_signal_time:
+            delta = (datetime.now(timezone.utc) if self._last_signal_time.tzinfo else datetime.now()) - self._last_signal_time
+            last_sig_str = f"{int(delta.total_seconds() / 60)}m ago"
+            
+        # Mood, Trust & Health
+        mood = "🪷 Flow" if self.risk_multiplier >= 1.0 else (f"⚠️ Stress ({self.current_tilt_score})" if self.risk_multiplier > 0 else "🛑 HARD GUARD")
+        trust = self.guard.get_trust_score()
+        
+        # Performance Metrics from PropGuardian (calculated in run_cycle)
+        perf = getattr(self, 'current_perf', {})
+        dd_str = f"DD: {perf.get('daily_drawdown', 0):.1%} / {perf.get('total_drawdown', 0):.1%}"
+        wr_rr = f"WR: {perf.get('win_rate', 0):.0%} | RR: {perf.get('avg_rr', 0):.1f}"
+
+        # --- Active Positions ---
+        active_positions = self.tl.get_open_positions()
+        pos_count = len(active_positions)
+        total_pnl = sum(p['pnl'] for p in active_positions)
+        pnl_icon = "💰" if total_pnl >= 0 else "📉"
+
+        logger.info(f"┌{'\u2500'*53}┐")
+        logger.info(f"│  🚀 CYCLE #{self._cycle_count:<4}  {cycle_time:<22}│")
+        logger.info(f"│  {session:<10} {kz_icon:<20} {dd_str:<20}│")
+        logger.info(f"│  ⏱  {q_label:<15} {wr_rr:<18} Last: {last_sig_str:<7}│")
+        logger.info(f"│  Mood: {mood:<20}  🛡️ Trust: {trust:<3}/100       │")
+        
+        if pos_count > 0:
+            logger.info(f"├{'\u2500'*53}┤")
+            logger.info(f"│  {pnl_icon} ACTIVE POSITIONS ({pos_count})       PnL: ${total_pnl:>+8.2f}  │")
+            for p in active_positions:
+                side_color = "🟢" if p['side'] == 'BUY' else "🔴"
+                logger.info(f"│    {side_color} {p['symbol']:<10} @ ${p['price']:<9.2f} PnL: ${p['pnl']:>+7.2f}   │")
+        
+        logger.info(f"└{'\u2500'*53}┘")
+
     def run_cycle(self):
         logger.info("🚀 Starting SMC Alpha Scan Cycle...")
+        self._print_cycle_header()
         self._send_pulse()
         try:
-            init_db()
+            # 1. Update Daily Start Equity (Anchor for drawdown)
+            live_equity = self.tl.get_total_equity()
+            if live_equity > 0:
+                # Update daily anchor if not set
+                state = get_db_connection().execute("SELECT value FROM sync_state WHERE key = 'daily_start_equity'").fetchone()
+                if not state:
+                    self.prop_guardian.update_daily_start(live_equity)
             
-            # 0. Biometric & Psychology Audit
-            logger.info("🧠 Performing Psychology & Biometric Audit...")
-            physio_tilt = self.biometrics.calculate_physio_tilt()
-            psych_state = self.psychology.analyze_user_state(
-                current_text="Periodic scan check.", 
-                physio_tilt=physio_tilt
-            )
-            self.current_tilt_score = psych_state.get('tilt_score', 1)
-            self.risk_multiplier = self.psychology.get_risk_multiplier(self.current_tilt_score)
+            # 2. Account Health & Accountability Audit
+            logger.info("🛡️ Prop Guardian: Auditing Account Health...")
+            health_report = self.prop_guardian.check_account_health(live_equity)
+            self.current_perf = health_report
             
-            if self.risk_multiplier < 1.0:
-                logger.warning(f"⚠️ RISK GATED: Tilt Level {self.current_tilt_score} | Multiplier: {self.risk_multiplier}x")
+            # 3. Biometric & Psychology Audit (Interactive: Ask & Listen every 20 cycles)
+            if self._cycle_count % 20 == 0 and not self.awaiting_psych_response:
+                logger.info("🧠 Prompting User for Psychology Update...")
+                self.notifier._send_message("🧠 *SOVEREIGN SENTIMENT:* How are you feeling right now? (Reply to update your risk profile)")
+                self.awaiting_psych_response = True
+                self.last_psych_prompt_time = int(time.time())
+                
+            if self.awaiting_psych_response:
+                logger.info("🧠 Checking for User Sentiment Response...")
+                user_response = self.notifier.get_latest_message(since_timestamp=self.last_psych_prompt_time)
+                
+                if user_response:
+                    logger.info(f"🧠 Sentiment Received: {user_response['text']}")
+                    physio_tilt = self.biometrics.calculate_physio_tilt()
+                    psych_state = self.psychology.analyze_user_state(
+                        current_text=user_response['text'], 
+                        physio_tilt=physio_tilt
+                    )
+                    self.last_psych_state = psych_state
+                    self.awaiting_psych_response = False
+                    
+                    # Feedback to User
+                    mood = psych_state.get('sentiment', 'Unknown')
+                    score = psych_state.get('tilt_score', 0)
+                    mult = self.psychology.get_risk_multiplier(score)
+                    self.notifier._send_message(f"✅ *SENTIMENT CAPTURED*\n• Mood: `{mood}`\n• Tilt Score: `{score}/10`\n• Risk Multiplier: `{mult}x`")
+                else:
+                    # Timeout after 15 minutes (5 cycles if interval=3m)
+                    if time.time() - self.last_psych_prompt_time > 900:
+                         logger.info("🧠 Psychology Prompt Timeout. Resetting...")
+                         self.awaiting_psych_response = False
+
+            self.current_tilt_score = self.last_psych_state.get('tilt_score', 1)
+
+            # --- Alpha Interview Response Handler ---
+            if self.awaiting_alpha_interview:
+                logger.info(f"🎤 Checking for Alpha Interview Response (Trade: {self.interview_trade_id})...")
+                user_response = self.notifier.get_latest_message(since_timestamp=self.last_interview_prompt_time)
+                
+                if user_response:
+                    reasoning = user_response['text']
+                    logger.info(f"🚀 Alpha Narrative Received: {reasoning}")
+                    
+                    # Update journal with human reasoning
+                    from src.core.database import update_journal_notes
+                    if update_journal_notes(self.interview_trade_id, reasoning):
+                        self.notifier._send_message(f"✅ *ALPHA LOGGED*\nYour reasoning has been added to the SFT training context. The system is learning your edge.")
+                    
+                    self.awaiting_alpha_interview = False
+                    self.processed_interviews.add(self.interview_trade_id)
+                elif time.time() - self.last_interview_prompt_time > 1800: # 30 min timeout
+                    logger.info("🎤 Alpha Interview Timeout.")
+                    self.awaiting_alpha_interview = False
+            
+            # Combine Psychology and Prop Health for the final multiplier
+            psych_mult = self.psychology.get_risk_multiplier(self.current_tilt_score)
+            self.risk_multiplier = min(psych_mult, health_report['risk_multiplier'])
+            
+            if health_report['status'] != "HEALTHY":
+                logger.warning(f"🛡️ PROP GUARD: {health_report['message']}")
+            
             if self.risk_multiplier == 0:
-                logger.error("🛑 HARD SHUTDOWN: High Tilt detected. Skipping cycle.")
+                logger.error("🛑 HARD SHUTDOWN: Risk Shield Active. Skipping cycle.")
                 return
 
             # 1. Sync Equity
@@ -275,7 +409,9 @@ class LocalScannerRunner:
                     # Alert if threshold met
                     if live_score >= threshold:
                         setups_found += 1
-                        logger.info(f"🔔 HIGH QUALITY SETUP! Sending alert for {symbol}")
+                        from datetime import timezone
+                        self._last_signal_time = datetime.now(timezone.utc)  # track for cycle header
+                        logger.info(f"🔔 HIGH QUALITY SETUP [{symbol}] — Score: {live_score}/10")
                         
                         # 💰 Risk Calculation (with regime size multiplier applied)
                         calc_equity = live_equity if live_equity > 0 else 100000.0
@@ -332,21 +468,17 @@ class LocalScannerRunner:
                         except Exception as e:
                             logger.error(f"❌ Failed to send Telegram alert: {e}")
             
-            # 4. Rogue Execution Audit (The Policeman)
-            logger.info("👮‍♂️ Running Rogue Execution Audit...")
-            self.audit_engine.run_audit(hours_back=12)
+            # 4. Rogue Execution Audit (The Policeman) - Run every 15 cycles
+            if self._cycle_count % 15 == 0:
+                logger.info("👮‍♂️ Running Rogue Execution Audit...")
+                self.audit_engine.run_audit(hours_back=12)
 
             # 4b. Rogue Trade Ledger Check (Feature 5)
             # Any trade in the journal with strategy='ROGUE' and no matching signed signal
             if self.ledger:
                 self._audit_rogue_ledger()
 
-            # 5. Prop Guardian (Forensic Rule Audit every 6 hours)
-            current_hour = datetime.now().hour
-            if current_hour % 6 == 0 and time.time() - self.last_prop_audit > 7200:
-                logger.info("🛡️ Prop Guardian: Checking forensic rule changes...")
-                self.prop_guardian.batch_audit()
-                self.last_prop_audit = time.time()
+            # Prop Guardian: Forensic Check skipped (Now handled in cycle start via health audit)
 
             # 6. Weekly Retraining Loop (Feature 6)
             if self.retrain_loop:
@@ -362,14 +494,21 @@ class LocalScannerRunner:
                 # HEARTBEAT: Log a silent scan to Supabase to keep Dashboard "Green"
                 logger.info("💓 Heartbeat: System pulse sent to dashboard.")
                 try:
+                    # Get actual bias for heartbeat
+                    btc_bias = self.scanner.get_detailed_bias("BTC/USD", index_context=market_context)
                     hb_data = {
                         'timestamp': datetime.now().isoformat(),
                         'symbol': 'HEARTBEAT',
                         'pattern': 'System Active',
-                        'bias': 'NEUTRAL',
+                        'bias': btc_bias, # Use real bias
                         'verdict': 'SCAN_HEARTBEAT'
                     }
                     log_scan(hb_data, {'score': 0, 'reasoning': 'Active Polling'})
+
+                    # ── MARKET PULSE: Send Visual Summary every 4 hours or on Strong Bias ──
+                    if (time.time() - self.last_market_pulse > 14400) or ("STRONG" in btc_bias):
+                        self._send_market_pulse("BTC/USD", btc_bias)
+                        self.last_market_pulse = time.time()
                 except: pass
                 
         except Exception as e:
@@ -405,6 +544,9 @@ class LocalScannerRunner:
             # Upsert CLOSED history (full 30-day backfill)
             for t in history:
                 entry_price = t.get('entry_price', t.get('price', 0.0))
+                trade_id = t['id']
+                pnl = t['pnl']
+                
                 c.execute("""
                     INSERT INTO journal 
                     (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy)
@@ -414,7 +556,15 @@ class LocalScannerRunner:
                         status = 'CLOSED',
                         price = excluded.price,
                         timestamp = excluded.timestamp
-                """, (t['close_time'], t['id'], t['symbol'], t['side'], t['pnl'], entry_price))
+                """, (t['close_time'], trade_id, t['symbol'], t['side'], pnl, entry_price))
+                
+                # ALPHA INTERVIEW TRIGGER: If newly closed, profitable, rogue, and not yet interviewed
+                if pnl > 0 and trade_id not in self.processed_interviews and not self.awaiting_alpha_interview:
+                    # Double check if we already have notes for this to avoid re-prompt on restart
+                    c.execute("SELECT notes FROM journal WHERE trade_id = ?", (str(trade_id),))
+                    row = c.fetchone()
+                    if not row or not row[0]: # No notes yet
+                         self._trigger_alpha_interview(t)
                 
             conn.commit()
             logger.info(f"📚 Journal synced: {len(history)} closed trades | {len(open_positions)} open positions")
@@ -491,6 +641,60 @@ class LocalScannerRunner:
 
         except Exception as e:
             logger.error(f"[RogueLedgerAudit] Error: {e}")
+
+    def _trigger_alpha_interview(self, trade):
+        """Sends the Alpha Interview prompt to Telegram."""
+        try:
+            trade_id = trade['id']
+            symbol = trade['symbol']
+            pnl = trade['pnl']
+            
+            logger.info(f"🚀 Triggering Alpha Interview for Trade {trade_id} ({symbol})")
+            
+            msg = (
+                f"🚀 *ALPHA DETECTED: Profitable Discretionary Trade*\n\n"
+                f"You just closed a win on `{symbol}` for `+${pnl:,.2f}`.\n\n"
+                f"🎤 *THE INTERVIEW:* Why did you take this setup? What did the bot miss? (Reply with your reasoning for SFT learning)"
+            )
+            self.notifier._send_message(msg)
+            
+            self.awaiting_alpha_interview = True
+            self.interview_trade_id = trade_id
+            self.last_interview_prompt_time = int(time.time())
+            self.processed_interviews.add(trade_id)
+            
+        except Exception as e:
+            logger.error(f"Failed to trigger Alpha Interview: {e}")
+
+    def _send_market_pulse(self, symbol, bias_str):
+        """Sends a visual market pulse (Chart + Bias) to Telegram."""
+        logger.info(f"📊 Sending Market Pulse for {symbol}...")
+        try:
+            df_4h = self.scanner.fetch_data(symbol, '4h', limit=100)
+            if df_4h is None: return
+            
+            # Ensure charts directory exists
+            os.makedirs(os.path.join("data", "charts"), exist_ok=True)
+            chart_path = os.path.join("data", "charts", f"pulse_{int(time.time())}.png")
+            
+            from src.engines.visualizer import generate_bias_chart
+            # Use generate_bias_chart for the visual pulse
+            generate_bias_chart(df_4h, symbol, timeframe="4h", output_path=chart_path)
+            
+            caption = (
+                f"📊 *SOVEREIGN MARKET PULSE*\n\n"
+                f"🪙 *Symbol:* `{symbol}`\n"
+                f"📉 *Current Bias:* `{bias_str}`\n"
+                f"🛡️ *Trust Score:* `{self.guard.get_trust_score()}/100`"
+            )
+            
+            if os.path.exists(chart_path):
+                self.notifier.send_photo(chart_path, caption=caption)
+            else:
+                self.notifier._send_message(caption)
+                
+        except Exception as e:
+            logger.error(f"Failed to send market pulse: {e}")
 
     def main_loop(self):
         logger.info("⚙️ Sovereign SMC Local Runner Initialized.")

@@ -1,0 +1,22 @@
+{
+  "parameters": {
+    "risk_per_trade": 0.007,
+    "win_rate": 0.421,
+    "avg_rr": 3.0,
+    "trades_per_month": 60,
+    "daily_drawdown_limit": 0.04
+  },
+  "statistics": {
+    "median_monthly_roi": 21.1,
+    "mean_monthly_roi": 21.92,
+    "std_dev": 13.02,
+    "best_month": 78.74,
+    "worst_month": -6.26,
+    "prob_of_pnl_at_least_10pct": 82.62,
+    "prob_of_pnl_at_least_5pct": 89.34
+  },
+  "risk_metrics": {
+    "prob_of_daily_drawdown_breach": 0.0,
+    "prob_of_total_drawdown_breach": 15.55
+  }
+}

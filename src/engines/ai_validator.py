@@ -342,13 +342,16 @@ class AIValidator:
         # DUAL-TRACK PROMPT CONSTRUCTION
         if self.sovereign_prompt:
             # Full Sovereign Version (Master Theory active)
+            # Ensure memory_context has a safe default before formatting
+            safe_memory = memory_context if memory_context else "No highly similar historical setups found for reference."
+            
             prompt = self.sovereign_prompt.format(
                 symbol=setup['symbol'],
                 pattern=setup.get('pattern', 'SMC Logic'),
                 phase=setup.get('time_quartile', {}).get('phase', 'Unknown'),
                 position='Deep Discount' if setup.get('is_discount') else 'Premium' if setup.get('is_premium') else 'Neutral',
                 smt_strength=setup.get('smt_strength', 0),
-                min_smt=Config.MIN_SMT_STRENGTH,
+                min_smt=Config.get('MIN_SMT_STRENGTH', 0.35),
                 cross_asset=setup.get('cross_asset_divergence', 0),
                 bias=setup.get('bias', 'Neutral'),
                 news=setup.get('news_context', 'Clear'),
@@ -357,8 +360,8 @@ class AIValidator:
                 regime=regime,
                 slippage_pct=slippage_info.get('slippage_pct', 'N/A'),
                 slippage_quality=slippage_info.get('quality', 'Unknown'),
-                threshold=Config.AI_THRESHOLD,
-                memory_context=memory_context or "No highly similar historical setups found for reference."
+                threshold=Config.get('AI_THRESHOLD', 5.5),
+                memory_context=safe_memory
             ).replace("[ORACLE_RULES_PLACEHOLDER]", oracle_rules)
         else:
             # Public Lite Version (General ICT logic)

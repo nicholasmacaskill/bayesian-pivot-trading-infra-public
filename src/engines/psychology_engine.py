@@ -55,7 +55,7 @@ class PsychologyEngine:
             # Public Lite Version
             prompt = f"Analyze the following trader text for emotional state (1-10 score): {current_text}"
         
-        contents = [prompt.format(text=current_text or "No text provided")]
+        contents = [prompt]
         
         if audio_path and os.path.exists(audio_path):
             # Pass audio to Gemini for tone analysis
@@ -104,10 +104,10 @@ class PsychologyEngine:
     def get_risk_multiplier(self, tilt_score):
         """
         Returns a risk multiplier based on tilt level.
-        Higher tilt = lower risk allowed (or forced shutdown).
+        Higher tilt = lower risk allowed (never cuts trading completely).
         """
         if tilt_score >= 8:
-            return 0.0  # HARD SHUTDOWN
+            return 0.25 # RISK FLOOR: Lower size instead of hard shutdown
         if tilt_score >= 6:
             return 0.5  # Half size
         if tilt_score >= 4:

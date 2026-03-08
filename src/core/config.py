@@ -12,10 +12,12 @@ class Config:
     TIMEFRAME = '5m'
     HTF_TIMEFRAME = '1h'
     
-    # Risk Management (VOLUME OPERATOR: 3%+ Monthly Target)
-    RISK_PER_TRADE = 0.0045  # 0.45% (Optimized for Non-Punitive SMT - ~157% ROI)
-    MAX_DRAWDOWN_LIMIT = 0.06  # 6%
+    # Risk Management (VOLUME OPERATOR MODE)
+    RISK_PER_TRADE = 0.007  # 0.7% (Scaled for optimized Volume Mode)
+    MAX_DRAWDOWN_LIMIT = 0.06  # 6% Total Account Drawdown
+    DAILY_DRAWDOWN_LIMIT = 0.025 # 2.5% Daily Drawdown (Standard Prop Rule)
     DAILY_TRADE_LIMIT = 2
+    TARGET_RR = 3.0 # Minimum Average R:R Target
 
     # Prop Firm Execution Profiles
     ACTIVE_FIRM = "UPCOMERS"  # Options: STANDARD, UPCOMERS
@@ -90,12 +92,12 @@ class Config:
     CORRELATION_MAX_PER_DIRECTION = 1  # Block if ≥ N signals in same direction per basket
     CORRELATION_SLOT_EXPIRY_HRS   = 4  # Auto-release slot after N hours (safety valve)
 
-    # ── Feature 2: Economic Calendar ─────────────────────────────────────────
     CALENDAR_BLACKOUT_MINUTES = 30  # Block N minutes before AND after high-impact events
+    NY_LUNCH_BLACKOUT = (17, 18)     # UTC (12 PM - 1 PM EST) - Institutional Manipulation Window
 
     # ── Feature 4: Regime Filter ─────────────────────────────────────────────
     REGIME_BLOCK_CHOPPY   = True   # Block signals in choppy regime
-    REGIME_ADX_TREND_MIN  = 25     # ADX ≥ this = trending
+    REGIME_ADX_TREND_MIN  = 20     # ADX ≥ this = trending (Loosened from 25)
     REGIME_ADX_CHOPPY_MAX = 18     # ADX ≤ this + Hurst ≈ 0.5 = choppy
 
     # ── Feature 5: Signed Trade Ledger ───────────────────────────────────────
@@ -107,13 +109,13 @@ class Config:
     RETRAIN_EXPORT_JSONL     = True  # Export JSONL for Vertex AI fine-tuning
     
     # Strategy Mode: "SNIPER" (Optimized for High Precision)
-    STRATEGY_MODE = "SNIPER" # Options: SNIPER, WIDE_NET
-    AI_THRESHOLD = 8.0              # Standard confidence gate
-    AI_THRESHOLD_ASIAN_FADE = 7.5   # Relaxed for the 100% win rate Asian Fade window
+    STRATEGY_MODE = "VOLUME_OPERATOR" # Options: SNIPER, VOLUME_OPERATOR
+    AI_THRESHOLD = 4.5              # Loosened from 5.5 for higher trade rate
+    AI_THRESHOLD_ASIAN_FADE = 5.0   # Relaxed for the 100% win rate Asian Fade window
     
     # Exit Parameters (Wide Net)
-    TP1_R_MULTIPLE = 1.5  # Bank profit early
-    TP2_R_MULTIPLE = 3.0  # Runner
+    TP1_R_MULTIPLE = 2.5  # Bank profit later (Higher R/R requested)
+    TP2_R_MULTIPLE = 4.0  # Runner expansion
     STOP_LOSS_ATR_MULTIPLIER = 2.0  # Breathing Room
     
     # Killzones
@@ -124,11 +126,11 @@ class Config:
     KILLZONE_NY_PM = None           # Merged into continuous session
     KILLZONE_NY_CONTINUOUS = (12, 20)  # UTC (7 AM - 3 PM EST) - Full NY trading session
     
-    # Edge Optimization Parameters (VOLUME OPERATOR MODE - 4 Trades/Week)
-    MIN_SMT_STRENGTH = 0.30  # Require strong multi-asset alignment (Optimized for Quality over Quantity)
+    # Edge Optimization Parameters (VOLUME OPERATOR MODE - Loosened)
+    MIN_SMT_STRENGTH = 0.25  # Loosened from 0.40 to capture more correlated moves
     MIN_PRICE_QUARTILE = 0.0  # Discount
-    MAX_PRICE_QUARTILE = 0.50 # Strict Discount (No Equilibrium Chasing)
-    MIN_PRICE_QUARTILE_SHORT = 0.50 # Strict Premium (No Equilibrium Chasing)
+    MAX_PRICE_QUARTILE = 0.75 # Relaxed from 0.65 (More room for expansion)
+    MIN_PRICE_QUARTILE_SHORT = 0.25 # Relaxed from 0.35
     MAX_PRICE_QUARTILE_SHORT = 1.0
     
     # Secrets (Loaded from Modal Environment)
@@ -145,7 +147,7 @@ class Config:
     DB_PATH = "/data/smc_alpha.db" if os.path.exists("/data") else os.path.join(os.getcwd(), "data", "smc_alpha.db")
 
     # Local Runner Parameters
-    RUN_INTERVAL_MINS = 1
+    RUN_INTERVAL_MINS = 3 # Increased from 1 to prevent Gemini 429 Rate Limits
 
     @classmethod
     def get(cls, key, default=None):

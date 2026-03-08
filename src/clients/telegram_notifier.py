@@ -172,6 +172,63 @@ class TelegramNotifier:
         except Exception as e:
             logger.error(f"Failed to send Telegram message: {e}")
 
+    def get_latest_message(self, since_timestamp=None):
+        """Fetches the latest text message from the chat."""
+        try:
+            url = f"{self.base_url}/getUpdates"
+            # We use a large limit but only look at the last one
+            params = {"limit": 10, "allowed_updates": ["message"]}
+            response = requests.get(url, params=params, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            
+            if not data.get("ok") or not data.get("result"):
+                return None
+                
+            # Filter for messages from our chat_id and newer than since_timestamp
+            valid_messages = []
+            for update in data["result"]:
+                msg = update.get("message")
+                if not msg or str(msg.get("chat", {}).get("id")) != str(self.chat_id):
+                    continue
+                
+                msg_text = msg.get("text")
+                msg_ts = msg.get("date") # Unix timestamp
+                
+                if not msg_text:
+                    continue
+                    
+                if since_timestamp and msg_ts <= since_timestamp:
+                    continue
+                    
+                valid_messages.append({"text": msg_text, "timestamp": msg_ts})
+                
+            if valid_messages:
+                # Return the absolute latest one
+                return sorted(valid_messages, key=lambda x: x['timestamp'])[-1]
+                
+            return None
+        except Exception as e:
+            logger.error(f"Failed to fetch Telegram updates: {e}")
+            return None
+
+    def send_photo(self, photo_path, caption=None):
+        """Sends a photo with an optional caption."""
+        if not self.bot_token or not self.chat_id:
+            return
+        try:
+            url = f"{self.base_url}/sendPhoto"
+            with open(photo_path, 'rb') as photo:
+                files = {'photo': photo}
+                payload = {'chat_id': self.chat_id}
+                if caption:
+                    payload['caption'] = caption
+                    payload['parse_mode'] = "Markdown"
+                response = requests.post(url, data=payload, files=files, timeout=10)
+                response.raise_for_status()
+        except Exception as e:
+            logger.error(f"Failed to send Telegram photo: {e}")
+
 # Standalone helper
 def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A", risk_calc=None, buttons=None, shadow_insights=None, security_status=None):
     notifier = TelegramNotifier()
