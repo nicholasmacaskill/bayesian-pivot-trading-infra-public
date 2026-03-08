@@ -98,7 +98,8 @@ class LocalScannerRunner:
         self.interview_trade_id = None
         self.last_interview_prompt_time = 0
         self.processed_interviews = set() # Track IDs in-memory to avoid re-prompting
-        self.last_command_time = int(time.time())
+        self.last_command_time = int(time.time()) - 300 # Look back 5 mins on startup
+        self.session_start_time = int(time.time())
         # ───────────────────────────────────────────────────────────
         # ───────────────────────────────────────────────────────────
 
@@ -159,13 +160,13 @@ class LocalScannerRunner:
             btc_bias = self.scanner.get_detailed_bias("BTC/USD")
             
             msg = (
-                f"📊 *SYSTEM STATUS REPORT*\n\n"
-                f"💰 *Equity:* `${equity:,.2f}`\n"
-                f"📈 *Trades Today:* `{trades_today or 0}` (Wins: `{wins or 0}`)\n"
-                f"🧠 *Mood:* `{self.last_psych_state.get('sentiment', 'Neutral')}`\n"
-                f"🛡️ *Risk Mult:* `{self.risk_multiplier:.2f}x` (Tilt: `{self.current_tilt_score}`)\n"
-                f"🌎 *Market Pulse:* `{btc_bias}`\n\n"
-                f"🕒 _Cycle #{self._cycle_count} Active_"
+                f"📊 <b>SYSTEM STATUS REPORT</b>\n\n"
+                f"💰 <b>Equity:</b> <code>${equity:,.2f}</code>\n"
+                f"📈 <b>Trades Today:</b> <code>{trades_today or 0}</code> (Wins: <code>{wins or 0}</code>)\n"
+                f"🧠 <b>Mood:</b> <code>{self.last_psych_state.get('sentiment', 'Neutral')}</code>\n"
+                f"🛡️ <b>Risk Mult:</b> <code>{self.risk_multiplier:.2f}x</code> (Tilt: <code>{self.current_tilt_score}</code>)\n"
+                f"🌎 <b>Market Pulse:</b> <code>{btc_bias}</code>\n\n"
+                f"🕒 <i>Cycle #{self._cycle_count} Active</i>"
             )
             self.notifier._send_message(msg)
         except Exception as e:
@@ -188,14 +189,14 @@ class LocalScannerRunner:
             if row:
                 delta = datetime.now() - datetime.fromisoformat(row['timestamp'])
                 scan_msg = (
-                    f"🔍 *LATEST HIGH-QUALITY SCAN*\n\n"
-                    f"💎 *Asset:* `{row['symbol']}`\n"
-                    f"🕒 *Time:* `{int(delta.total_seconds() / 60)}m ago`\n"
-                    f"🧩 *Pattern:* `{row['pattern']}`\n"
-                    f"🤖 *AI Score:* `{row['ai_score']}/10`\n"
-                    f"⚖️ *Verdict:* `{row['verdict']}`\n"
-                    f"🌎 *Regime:* `{row['shadow_regime']}`\n\n"
-                    f"*Reasoning:* _{row['ai_reasoning'][:200]}..._"
+                    f"🔍 <b>LATEST HIGH-QUALITY SCAN</b>\n\n"
+                    f"💎 <b>Asset:</b> <code>{row['symbol']}</code>\n"
+                    f"🕒 <b>Time:</b> <code>{int(delta.total_seconds() / 60)}m ago</code>\n"
+                    f"🧩 <b>Pattern:</b> <code>{row['pattern']}</code>\n"
+                    f"🤖 <b>AI Score:</b> <code>{row['ai_score']}/10</code>\n"
+                    f"⚖️ <b>Verdict:</b> <code>{row['verdict']}</code>\n"
+                    f"🌎 <b>Regime:</b> <code>{row['shadow_regime']}</code>\n\n"
+                    f"<b>Reasoning:</b> <i>{row['ai_reasoning'][:200]}...</i>"
                 )
                 self.notifier._send_message(scan_msg)
             else:
@@ -645,7 +646,13 @@ class LocalScannerRunner:
                 """, (t['close_time'], trade_id, t['symbol'], t['side'], pnl, entry_price))
                 
                 # ALPHA INTERVIEW TRIGGER: If newly closed, profitable, rogue, and not yet interviewed
-                if pnl > 0 and trade_id not in self.processed_interviews and not self.awaiting_alpha_interview:
+                # CRITICAL: Only trigger for trades closed during THIS session to avoid ghost alerts on restart
+                try:
+                    close_ts = datetime.fromisoformat(t['close_time']).timestamp()
+                except:
+                    close_ts = 0
+                
+                if pnl > 0 and trade_id not in self.processed_interviews and not self.awaiting_alpha_interview and close_ts > (self.session_start_time - 3600):
                     # Double check if we already have notes for this to avoid re-prompt on restart
                     c.execute("SELECT notes FROM journal WHERE trade_id = ?", (str(trade_id),))
                     row = c.fetchone()
