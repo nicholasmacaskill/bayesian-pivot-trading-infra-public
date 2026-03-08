@@ -125,17 +125,22 @@ class LocalScannerRunner:
     def _handle_commands(self):
         """Listens for and executes Telegram commands (/status, /scan)."""
         msg = self.notifier.get_latest_message(since_timestamp=self.last_command_time)
-        if not msg: return
+        if not msg: 
+            return
         
         self.last_command_time = msg['timestamp'] + 1
         text = msg['text'].strip().lower()
+        logger.info(f"⌨️  User Command Detected: '{text}'")
 
-        if text == '/status':
-            logger.info("🎰 Processing /status command...")
+        # Support both slash and non-slash versions
+        if text in ['/status', 'status']:
+            logger.info("🎰 Generating Status Report...")
             self._send_status_report()
-        elif text == '/scan':
-            logger.info("🔍 Processing /scan command...")
+        elif text in ['/scan', 'scan']:
+            logger.info("🔍 Generating Latest Scan Report...")
             self._send_latest_scan_report()
+        else:
+            logger.debug(f"Ignored unknown message: {text}")
 
     def _send_status_report(self):
         """Sends a high-fidelity system status report via Telegram."""
@@ -779,20 +784,26 @@ class LocalScannerRunner:
 
     def main_loop(self):
         logger.info("⚙️ Sovereign SMC Local Runner Initialized.")
-        logger.info(f"⏱️  Interval: {Config.get('RUN_INTERVAL_MINS', 5)} minutes")
+        interval_mins = Config.get('RUN_INTERVAL_MINS', 3)
+        logger.info(f"⏱️  Scan Interval: {interval_mins} minutes")
+        logger.info("⌨️  Command Listener: Active (5s polling)")
         
         while self.running:
-            start_time = time.time()
+            # 1. Run the main scan cycle
             self.run_cycle()
             
-            # Wait for next interval
-            elapsed = (time.time() - start_time) / 60
-            sleep_time = max(1, (Config.get('RUN_INTERVAL_MINS', 5) - elapsed) * 60)
+            # 2. Frequent Command Polling during wait interval
+            next_scan_time = time.time() + (interval_mins * 60)
+            logger.info(f"😴 Waiting for next scan... (Responsive command listener active)")
             
-            if self.running:
-                logger.info(f"😴 Sleeping for {sleep_time/60:.1f} minutes...")
-                time.sleep(sleep_time)
-
+            while time.time() < next_scan_time and self.running:
+                try:
+                    self._handle_commands()
+                except Exception as e:
+                    logger.error(f"Command Handler Error: {e}")
+                
+                time.sleep(5) # Fast poll for user commands
+            
 if __name__ == "__main__":
     runner = LocalScannerRunner()
     runner.main_loop()
