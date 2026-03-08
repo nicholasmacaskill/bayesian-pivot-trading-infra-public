@@ -150,9 +150,9 @@ class TelegramNotifier:
     def send_system_error(self, component, error):
         """Sends a critical system error alert."""
         message = (
-            f"🆘 *CRITICAL SYSTEM ERROR* 🆘\n\n"
-            f"📍 *Component:* `{component}`\n"
-            f"❌ *Error:* `{error[:300]}...`\n\n"
+            f"🆘 <b>BAYESIAN PIVOT: CRITICAL ERROR</b> 🆘\n\n"
+            f"📍 <b>Component:</b> <code>{component}</code>\n"
+            f"❌ <b>Error:</b> <code>{error[:300]}...</code>\n\n"
             f"Check dashboard or Modal logs for details."
         )
         self._send_message(message)

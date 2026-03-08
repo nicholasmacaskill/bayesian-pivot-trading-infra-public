@@ -56,7 +56,7 @@ def check_single_instance():
         fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return lock_file
     except IOError:
-        print("⚠️  Another instance of Sovereign SMC is already running. Exiting.")
+        print("⚠️  Another instance of Bayesian Pivot is already running. Exiting.")
         sys.exit(0)
 
 class LocalScannerRunner:
@@ -135,11 +135,14 @@ class LocalScannerRunner:
 
         # Support both slash and non-slash versions
         if text in ['/status', 'status']:
-            logger.info("🎰 Generating Status Report...")
+            logger.info("🎰 Generating Bayesian Pivot Status Report...")
             self._send_status_report()
         elif text in ['/scan', 'scan']:
-            logger.info("🔍 Generating Latest Scan Report...")
+            logger.info("🔍 Generating Latest Bayesian Pivot Scan...")
             self._send_latest_scan_report()
+        elif text in ['/guide', 'guide']:
+            logger.info("📖 Sending Bayesian Pivot Command Guide...")
+            self._send_command_guide()
         else:
             logger.debug(f"Ignored unknown message: {text}")
 
@@ -147,7 +150,6 @@ class LocalScannerRunner:
         """Sends a high-fidelity system status report via Telegram."""
         try:
             equity = self.tl.get_total_equity()
-            status = self.prop_guardian.check_account_health(equity)
             
             # Daily Stats
             today = datetime.now().strftime('%Y-%m-%d')
@@ -160,7 +162,7 @@ class LocalScannerRunner:
             btc_bias = self.scanner.get_detailed_bias("BTC/USD")
             
             msg = (
-                f"📊 <b>SYSTEM STATUS REPORT</b>\n\n"
+                f"📊 <b>BAYESIAN PIVOT STATUS</b>\n\n"
                 f"💰 <b>Equity:</b> <code>${equity:,.2f}</code>\n"
                 f"📈 <b>Trades Today:</b> <code>{trades_today or 0}</code> (Wins: <code>{wins or 0}</code>)\n"
                 f"🧠 <b>Mood:</b> <code>{self.last_psych_state.get('sentiment', 'Neutral')}</code>\n"
@@ -189,7 +191,7 @@ class LocalScannerRunner:
             if row:
                 delta = datetime.now() - datetime.fromisoformat(row['timestamp'])
                 scan_msg = (
-                    f"🔍 <b>LATEST HIGH-QUALITY SCAN</b>\n\n"
+                    f"🔍 <b>BAYESIAN PIVOT: LATEST SCAN</b>\n\n"
                     f"💎 <b>Asset:</b> <code>{row['symbol']}</code>\n"
                     f"🕒 <b>Time:</b> <code>{int(delta.total_seconds() / 60)}m ago</code>\n"
                     f"🧩 <b>Pattern:</b> <code>{row['pattern']}</code>\n"
@@ -203,6 +205,21 @@ class LocalScannerRunner:
                 self.notifier._send_message("❌ No recent high-quality scans found.")
         except Exception as e:
             logger.error(f"Failed to fetch latest scan: {e}")
+
+    def _send_command_guide(self):
+        """Sends the pinned command guide to Telegram."""
+        guide = (
+            "🎯 <b>BAYESIAN PIVOT COMMAND GUIDE</b>\n\n"
+            "Use these commands to interact with the system in real-time:\n\n"
+            "📈 <b>/status</b> - Live equity, daily stats, and risk mood.\n"
+            "🔍 <b>/scan</b> - Latest high-conviction setup detected.\n"
+            "📖 <b>/guide</b> - View this command manual.\n\n"
+            "🧠 <b>Interactive Features:</b>\n"
+            "• <b>Sentiments:</b> Reply to hourly prompts with your mood to tune risk.\n"
+            "• <b>Alpha Interviews:</b> When the bot asks 'Why?', provide your logic for SFT learning.\n\n"
+            "<i>Pin this message for quick access.</i>"
+        )
+        self.notifier._send_message(guide)
 
     def _send_pulse(self):
         """PULSE PROTOCOL: Notify Modal that we are alive."""
@@ -272,7 +289,7 @@ class LocalScannerRunner:
         logger.info(f"└{'\u2500'*53}┘")
 
     def run_cycle(self):
-        logger.info("🚀 Starting SMC Alpha Scan Cycle...")
+        logger.info("🚀 Starting Bayesian Pivot Scan Cycle...")
         self._handle_commands() # Listen for user requests
         self._print_cycle_header()
         self._send_pulse()
@@ -790,7 +807,7 @@ class LocalScannerRunner:
             logger.error(f"Failed to send market pulse: {e}")
 
     def main_loop(self):
-        logger.info("⚙️ Sovereign SMC Local Runner Initialized.")
+        logger.info("⚙️ Bayesian Pivot Local Runner Initialized.")
         interval_mins = Config.get('RUN_INTERVAL_MINS', 3)
         logger.info(f"⏱️  Scan Interval: {interval_mins} minutes")
         logger.info("⌨️  Command Listener: Active (5s polling)")

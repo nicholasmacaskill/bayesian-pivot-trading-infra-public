@@ -1,7 +1,7 @@
 # 👁️ THE SOVEREIGN SYSTEM MANIFESTO
 ### *High-Frequency Institutional Sniper: BTC, ETH, SOL*
 
-The Sovereign SMC system is not a retail bot. It is an automated institutional gatekeeper designed to extract capital from the market using the core principles of Inner Circle Trader (ICT) mentorships, reinforced by multi-asset confluence and Multimodal AI Vision.
+The Bayesian Pivot system is not a retail bot. It is an automated institutional gatekeeper designed to extract capital from the market using the core principles of Inner Circle Trader (ICT) mentorships, reinforced by multi-asset confluence and Multimodal AI Vision.
 
 ---
 
