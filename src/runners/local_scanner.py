@@ -98,6 +98,7 @@ class LocalScannerRunner:
         self.interview_trade_id = None
         self.last_interview_prompt_time = 0
         self.processed_interviews = set() # Track IDs in-memory to avoid re-prompting
+        self.last_command_time = int(time.time())
         # ───────────────────────────────────────────────────────────
         # ───────────────────────────────────────────────────────────
 
@@ -120,6 +121,82 @@ class LocalScannerRunner:
         self.running = False
         self.guard.stop()
         logger.info("🛡️  Sovereign Guard stopped.")
+
+    def _handle_commands(self):
+        """Listens for and executes Telegram commands (/status, /scan)."""
+        msg = self.notifier.get_latest_message(since_timestamp=self.last_command_time)
+        if not msg: return
+        
+        self.last_command_time = msg['timestamp'] + 1
+        text = msg['text'].strip().lower()
+
+        if text == '/status':
+            logger.info("🎰 Processing /status command...")
+            self._send_status_report()
+        elif text == '/scan':
+            logger.info("🔍 Processing /scan command...")
+            self._send_latest_scan_report()
+
+    def _send_status_report(self):
+        """Sends a high-fidelity system status report via Telegram."""
+        try:
+            equity = self.tl.get_total_equity()
+            status = self.prop_guardian.check_account_health(equity)
+            
+            # Daily Stats
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT COUNT(*), SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) FROM journal WHERE date(timestamp) = ?", (today,))
+            trades_today, wins = c.fetchone()
+            conn.close()
+            
+            btc_bias = self.scanner.get_detailed_bias("BTC/USD")
+            
+            msg = (
+                f"📊 *SYSTEM STATUS REPORT*\n\n"
+                f"💰 *Equity:* `${equity:,.2f}`\n"
+                f"📈 *Trades Today:* `{trades_today or 0}` (Wins: `{wins or 0}`)\n"
+                f"🧠 *Mood:* `{self.last_psych_state.get('sentiment', 'Neutral')}`\n"
+                f"🛡️ *Risk Mult:* `{self.risk_multiplier:.2f}x` (Tilt: `{self.current_tilt_score}`)\n"
+                f"🌎 *Market Pulse:* `{btc_bias}`\n\n"
+                f"🕒 _Cycle #{self._cycle_count} Active_"
+            )
+            self.notifier._send_message(msg)
+        except Exception as e:
+            logger.error(f"Failed to generate status report: {e}")
+
+    def _send_latest_scan_report(self):
+        """Sends the most recent high-score scan result via Telegram."""
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("""
+                SELECT * FROM scans 
+                WHERE verdict != 'SCAN_HEARTBEAT' 
+                AND ai_score > 0
+                ORDER BY timestamp DESC LIMIT 1
+            """)
+            row = c.fetchone()
+            conn.close()
+            
+            if row:
+                delta = datetime.now() - datetime.fromisoformat(row['timestamp'])
+                scan_msg = (
+                    f"🔍 *LATEST HIGH-QUALITY SCAN*\n\n"
+                    f"💎 *Asset:* `{row['symbol']}`\n"
+                    f"🕒 *Time:* `{int(delta.total_seconds() / 60)}m ago`\n"
+                    f"🧩 *Pattern:* `{row['pattern']}`\n"
+                    f"🤖 *AI Score:* `{row['ai_score']}/10`\n"
+                    f"⚖️ *Verdict:* `{row['verdict']}`\n"
+                    f"🌎 *Regime:* `{row['shadow_regime']}`\n\n"
+                    f"*Reasoning:* _{row['ai_reasoning'][:200]}..._"
+                )
+                self.notifier._send_message(scan_msg)
+            else:
+                self.notifier._send_message("❌ No recent high-quality scans found.")
+        except Exception as e:
+            logger.error(f"Failed to fetch latest scan: {e}")
 
     def _send_pulse(self):
         """PULSE PROTOCOL: Notify Modal that we are alive."""
@@ -190,6 +267,7 @@ class LocalScannerRunner:
 
     def run_cycle(self):
         logger.info("🚀 Starting SMC Alpha Scan Cycle...")
+        self._handle_commands() # Listen for user requests
         self._print_cycle_header()
         self._send_pulse()
         try:
