@@ -1,7 +1,10 @@
 from google import genai
 import os
 import json
+import logging
 from src.core.config import Config
+
+logger = logging.getLogger(__name__)
 
 class AIAuditEngine:
     def __init__(self, api_key=None):
@@ -35,7 +38,7 @@ class AIAuditEngine:
             emb = result.embeddings[0].values
             return emb
         except Exception as e:
-            print(f"DEBUG EMBED ERROR: {e}")
+            logger.error(f"DEBUG EMBED ERROR: {e}")
             return []
 
     def audit_trade(self, manual_trade, system_data, zen_mode=False):
@@ -90,28 +93,41 @@ class AIAuditEngine:
         """
 
         try:
-            # Simulated high-quality response for Zen Mode
-            if zen_mode and manual_trade['pnl'] > 0 and "None" in system_data['patterns_found']:
-                return {
-                    "score": 2.5,
-                    "feedback": "You were rewarded for bad behavior. There was no setup here. Your PnL is a lie that will lead to a blown account. Do not do this again.",
-                    "deviations": ["Gambling", "Strategy Drift"],
-                    "is_lucky_failure": True
-                }
-            
-            response = self.client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt,
-                config={'response_mime_type': 'application/json'}
-            )
+            # Multi-model fallback for robustness
+            models_to_try = [
+                'gemini-2.0-flash', 
+                'gemini-1.5-flash', 
+                'gemini-1.5-pro'
+            ]
+            response = None
+            last_err = None
+
+            for m in models_to_try:
+                try:
+                    response = self.client.models.generate_content(
+                        model=m,
+                        contents=prompt,
+                        config={'response_mime_type': 'application/json'}
+                    )
+                    if response and response.text:
+                        break
+                except Exception as ex:
+                    last_err = ex
+                    continue
+
+            if not response or not response.text:
+                raise last_err or Exception("All Gemini models failed in Audit Engine")
+
             return json.loads(response.text)
         except Exception as e:
+            logger.error(f"Audit Engine Failure: {e}")
             return {
                 "score": 0.0, 
                 "feedback": f"Audit Error: {e}",
                 "deviations": ["System Failure"],
                 "is_lucky_failure": False
             }
+
     def audit_discretionary_trade(self, manual_trade):
         """
         Analyzes a trade taken WITHOUT a system signal.
@@ -129,6 +145,7 @@ class AIAuditEngine:
         - Action: {manual_trade['side']}
         - PnL: ${manual_trade['pnl']}
         - Entry/Exit Context: {manual_trade.get('notes', 'No notes provided')}
+        - Auto-Context: {manual_trade.get('auto_context', 'N/A')}
 
         **Your Mission:**
         1. **Alpha Hunt**: Was there a valid SMC/ICT setup here (Liquidity grab, MSS, Inducement) that the scanner might have missed?
@@ -148,12 +165,27 @@ class AIAuditEngine:
         """
 
         try:
-            response = self.client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt,
-                config={'response_mime_type': 'application/json'}
-            )
+            # Multi-model fallback
+            models_to_try = ['gemini-2.0-flash', 'gemini-1.5-flash']
+            response = None
+            last_err = None
+            for m in models_to_try:
+                try:
+                    response = self.client.models.generate_content(
+                        model=m,
+                        contents=prompt,
+                        config={'response_mime_type': 'application/json'}
+                    )
+                    if response and response.text:
+                        break
+                except Exception as ex:
+                    last_err = ex
+                    continue
+            
+            if not response or not response.text:
+                 raise last_err or Exception("All Gemini models failed in Discretionary Audit")
+
             return json.loads(response.text)
         except Exception as e:
+            logger.error(f"Discordant Audit Failure: {e}")
             return {"score": 3.0, "feedback": f"Discordant Audit Error: {e}", "is_alpha": False}
-
