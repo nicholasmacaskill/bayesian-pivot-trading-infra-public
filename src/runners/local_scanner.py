@@ -179,11 +179,25 @@ class LocalScannerRunner:
         trust = self.guard.get_trust_score()
         trust_icon = "🛡️" if trust > 90 else "⚠️"
 
+        # --- Active Positions ---
+        active_positions = self.tl.get_open_positions()
+        pos_count = len(active_positions)
+        total_pnl = sum(p['pnl'] for p in active_positions)
+        pnl_icon = "💰" if total_pnl >= 0 else "📉"
+
         logger.info(f"┌{'\u2500'*53}┐")
         logger.info(f"│  🚀 CYCLE #{self._cycle_count:<4}  {cycle_time:<22}│")
         logger.info(f"│  {session:<18}  {kz_icon:<25}│")
         logger.info(f"│  ⏱  {q_label:<22}  Last signal: {last_sig_str:<7}│")
         logger.info(f"│  {mood_icon:<27}  {trust_icon} Trust: {trust:<10}/100│")
+        
+        if pos_count > 0:
+            logger.info(f"├{'\u2500'*53}┤")
+            logger.info(f"│  {pnl_icon} ACTIVE POSITIONS ({pos_count})       PnL: ${total_pnl:>+8.2f}  │")
+            for p in active_positions:
+                side_color = "🟢" if p['side'] == 'BUY' else "🔴"
+                logger.info(f"│    {side_color} {p['symbol']:<10} @ ${p['price']:<9.2f} PnL: ${p['pnl']:>+7.2f}   │")
+        
         logger.info(f"└{'\u2500'*53}┘")
         self._send_pulse()
         try:
@@ -301,7 +315,7 @@ class LocalScannerRunner:
                     security_status = self.guard.get_security_context()
                     # ────────────────────────────────────────────────────────
 
-                    # AI Validation (Vision Proxy + RAG Active)
+                    # AI Validation (Vision Proxy + RAG Active + Technical Regime Grounding)
                     ai_result = validate_setup(
                         setup,
                         market_data,
@@ -309,7 +323,8 @@ class LocalScannerRunner:
                         image_path=generated_chart,
                         df=df,
                         exchange=self.scanner.exchange,
-                        memory_context=memory_context  # Reverted back to original memory context
+                        memory_context=memory_context,
+                        regime_str=regime_result.regime.value  # Inject Technical Ground Truth
                     )
                     
                     live = ai_result.get('live_execution', ai_result)

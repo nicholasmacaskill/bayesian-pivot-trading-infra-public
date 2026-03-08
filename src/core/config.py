@@ -108,12 +108,12 @@ class Config:
     
     # Strategy Mode: "SNIPER" (Optimized for High Precision)
     STRATEGY_MODE = "SNIPER" # Options: SNIPER, WIDE_NET
-    AI_THRESHOLD = 8.0              # Standard confidence gate
-    AI_THRESHOLD_ASIAN_FADE = 7.5   # Relaxed for the 100% win rate Asian Fade window
+    AI_THRESHOLD = 5.5              # Loosened from 8.0 for higher trade rate
+    AI_THRESHOLD_ASIAN_FADE = 5.0   # Relaxed for the 100% win rate Asian Fade window
     
     # Exit Parameters (Wide Net)
-    TP1_R_MULTIPLE = 1.5  # Bank profit early
-    TP2_R_MULTIPLE = 3.0  # Runner
+    TP1_R_MULTIPLE = 2.5  # Bank profit later (Higher R/R requested)
+    TP2_R_MULTIPLE = 4.0  # Runner expansion
     STOP_LOSS_ATR_MULTIPLIER = 2.0  # Breathing Room
     
     # Killzones
@@ -125,10 +125,10 @@ class Config:
     KILLZONE_NY_CONTINUOUS = (12, 20)  # UTC (7 AM - 3 PM EST) - Full NY trading session
     
     # Edge Optimization Parameters (VOLUME OPERATOR MODE - 4 Trades/Week)
-    MIN_SMT_STRENGTH = 0.30  # Require strong multi-asset alignment (Optimized for Quality over Quantity)
+    MIN_SMT_STRENGTH = 0.35  # Tightened from 0.15 to prevent Phantom Correlation Signals
     MIN_PRICE_QUARTILE = 0.0  # Discount
-    MAX_PRICE_QUARTILE = 0.50 # Strict Discount (No Equilibrium Chasing)
-    MIN_PRICE_QUARTILE_SHORT = 0.50 # Strict Premium (No Equilibrium Chasing)
+    MAX_PRICE_QUARTILE = 0.65 # Relaxed from 0.50 (No Equilibrium Chasing)
+    MIN_PRICE_QUARTILE_SHORT = 0.35 # Relaxed from 0.50 (Strict Premium (No Equilibrium Chasing))
     MAX_PRICE_QUARTILE_SHORT = 1.0
     
     # Secrets (Loaded from Modal Environment)

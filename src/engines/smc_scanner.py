@@ -385,6 +385,7 @@ class SMCScanner:
                     return entry['label']
 
         score = 0
+        price_dist_20 = 0.0  # Track displacement for 1D Drag check
         
         # 1. 4H Trend & Momentum
         df_4h = self.fetch_data(symbol, Config.HTF_TIMEFRAME, limit=100)
@@ -394,11 +395,30 @@ class SMCScanner:
             df_4h['rsi'] = self.calculate_rsi(df_4h)
             
             latest = df_4h.iloc[-1]
-            # Trend Check
-            score_4h = 0
-            if latest['ema_20'] > latest['ema_50']: score_4h += 1
-            elif latest['ema_20'] < latest['ema_50']: score_4h -= 1
             
+            # Trend Check (EMA Alignment)
+            score_4h = 0
+            if latest['ema_20'] > latest['ema_50']: score_4h += 1.0
+            elif latest['ema_20'] < latest['ema_50']: score_4h -= 1.0
+            
+            # --- DIRECTIONAL GUARD: Immediate Displacement ---
+            # If price is significantly above EMAs, we are in expansion even without a cross
+            price_dist_20 = (latest['close'] / latest['ema_20'] - 1) * 100
+            if price_dist_20 > 0.5: score_4h += 0.5 # Aggressive Bullish Expansion
+            elif price_dist_20 < -0.5: score_4h -= 0.5 # Aggressive Bearish Expansion
+
+            # --- VOLATILITY GUARD: Volume Surging ---
+            avg_vol = df_4h['volume'].rolling(20).mean().iloc[-1]
+            
+            # Weekend Void Fix: Lower the surge threshold on weekends (Sat/Sun)
+            is_weekend = latest.name.weekday() >= 5 if isinstance(latest.name, pd.Timestamp) else False
+            vol_multiplier = 1.2 if is_weekend else 1.5
+            
+            if latest['volume'] > avg_vol * vol_multiplier:
+                # Volume surging in direction of price movement adds conviction
+                if latest['close'] > latest['open']: score_4h += 0.5
+                else: score_4h -= 0.5
+
             # Momentum Check
             if latest['rsi'] > 55: score_4h += 0.5
             elif latest['rsi'] < 45: score_4h -= 0.5
@@ -410,10 +430,24 @@ class SMCScanner:
             df_1d['ema_20'] = df_1d['close'].ewm(span=20).mean()
             df_1d['ema_50'] = df_1d['close'].ewm(span=50).mean()
             
+            
             score_1d = 0
             latest_d = df_1d.iloc[-1]
-            if latest_d['ema_20'] > latest_d['ema_50']: score_1d += 1
-            elif latest_d['ema_20'] < latest_d['ema_50']: score_1d -= 1
+            
+            # 1D Drag Anchor Fix: Skip 1D drag if 4H is in aggressive expansion
+            is_strong_expansion = abs(price_dist_20) > 0.5
+            
+            if latest_d['ema_20'] > latest_d['ema_50']: 
+                score_1d += 1
+            elif latest_d['ema_20'] < latest_d['ema_50']: 
+                # Don't penalize a new bullish expansion with old bearish daily data
+                if not (is_strong_expansion and price_dist_20 > 0):
+                    score_1d -= 1
+                    
+            # Mirror for strong bearish expansion resisting strong daily bull
+            if latest_d['ema_20'] > latest_d['ema_50'] and is_strong_expansion and price_dist_20 < 0:
+                score_1d -= 1 # Nullify the +1
+                
             score += score_1d
             
         # 3. Intermarket (DXY Trend)

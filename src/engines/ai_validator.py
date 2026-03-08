@@ -102,18 +102,23 @@ class AIValidator:
             range_pct = (recent_high - recent_low) / recent_low if recent_low > 0 else 0
             
             # Classification logic
-            if vol_ratio > 1.5:
-                if ema_20 > ema_50 * 1.02 or ema_20 < ema_50 * 0.98:
-                    return "High-Volatility Trending"
+            if vol_ratio > 1.3: # Loosened from 1.5
+                if ema_20 > ema_50 * 1.01 or ema_20 < ema_50 * 0.99:
+                    return "Trending Expansion" # Renamed for clarity
                 else:
                     return "High-Volatility Expansion"
-            elif vol_ratio < 1.0:
-                if range_pct < 0.02:  # Less than 2% range
+            elif vol_ratio < 0.9:
+                # --- REGIME GUARD: Strict Consolidation Check ---
+                # Even if vol is low, if we broke a 20-candle high, we are NOT in consolidation
+                if close.iloc[-1] > recent_high or close.iloc[-1] < recent_low:
+                    return "Consolidation Breakout (Expansion)"
+
+                if range_pct < 0.015:  # Tightened from 2%
                     return "Low-Volatility Consolidation"
                 else:
                     return "Low-Volatility Ranging"
             else:
-                if abs(ema_20 - ema_50) / ema_50 < 0.01:
+                if abs(ema_20 - ema_50) / ema_50 < 0.005: # Tightened from 0.01
                     return "Normal-Volatility Choppy"
                 else:
                     return "Normal-Volatility Trending"
@@ -303,7 +308,7 @@ class AIValidator:
             }
         }
 
-    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
+    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, regime_str=None):
         """
         Calls Gemini API to validate the setup with DUAL-TRACK analysis.
         
@@ -315,6 +320,7 @@ class AIValidator:
             df: Optional dataframe for regime detection
             exchange: Optional CCXT exchange for slippage estimation
             memory_context: Optional historical context from RAG
+            regime_str: Optional pre-calculated regime override (Ground Truth)
         
         Returns:
             dict: Dual-track analysis with live_execution and shadow_optimizer sections
@@ -326,8 +332,8 @@ class AIValidator:
         # Dynamic Oracle Grounding
         oracle_rules = self._get_oracle_prompt(setup.get('pattern', 'PO3'))
         
-        # Detect market regime for shadow track
-        regime = self.detect_market_regime(df) if df is not None else "Unknown"
+        # Detect market regime for shadow track (Use override if provided)
+        regime = regime_str if regime_str else (self.detect_market_regime(df) if df is not None else "Unknown")
         
         # Calculate slippage estimate
         entry_price = setup.get('entry', 0)
@@ -371,7 +377,7 @@ class AIValidator:
             - Pattern: {setup.get('pattern', 'SMC Logic')}
             - SMT Strength: {setup.get('smt_strength', 0)} (Institutional Divergence Score)
             - True SMT Type: {setup.get('true_smt', 'None detected')}
-            - Regime: {regime}
+            - TECHNICAL REGIME: {regime} (THIS IS GROUND TRUTH - DO NOT HALLUCINATE CONSOLIDATION IF THIS SAYS TRENDING/EXPANSION)
             - Confluences: {oracle_rules}
             
             NOTE: SMT Strength > 0.35 indicates a 'Crack in Correlation' (Institutional Sponsorship). 
@@ -574,7 +580,7 @@ class AIValidator:
             print(f"⚠️ Visual Bias Check Failed: {e}")
             return 0
 
-def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
+def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, regime_str=None):
     """
     Main entry point for trade validation with dual-track analysis.
     
@@ -586,9 +592,10 @@ def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=
         df: Optional dataframe for regime detection
         exchange: Optional CCXT exchange for slippage estimation
         memory_context: Optional historical context from RAG
+        regime_str: Optional pre-calculated regime override
     
     Returns:
         dict: Dual-track analysis result
     """
     validator = AIValidator()
-    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context)
+    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context, regime_str)
