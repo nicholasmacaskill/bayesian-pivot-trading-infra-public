@@ -471,7 +471,10 @@ class LocalScannerRunner:
             # 4. Rogue Execution Audit (The Policeman) - Run every 15 cycles
             if self._cycle_count % 15 == 0:
                 logger.info("👮‍♂️ Running Rogue Execution Audit...")
-                self.audit_engine.run_audit(hours_back=12)
+                try:
+                    self.audit_engine.run_audit(hours_back=12)
+                except Exception as e:
+                    logger.error(f"👮‍♂️ Rogue Audit failed: {e}")
 
             # 4b. Rogue Trade Ledger Check (Feature 5)
             # Any trade in the journal with strategy='ROGUE' and no matching signed signal
