@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from src.core.supabase_client import supabase
 from src.clients.tl_client import TradeLockerClient
-from ai_audit_engine import AIAuditEngine
+from src.engines.ai_audit_engine import AIAuditEngine
 from src.engines.smc_scanner import SMCScanner
 
 logger = logging.getLogger(__name__)

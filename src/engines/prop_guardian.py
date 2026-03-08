@@ -1,204 +1,186 @@
 import os
 import json
-import requests
+import sqlite3
+from datetime import datetime, timedelta
 import re
 from google import genai
+import requests
 from src.core.config import Config
+from src.core.database import get_db_connection
 
 class PropGuardian:
     def __init__(self):
+        # Establish sensible defaults (User requested 4% daily)
+        self.max_daily_drawdown = Config.get('DAILY_DRAWDOWN_LIMIT', 0.04)
+        self.max_total_drawdown = Config.get('MAX_DRAWDOWN_LIMIT', 0.06)
+        self.target_rr = Config.get('TARGET_RR', 3.0)
+        
+        # Initialize Gemini for URL reading
         self.api_key = os.environ.get("GEMINI_API_KEY")
         if self.api_key:
             self.client = genai.Client(api_key=self.api_key)
         else:
             self.client = None
+            
+        # Try to pull dynamic rules once on init
+        self._sync_dynamic_rules()
 
-    def _fetch_single_page(self, url: str) -> dict:
-        """Helper to fetch one page and extract text + links"""
+    def _sync_dynamic_rules(self):
+        """Attempts to scrape the active prop firm URL and extract Drawdown logic."""
+        active_firm = Config.get('ACTIVE_FIRM', 'UPCOMERS')
+        firm_data = Config.PROP_FIRMS.get(active_firm)
+        
+        if not firm_data or not firm_data.get('url') or not self.client:
+            return
+            
+        url = firm_data['url']
         try:
-            print(f"Crawling: {url}...")
+            print(f"🛡️ PropGuardian: Fetching dynamic rules from {url}...")
             headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-                "Connection": "keep-alive",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             }
-            res = requests.get(url, headers=headers, timeout=15) # Increased timeout
+            res = requests.get(url, headers=headers, timeout=10)
             res.raise_for_status()
             
             html = res.text
-            
-            # Extract links specifically from <a> and buttons that might have href/onclick
-            links = re.findall(r'href=["\'](.*?)["\']', html, flags=re.IGNORECASE)
-            
-            # Aggressive Text Cleaning for LLM tokens
             clean = re.sub(r'<script.*?>.*?</script>', '', html, flags=re.DOTALL)
             clean = re.sub(r'<style.*?>.*?</style>', '', clean, flags=re.DOTALL)
-            clean = re.sub(r'<header.*?>.*?</header>', '', clean, flags=re.DOTALL)
-            clean = re.sub(r'<footer.*?>.*?</footer>', '', clean, flags=re.DOTALL)
-            clean = re.sub(r'<nav.*?>.*?</nav>', '', clean, flags=re.DOTALL)
-            clean = re.sub(r'<!--.*?-->', '', clean, flags=re.DOTALL)
             
-            # Extract text from semantic tags
+            # Simple text extraction
             text_content = []
-            for tag in ['p', 'h1', 'h2', 'h3', 'li', 'article', 'section']:
+            for tag in ['p', 'h1', 'h2', 'h3', 'li']:
                 matches = re.findall(f'<{tag}[^>]*>(.*?)</{tag}>', clean, flags=re.DOTALL)
                 for m in matches:
-                    mtext = re.sub(r'<[^>]+>', ' ', m)
-                    text_content.append(mtext)
+                    text_content.append(re.sub(r'<[^>]+>', ' ', m))
             
-            raw_text = " ".join(text_content)
-            clean_text = re.sub(r'\s+', ' ', raw_text).strip()
+            clean_text = re.sub(r'\s+', ' ', " ".join(text_content)).strip()
             
-            return {"url": url, "text": clean_text, "links": links}
-        except Exception as e:
-            print(f"Failed to fetch {url}: {e}")
-            return {"url": url, "text": "", "links": []}
-
-    def fetch_rules_content(self, start_url: str) -> str:
-        """
-        Deep Spider: Fetches the URL + crawls critical FAQ/Legal/Rules links.
-        """
-        from urllib.parse import urljoin, urlparse
-
-        # 1. Fetch Seed Page
-        seed_data = self._fetch_single_page(start_url)
-        full_content = f"--- SOURCE: {start_url} (ENTRY POINT) ---\n{seed_data['text'][:20000]}\n\n"
-        
-        # 2. Extract and Filter Relevant Sub-Links
-        parsed_start = urlparse(start_url)
-        base_domain = parsed_start.netloc
-        root_domain = base_domain.replace("www.", "")
-        
-        # High-Value Keywords for Rule Detection
-        keywords = [
-            "rule", "faq", "terms", "condition", "objectiv", "prohibit", 
-            "restrict", "scaling", "drawdown", "consistency", "news", 
-            "payout", "leverage", "contract", "instrument", "legal"
-        ]
-        
-        candidates = []
-        seen_links = {start_url}
-        
-        for link in seed_data['links']:
-            # Normalize Link
-            try:
-                full_link = urljoin(start_url, link)
-                link_parsed = urlparse(full_link)
-                link_domain = link_parsed.netloc.replace("www.", "")
-                
-                # Stay within root domain or trusted subdomains
-                if (link_domain == root_domain or link_domain.endswith("." + root_domain)) and full_link not in seen_links:
-                    if any(k in full_link.lower() for k in keywords):
-                        candidates.append(full_link)
-                        seen_links.add(full_link)
-            except: continue
-
-        # Prioritize and limit (Rules/Terms are highest priority)
-        # Sort by relevance score
-        def score_link(l):
-            l_low = l.lower()
-            if "rule" in l_low or "terms" in l_low: return 0
-            if "faq" in l_low: return 1
-            if "drawdown" in l_low: return 2
-            return 3
-
-        priority_links = sorted(list(set(candidates)), key=score_link)[:5] # Increased to 5 sub-pages
-        
-        # 3. Fetch Sub-Pages and aggregate
-        for sub_url in priority_links:
-            data = self._fetch_single_page(sub_url)
-            if len(data['text']) > 300:
-                full_content += f"--- SOURCE: {sub_url} (MANDATORY READING) ---\n{data['text'][:15000]}\n\n"
-        
-        return full_content
-
-    def analyze_rules(self, text_or_url: str):
-        """
-        Analyzes prop firm rule text OR URL for adversarial design patterns.
-        """
-        content = text_or_url
-        if text_or_url.startswith("http"):
-            content = self.fetch_rules_content(text_or_url)
-            
-        if not self.client:
-            return {
-                "risk_score": 0,
-                "traps": [{"title": "API Key Missing", "detail": "Cannot analyze without Gemini API Key."}],
-                "verdict": "Unknown",
-                "firm_name": "Unknown"
-            }
-
-        # Load Sovereign Prompts (Private IP)
-        try:
-            from src.sovereign_core.prompts.guardian_prompts import SOVEREIGN_GUARDIAN_PROMPT
-            sovereign_prompt = SOVEREIGN_GUARDIAN_PROMPT
-        except ImportError:
-            sovereign_prompt = None
-
-        if sovereign_prompt:
-            prompt = sovereign_prompt.format(content=content[:40000])
-        else:
-            # Public Lite Version
             prompt = f"""
-            Analyze the following prop firm rules for basic risks (drawdown, fees, execution).
+            Analyze the following text scraped from a prop firm website. 
+            Extract the exact 'Daily Drawdown' limit and 'Total Drawdown' limit as percentages.
             
-            FIRM TEXT:
-            {content[:10000]}
+            If the text says "4% Daily Drawdown", return 0.04 for daily_drawdown.
+            If multiple phases exist, return the strictest (lowest) drawdown.
             
-            Return JSON with risk_score (1-10) and traps list.
+            TEXT:
+            {clean_text[:15000]}
+            
+            Return EXACTLY a JSON format like this, nothing else:
+            {{"daily_drawdown": 0.04, "total_drawdown": 0.06}}
             """
+            
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config={'response_mime_type': 'application/json'}
+            )
+            
+            data = json.loads(response.text)
+            
+            # Update Internal Limits
+            if 'daily_drawdown' in data and data['daily_drawdown'] > 0:
+                self.max_daily_drawdown = float(data['daily_drawdown'])
+            if 'total_drawdown' in data and data['total_drawdown'] > 0:
+                self.max_total_drawdown = float(data['total_drawdown'])
+                
+            print(f"🛡️ PropGuardian: Dynamic Rules Loaded - Daily: {self.max_daily_drawdown:.1%}, Total: {self.max_total_drawdown:.1%}")
+            
+        except Exception as e:
+            print(f"PropGuardian Rule Sync Failed (Using Defaults): {e}")
 
-        models_to_try = [
-            "gemini-2.0-flash",
-            "gemini-2.5-flash",
-            "gemini-1.5-flash",
-        ]
-        
-        last_error = None
-        for model_name in models_to_try:
-            try:
-                response = self.client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config={'response_mime_type': 'application/json'}
-                )
-                return json.loads(response.text)
-            except Exception as e:
-                last_error = e
-                if "404" not in str(e) and "NOT_FOUND" not in str(e):
-                    break 
-        
-        return {
-            "risk_score": 0,
-            "firm_name": "Audit Error",
-            "traps": [{
-                "category": "System",
-                "severity": "High",
-                "title": "Audit Failed",
-                "description": f"Auditor system failure: {str(last_error)}"
-            }],
-            "verdict": "Inconclusive",
-            "recommendation": "Retry scan or check manual docs."
+    def check_account_health(self, current_equity: float):
+        """
+        Analyzes account health based on drawdown and historical performance.
+        Returns a structured report with a risk_multiplier.
+        """
+        report = {
+            "status": "HEALTHY",
+            "daily_drawdown": 0.0,
+            "total_drawdown": 0.0,
+            "win_rate": 0.0,
+            "avg_rr": 0.0,
+            "risk_multiplier": 1.0,
+            "message": "Account within safe parameters."
         }
 
-    def batch_audit(self, override_firms=None):
-        """Runs audit on all configured firms and returns results."""
-        from src.core.config import Config
-        from src.core.database import log_prop_audit
-        
-        firms = override_firms or Config.PROP_FIRMS
-        results = []
-        
-        for key, info in firms.items():
-            try:
-                print(f"--- COMMENCING AUDIT: {info['name']} ---")
-                audit = self.analyze_rules(info['url'])
-                # Ensure firm_name is correct
-                audit['firm_name'] = info['name']
-                log_prop_audit(audit)
-                results.append(audit)
-            except Exception as e:
-                print(f"Error auditing {info['name']}: {e}")
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+
+            # 1. Total Drawdown Calculation
+            # We use the maximum historical value from sync_state as high-water mark
+            c.execute("SELECT value FROM sync_state WHERE key = 'high_water_mark'")
+            hwm_row = c.fetchone()
+            hwm = float(hwm_row['value']) if hwm_row else current_equity
+
+            if current_equity > hwm:
+                hwm = current_equity
+                c.execute("INSERT OR REPLACE INTO sync_state (key, value, last_updated) VALUES (?, ?, ?)", 
+                         ("high_water_mark", str(hwm), datetime.now().isoformat()))
+                conn.commit()
+
+            total_dd = (hwm - current_equity) / hwm if hwm > 0 else 0
+            report['total_drawdown'] = total_dd
+
+            # 2. Daily Drawdown Calculation
+            # Fetch equity at the start of the day (first sync_state entry for 'today')
+            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            # Note: This simplified logic assumes we track daily starting equity
+            c.execute("SELECT value FROM sync_state WHERE key = 'daily_start_equity'")
+            day_start_row = c.fetchone()
+            day_start_equity = float(day_start_row['value']) if day_start_row else current_equity
+
+            daily_dd = (day_start_equity - current_equity) / day_start_equity if day_start_equity > 0 else 0
+            report['daily_drawdown'] = daily_dd
+
+            # 3. Performance Stats (Last 30 days)
+            thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+            c.execute("""
+                SELECT pnl, side, strategy 
+                FROM journal 
+                WHERE status = 'CLOSED' AND timestamp > ?
+            """, (thirty_days_ago,))
+            trades = c.fetchall()
+
+            if trades:
+                wins = len([t for t in trades if t['pnl'] > 0])
+                losses = len([t for t in trades if t['pnl'] <= 0])
+                report['win_rate'] = wins / len(trades)
                 
-        return results
+                # Simple R:R estimation (Average Win / Average Loss)
+                avg_win = sum(t['pnl'] for t in trades if t['pnl'] > 0) / wins if wins > 0 else 0
+                avg_loss = abs(sum(t['pnl'] for t in trades if t['pnl'] < 0) / losses) if losses > 0 else 1
+                report['avg_rr'] = avg_win / avg_loss if avg_loss > 0 else 0
+
+            # --- HARD GUARD LOGIC ---
+            if daily_dd >= self.max_daily_drawdown:
+                report['status'] = "CRITICAL_DAILY_DD"
+                report['risk_multiplier'] = 0.0
+                report['message'] = f"Daily Drawdown Limit Hit: {daily_dd:.2%}"
+            elif total_dd >= self.max_total_drawdown:
+                report['status'] = "CRITICAL_TOTAL_DD"
+                report['risk_multiplier'] = 0.0
+                report['message'] = f"Total Drawdown Limit Hit: {total_dd:.2%}"
+            elif report['win_rate'] < 0.3 and len(trades) > 5:
+                report['status'] = "WARNING_PERFORMANCE"
+                report['risk_multiplier'] = 0.5
+                report['message'] = f"Low Win Rate ({report['win_rate']:.1%}). Reducing risk."
+
+            conn.close()
+        except Exception as e:
+            print(f"PropGuardian Health Check Error: {e}")
+
+        return report
+
+    def update_daily_start(self, equity: float):
+        """Call this at the first run of the day to anchor drawdown."""
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("INSERT OR REPLACE INTO sync_state (key, value, last_updated) VALUES (?, ?, ?)", 
+                     ("daily_start_equity", str(equity), datetime.now().isoformat()))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error updating daily start equity: {e}")

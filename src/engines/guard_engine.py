@@ -102,6 +102,12 @@ PERSISTENCE_PATHS = [
     '/Library/LaunchDaemons',
 ]
 
+# Legitimate service whitelists
+SAFE_PLIST_PREFIXES = [
+    'com.google.', 'com.docker.', 'com.cloudflare.', 
+    'com.windscribe.', 'com.apple.', 'com.microsoft.'
+]
+
 DEBUG_PORT_FLAG = '--remote-debugging-port'
 SUSPICIOUS_FLAGS = ['--disable-web-security', '--no-sandbox', '--headless',
                     '--remote-debugging-port']
@@ -445,14 +451,21 @@ class GuardEngine:
 
                         # New file since last check?
                         if fpath not in self._persistence_baseline:
-                            threats.append({
-                                'type': 'NEW_PERSISTENCE_ENTRY',
-                                'severity': 'HIGH',
-                                'title': '👻 NEW LAUNCH AGENT DETECTED',
-                                'summary': f"New persistence entry appeared: `{fname}`\nPath: `{fpath}`"
-                            })
+                            # Whitelist check
+                            is_safe = any(fname.startswith(prefix) for prefix in SAFE_PLIST_PREFIXES)
+                            if not is_safe:
+                                threats.append({
+                                    'type': 'NEW_PERSISTENCE_ENTRY',
+                                    'severity': 'HIGH',
+                                    'title': '👻 NEW LAUNCH AGENT DETECTED',
+                                    'summary': f"New persistence entry appeared: `{fname}`\nPath: `{fpath}`"
+                                })
                 except PermissionError:
                     continue
+            
+            # Summary of verified services instead of line-by-line noise on first run
+            if not self._persistence_baseline and current_state:
+                logger.info(f"🛡️  Persistence Baseline: Verified {len(current_state)} background services.")
 
             # Update baseline
             self._persistence_baseline = current_state

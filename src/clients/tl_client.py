@@ -68,15 +68,23 @@ class TradeLockerHelper:
             resp = requests.post(url, json=payload, headers=self._get_headers(), timeout=10)
             
             if resp.status_code in [200, 201]:
-                data = resp.json()
-                self.access_token = data.get('accessToken')
-                # CRITICAL: Fetch account details to avoid 404s
-                return self.get_account_details()
+                try:
+                    data = resp.json()
+                    self.access_token = data.get('accessToken')
+                    # CRITICAL: Fetch account details to avoid 404s
+                    return self.get_account_details()
+                except Exception:
+                    if "<html" not in resp.text.lower():
+                        logger.warning(f"Login failed: Invalid JSON response")
+                    return False
             else:
-                logger.error(f"Login Failed: {resp.status_code} - {resp.text[:100]}")
+                logger.warning(f"Login Failed: {resp.status_code}")
                 return False
+        except requests.exceptions.Timeout:
+            logger.warning("TL Login Timeout: Service might be down.")
+            return False
         except Exception as e:
-            logger.error(f"TL Connection Error: {e}")
+            logger.warning(f"TL Connection Error: {e}")
             return False
 
     def get_account_details(self):
@@ -85,13 +93,23 @@ class TradeLockerHelper:
             url = f"{self.base_url}/backend-api/auth/jwt/all-accounts"
             resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
             if resp.status_code == 200:
-                accounts = resp.json().get('accounts', [])
+                try:
+                    data = resp.json()
+                    accounts = data.get('accounts', [])
+                except Exception:
+                    # Silent failure during known downtime if it's HTML
+                    if "<html" not in resp.text.lower():
+                        logger.error(f"Invalid JSON from account details: {resp.text[:50]}...")
+                    return False
+
                 if accounts:
                     # Capture both ID and AccNum
                     self.account_id = accounts[0]['id']
                     self.acc_num = accounts[0].get('accNum')
+                    print(f"DEBUG: Account Discovery Meta: {accounts[0]}")
                     return True
-            logger.error(f"Failed to fetch account details: {resp.status_code}")
+            if resp.status_code not in [502, 503, 504]:
+                logger.warning(f"Failed to fetch account details: {resp.status_code}")
             return False
         except Exception as e:
             logger.error(f"Account details exception: {e}")
@@ -105,13 +123,17 @@ class TradeLockerHelper:
             url = f"{self.base_url}/backend-api/auth/jwt/all-accounts"
             resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
             if resp.status_code == 200:
-                accounts = resp.json().get('accounts', [])
-                total_equity = 0.0
-                for acc in accounts:
-                    equity = float(acc.get('projectedEquity') or acc.get('accountBalance', 0.0))
-                    logger.info(f"   found account {acc['id']}: ${equity:,.2f}")
-                    total_equity += equity
-                return total_equity
+                try:
+                    accounts = resp.json().get('accounts', [])
+                    total_equity = 0.0
+                    for acc in accounts:
+                        logger.info(f"🔍 RAW ACCOUNT META: {acc}")
+                        equity = float(acc.get('projectedEquity') or acc.get('accountBalance', 0.0))
+                        logger.info(f"   found account {acc['id']}: ${equity:,.2f}")
+                        total_equity += equity
+                    return total_equity
+                except Exception:
+                    return 0.0
             return 0.0
         except Exception:
             return 0.0
@@ -181,7 +203,12 @@ class TradeLockerHelper:
                 logger.error(f"ordersHistory failed: {resp.status_code} - {resp.text[:200]}")
                 return []
 
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception:
+                logger.error(f"Failed to decode history JSON: {resp.text[:100]}")
+                return []
+                
             raw_orders = data.get('d', {}).get('ordersHistory', [])
 
             from datetime import datetime, timedelta
@@ -315,9 +342,17 @@ class TradeLockerClient:
                 resp = requests.get(url, headers=helper._get_headers(auth=True), timeout=10)
                 
                 if resp.status_code == 200:
-                    accounts = resp.json().get('accounts', [])
+                    try:
+                        data = resp.json()
+                        accounts = data.get('accounts', [])
+                    except Exception:
+                        if "<html" not in resp.text.lower():
+                            logger.error(f"Invalid JSON from account check: {resp.text[:50]}...")
+                        continue
+
                     for acc in accounts:
                         acc_id = acc['id']
+                        logger.info(f"🔍 RAW ACCOUNT META: {acc}")
                         if acc_id in seen_account_ids:
                             print(f"   Skipping duplicate account {acc_id} (already counted)")
                             continue
@@ -327,10 +362,16 @@ class TradeLockerClient:
                         total_equity += equity
                         seen_account_ids.add(acc_id)
                 else:
-                    print(f"Account {i+1} ({helper.email}) check failed: {resp.status_code}")
+                    if resp.status_code not in [500, 502, 503, 504]: # Don't spam during downtime
+                        logger.error(f"Account {i+1} ({helper.email}) check failed: {resp.status_code}")
                     
             except Exception as e:
-                print(f"Error checking account {i+1}: {e}")
+                # Silence expected connection errors
+                err_str = str(e)
+                if "Expecting value: line 1 column 1 (char 0)" in err_str:
+                    pass # Handled by the try/except block above
+                elif "503" not in err_str and "timed out" not in err_str.lower():
+                    logger.error(f"Error checking account {i+1}: {e}")
         
         return total_equity
 
