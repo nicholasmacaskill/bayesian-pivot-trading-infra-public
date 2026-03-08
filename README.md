@@ -76,9 +76,9 @@ Compliance auditing for institutional and funded account providers.
 
 ## 🧠 The Sovereign Psychologist (Psychology Engine)
 Trading is biological. This engine protects the system from the trader.
-- **Multimodal Tilt Detection**: Analyzes user voice tone and chat sentiment to detect emotional distortion.
-- **Risk Gating**: High Tilt (Score > 6) triggers automated trade-downsizing. Panic/Revenge indices trigger a **Hard Shutdown**.
-- **Voice Verdicts**: The Gatekeeper provides auditory audits via macOS native TTS to ground the trader.
+- **Interactive Sentiment**: The system periodically prompts via Telegram for the trader's mental state. Natural language analysis (Gemini 2.0) determines the "Sovereign Sentiment" score.
+- **Risk Gating**: High Tilt (Score > 6) triggers automated trade-downsizing with a **0.25x Risk Floor**—protecting equity without a hard-stop on potential alpha. Panic/Revenge indices trigger a **Hard Shutdown**.
+- **Voice Verdicts**: The Gatekeeper provides auditory audits via macOS native TTS to ground the trader during high-volatility events.
 
 ---
 
@@ -101,7 +101,9 @@ The **Delta Engine** compares the outcomes of these two paths, identifying "Alph
 ### 3. SFT Retraining Loop (Vertex AI)
 Every Sunday at 00:00 UTC, the system executes an **Automated Retraining Cycle**:
 - **Soft Training**: Updates the in-memory few-shot context window for Gemini with the past week's "Ground Truth" outcomes.
-- **Hard Training**: Exports a JSONL dataset for deep **Supervised Fine-Tuning (SFT)** on Google Vertex AI. This ensures the 9-Gate math evolves to match shifting market regimes.
+- **Hard Training**: Exports a JSONL dataset for deep **Supervised Fine-Tuning (SFT)** on Google Vertex AI. 
+- **Alpha Hunting**: The system now learns from discretionary "Human Alpha"—trades marked as `ALPHA` by the auditor are prioritized in the training set to replicate the trader's unique institutional edge.
+- **Alpha Interview**: Upon closing a profitable rogue trade, the system "interviews" the trader via Telegram to capture technical reasoning (e.g., "Asian High fade during NY London overlap"), injecting high-quality human intent into the AI's pattern-recognition engine.
 
 ---
 
