@@ -9,6 +9,7 @@ class TelegramNotifier:
         self.bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
         self.chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        logger.info(f"📤 Notifier Initialized | Chat ID: {self.chat_id}")
         
         # Deduplication Tracker: {key: timestamp}
         # Key format: f"{symbol}_{pattern}"
@@ -162,15 +163,19 @@ class TelegramNotifier:
             payload = {
                 "chat_id": self.chat_id,
                 "text": text,
-                "parse_mode": "Markdown",
+                "parse_mode": "HTML",
                 "disable_web_page_preview": True
             }
             if buttons:
                 payload["reply_markup"] = {"inline_keyboard": buttons}
+            
             response = requests.post(url, json=payload, timeout=5)
+            logger.info(f"📤 Telegram Response ({response.status_code}): {response.text[:100]}")
             response.raise_for_status()
         except Exception as e:
-            logger.error(f"Failed to send Telegram message: {e}")
+            logger.error(f"❌ Failed to send Telegram message: {e}")
+            if 'response' in locals():
+                logger.error(f"❌ Error Detail: {response.text}")
 
     def get_latest_message(self, since_timestamp=None):
         """Fetches the latest text message from the chat."""

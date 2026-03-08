@@ -1,20 +1,6 @@
 {
   "sessions": [
     {
-      "timestamp": "2026-03-08T16:24:26.854174",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0
-    },
-    {
-      "timestamp": "2026-03-08T16:25:27.544047",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0
-    },
-    {
       "timestamp": "2026-03-08T16:26:26.783209",
       "tilt_score": 1,
       "sentiment": "Calm",
@@ -345,6 +331,20 @@
     },
     {
       "timestamp": "2026-03-08T17:14:27.318106",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0
+    },
+    {
+      "timestamp": "2026-03-08T17:15:27.365838",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "Periodic scan check.",
+      "physio_tilt": 1.0
+    },
+    {
+      "timestamp": "2026-03-08T17:16:27.326806",
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
