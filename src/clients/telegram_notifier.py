@@ -55,13 +55,13 @@ class TelegramNotifier:
              signal_type = "⚠️ MED ALPHA ALERT"
         
         message = (
-            f"{emoji} *{signal_type}*\n\n"
-            f"🪙 *Symbol:* `{symbol}`\n"
-            f"⚖️ *Verdict:* `{verdict}`\n"
-            f"⏱️ *Timeframe:* `{timeframe}`\n"
-            f"🔎 *Pattern:* {pattern}\n"
-            f"🤖 *AI Score:* `{ai_score}/10`\n\n"
-            f"🧠 *Analysis:* \n_{reasoning}_\n\n"
+            f"{emoji} <b>{signal_type}</b>\n\n"
+            f"🪙 <b>Symbol:</b> <code>{symbol}</code>\n"
+            f"⚖️ <b>Verdict:</b> <code>{verdict}</code>\n"
+            f"⏱️ <b>Timeframe:</b> <code>{timeframe}</code>\n"
+            f"🔎 <b>Pattern:</b> {pattern}\n"
+            f"🤖 <b>AI Score:</b> <code>{ai_score}/10</code>\n\n"
+            f"🧠 <b>Analysis:</b> \n<i>{reasoning}</i>\n\n"
         )
         
         if risk_calc:
@@ -74,20 +74,20 @@ class TelegramNotifier:
             tp_str = f"${tp_price:,.2f}" if isinstance(tp_price, (int, float)) else str(tp_price)
             
             message += (
-                f"🛡️ *Risk Management (0.75%):*\n"
-                f"• Entry: `${entry_price:,.2f}`\n"
-                f"• Stop: `${risk_calc.get('stop_loss', 0.0):,.2f}`\n"
-                f"• TP: `{tp_str}`\n"
-                f"• Position Size: `{position_size} {symbol.split('/')[0]}`\n"
-                f"• Position Value: `${position_value:,.2f}`\n\n"
+                f"🛡️ <b>Risk Management (0.75%):</b>\n"
+                f"• Entry: <code>${entry_price:,.2f}</code>\n"
+                f"• Stop: <code>${risk_calc.get('stop_loss', 0.0):,.2f}</code>\n"
+                f"• TP: <code>{tp_str}</code>\n"
+                f"• Position Size: <code>{position_size} {symbol.split('/')[0]}</code>\n"
+                f"• Position Value: <code>${position_value:,.2f}</code>\n\n"
             )
         
         # Add Security Status (vibrant confirmation)
         if security_status:
             if "CLEAN" in security_status.upper() or "SECURE" in security_status.upper():
-                status_formatted = "🛡️ *Security:* Environment confirmed as secure"
+                status_formatted = "🛡️ <b>Security:</b> Environment confirmed as secure"
             else:
-                status_formatted = f"⚠️ *Security:* {security_status}"
+                status_formatted = f"⚠️ <b>Security:</b> {security_status}"
             message += f"{status_formatted}\n\n"
 
         # Add Shadow Optimizer Insights (if available)
@@ -105,11 +105,11 @@ class TelegramNotifier:
                 deviation_warning = "⚠️ Shadow suggests DECREASE (advisory only)"
             
             message += (
-                f"🔬 *Shadow Optimizer (Experimental):*\n"
-                f"• Regime: `{regime}`\n"
-                f"• Suggested Risk: `{multiplier}x` ({multiplier * 0.75:.2f}%)\n"
+                f"🔬 <b>Shadow Optimizer (Experimental):</b>\n"
+                f"• Regime: <code>{regime}</code>\n"
+                f"• Suggested Risk: <code>{multiplier}x</code> ({multiplier * 0.75:.2f}%)\n"
                 f"• Alpha Delta: {alpha_delta}\n"
-                f"• Slippage Est: `{slippage}`\n"
+                f"• Slippage Est: <code>{slippage}</code>\n"
             )
             
             if deviation_warning:
@@ -117,7 +117,7 @@ class TelegramNotifier:
             
             message += "\n"
             
-        message += f"📊 [View on TradingView]({tv_link})"
+        message += f"📊 <a href='{tv_link}'>View on TradingView</a>"
 
         self._send_message(message, buttons=buttons)
 
@@ -130,18 +130,18 @@ class TelegramNotifier:
         }.get(severity, "⚠️")
 
         message = (
-            f"{severity_icon} *SOVEREIGN GUARD — {severity} ALERT*\n\n"
-            f"🛡️ *{title}*\n\n"
+            f"{severity_icon} <b>SOVEREIGN GUARD — {severity} ALERT</b>\n\n"
+            f"🛡️ <b>{title}</b>\n\n"
             f"{summary}\n\n"
-            f"⏰ `{__import__('datetime').datetime.now().strftime('%H:%M:%S UTC')}`"
+            f"⏰ <code>{__import__('datetime').datetime.now().strftime('%H:%M:%S UTC')}</code>"
         )
         self._send_message(message)
 
     def send_kill_switch(self, reason):
         """Sends a critical Kill Switch/Circuit Breaker alert."""
         message = (
-            f"⚠️ *CIRCUIT BREAKER TRIGGERED* ⚠️\n\n"
-            f"🛑 *System Halted*\n"
+            f"⚠️ <b>CIRCUIT BREAKER TRIGGERED</b> ⚠️\n\n"
+            f"🛑 <b>System Halted</b>\n"
             f"Reason: {reason}\n\n"
             f"Trading suspended until manual reset or 00:00 UTC."
         )
@@ -153,7 +153,7 @@ class TelegramNotifier:
             f"🆘 <b>BAYESIAN PIVOT: CRITICAL ERROR</b> 🆘\n\n"
             f"📍 <b>Component:</b> <code>{component}</code>\n"
             f"❌ <b>Error:</b> <code>{error[:300]}...</code>\n\n"
-            f"Check dashboard or Modal logs for details."
+            f"Check dashboard or local logs for details."
         )
         self._send_message(message)
 

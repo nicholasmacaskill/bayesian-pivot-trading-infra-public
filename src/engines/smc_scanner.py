@@ -220,29 +220,35 @@ class SMCScanner:
         # 1. Check NY Lunch Blackout (12:00 - 13:00 EST / 17:00 - 18:00 UTC)
         lunch_start, lunch_end = Config.get('NY_LUNCH_BLACKOUT', (17, 18))
         if hour >= lunch_start and hour < lunch_end:
-            return False, "NY_LUNCH_BLACKOUT"
+            logger.debug("Killzone: NY_LUNCH_BLACKOUT")
+            return False
 
         # 2. London Session (7 - 10 UTC)
         lon_start, lon_end = Config.KILLZONE_LONDON
         if lon_start <= hour < lon_end:
-            return True, "LONDON"
+            logger.debug("Killzone: LONDON")
+            return True
 
         # 3. Asian session (0 - 4 UTC)
         asia_start, asia_end = Config.KILLZONE_ASIA
         if asia_start <= hour < asia_end:
-            return True, "ASIA"
+            logger.debug("Killzone: ASIA")
+            return True
 
         # 4. Asian Fade prime window (4 - 7 UTC)
         fade_start, fade_end = Config.KILLZONE_ASIAN_FADE
         if fade_start <= hour < fade_end:
-            return True, "ASIAN_FADE"
+            logger.debug("Killzone: ASIAN_FADE")
+            return True
 
         # 5. NY continuous session (12 - 20 UTC)
         ny_start, ny_end = Config.KILLZONE_NY_CONTINUOUS
         if ny_start <= hour < ny_end:
-            return True, "NY_CONTINUOUS"
+            logger.debug("Killzone: NY_CONTINUOUS")
+            return True
 
-        return False, None
+        logger.debug("Killzone: CLOSED")
+        return False
 
     def is_asian_fade_window(self, hour=None):
         """Returns True if we are in the 11 PM – 2 AM EST (4–7 AM UTC) Asian Fade prime window."""
@@ -1148,19 +1154,23 @@ class SMCScanner:
         return None
 
     @safe_scan("Scanner.scan_order_flow")
-    def scan_order_flow(self, symbol, timeframe=Config.TIMEFRAME):
+    def scan_order_flow(self, symbol, timeframe=Config.TIMEFRAME, cached_context=None):
         """
         STRATEGY 3: ICT ORDER FLOW (Order Blocks + MSS)
         Focuses on high-probability reversals or continuations sponsored by institutions.
         """
-        # 1. BIAS CHECK (Hard Gate)
+        # 1. HARD GATE: Killzone
+        if not self.is_killzone():
+            return None
+
+        # 2. BIAS CHECK (Hard Gate)
         # We reuse the detailed bias logic
-        index_context = self.intermarket.get_market_context()
+        index_context = cached_context or self.intermarket.get_market_context()
         bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=False) # Visual done later if needed
         
         # Parse bias direction
-        is_bullish = "BULLISH" in bias_full or "NEUTRAL" in bias_full
-        is_bearish = "BEARISH" in bias_full or "NEUTRAL" in bias_full
+        is_bullish = "BULLISH" in bias_full
+        is_bearish = "BEARISH" in bias_full
         
         if not is_bullish and not is_bearish:
             return None
