@@ -243,136 +243,160 @@ class LocalScannerRunner:
         return "\n".join(lines)
 
     def _send_latest_scan_report(self):
-        """Sends an enriched mission-control scan report via Telegram."""
+        """Sends a full Sovereign Market Briefing via Telegram on /scan."""
         try:
-            # 1. System & Security Meta
-            security = self.guard.get_security_context()
-            uptime = str(timedelta(seconds=int(time.time() - self.session_start_time)))
-            
-            # 2. Account Balances (per-account)
+            # ── 1. Security & Session Header ─────────────────────────────────
+            security   = self.guard.get_security_context()
+            trust      = self.guard.get_trust_score()
+            uptime     = str(timedelta(seconds=int(time.time() - self.session_start_time)))
+            utc_now    = datetime.now(timezone.utc)
+            active_kz  = _get_active_killzone(utc_now.hour)
+            kz_name    = active_kz['name'] if active_kz else 'OFF-HOURS'
+            quartile_d = self.scanner.get_session_quartile()
+            sess_phase = quartile_d.get('phase', 'Unknown')
+
+            health_report = getattr(self, 'current_perf', {})
+            dd_pct = (health_report.get('daily_drawdown', 0.0) * 100) if health_report else 0.0
+            integrity_badge = '⚠️ <b>[INTEGRITY: WARNING]</b>' if dd_pct >= 3.0 else '🛡️ <b>[INTEGRITY: SECURE]</b>'
+
+            header = (
+                f"🔍 <b>BAYESIAN PIVOT: SOVEREIGN BRIEFING</b>\n"
+                f"{integrity_badge} | Trust: <code>{trust}/100</code>\n"
+                f"📉 DD: <code>{dd_pct:.1f}% / 4.0%</code> | ⏱️ <b>{kz_name}</b> ({sess_phase})\n"
+                f"🕒 Uptime: <code>{uptime}</code> | Cycle <code>#{self._cycle_count}</code>\n"
+                f"🔐 <code>{security}</code>"
+            )
+
+            # ── 2. Account Balance ─────────────────────────────────────────────
             total_equity = self.tl.get_total_equity()
-            accounts_str = f"• <b>Total Equity:</b> <code>${total_equity:,.2f}</code>\n"
-            
-            # 3. Open Positions
+
+            # ── 3. Open Positions ──────────────────────────────────────────────
             open_positions = self.tl.get_open_positions()
             if open_positions:
-                open_str = ""
+                open_str = ''
                 for p in open_positions:
-                    side = "BUY" if p.get('side', '').upper() == 'BUY' else "SELL"
-                    pnl = p.get('pnl', 0)
-                    pnl_icon = "🟢" if pnl >= 0 else "🔴"
-                    open_str += (
-                        f"  {pnl_icon} <code>{p.get('symbol', 'N/A')}</code> {side} "
-                        f"@ <code>{p.get('price', 0):.4f}</code> → "
-                        f"PnL: <code>{pnl:+.2f}</code>\n"
-                    )
+                    side = 'BUY' if p.get('side','').upper() == 'BUY' else 'SELL'
+                    pnl  = p.get('pnl', 0)
+                    icon = '🟢' if pnl >= 0 else '🔴'
+                    open_str += f"  {icon} <code>{p.get('symbol','N/A')}</code> {side} @ <code>{p.get('price',0):.4f}</code> → <code>{pnl:+.2f}</code>\n"
             else:
-                open_str = "  <i>No open positions.</i>\n"
-            
-            # 4. Closed Trade History (last 5 + stats over 720h)
-            history = self.tl.get_recent_history(hours=720)
+                open_str = '  <i>No open positions.</i>\n'
+
+            # ── 4. Trade Stats (720h) ─────────────────────────────────────────
+            history        = self.tl.get_recent_history(hours=720)
             history_sorted = sorted(history, key=lambda x: x.get('close_time', ''), reverse=True)
-            
-            # Compute win % and avg RR from all available history
-            winning = [t for t in history if t.get('pnl', 0) > 0]
-            losing  = [t for t in history if t.get('pnl', 0) < 0]
-            total_closed = len(history)
-            win_rate = (len(winning) / total_closed * 100) if total_closed > 0 else 0
+            winning  = [t for t in history if t.get('pnl', 0) > 0]
+            losing   = [t for t in history if t.get('pnl', 0) < 0]
+            total_cl = len(history)
+            win_rate = (len(winning) / total_cl * 100) if total_cl > 0 else 0
             avg_win  = (sum(t['pnl'] for t in winning) / len(winning)) if winning else 0
             avg_loss = (abs(sum(t['pnl'] for t in losing)) / len(losing)) if losing else 1
             avg_rr   = (avg_win / avg_loss) if avg_loss > 0 else 0
 
-            # Format recent 5 closed trades
-            recent_closed_str = ""
+            recent_str = ''
             for t in history_sorted[:5]:
-                pnl = t.get('pnl', 0)
-                pnl_icon = "🟢" if pnl >= 0 else "🔴"
-                ts = t.get('close_time', '')[:10]
-                recent_closed_str += (
-                    f"  {pnl_icon} <code>{t.get('symbol', 'N/A')}</code> {t.get('side','')}"
-                    f" {ts} → <code>{pnl:+.2f}</code>\n"
-                )
-            if not recent_closed_str:
-                recent_closed_str = "  <i>No closed history found.</i>\n"
-            
-            # 5. Alpha Persistence
-            alpha_reasoning = getattr(self, 'alpha_reasoning', 'Initial baseline.')
-            alpha_mult = getattr(self, 'alpha_mult', 1.0)
-            
-            # 6. Intermarket Context (Last Batched)
+                pnl  = t.get('pnl', 0)
+                icon = '🟢' if pnl >= 0 else '🔴'
+                ts   = t.get('close_time', '')[:10]
+                recent_str += f"  {icon} <code>{t.get('symbol','N/A')}</code> {t.get('side','')} {ts} → <code>{pnl:+.2f}</code>\n"
+            if not recent_str:
+                recent_str = '  <i>No closed history found.</i>\n'
+
+            # ── 5. Intermarket Confluence ───────────────────────────────────────
             market_context = getattr(self, '_last_market_context', {})
-            im_str = "<i>No intermarket data found.</i>"
             if market_context:
                 dxy = market_context.get('DXY', {})
-                nq = market_context.get('NQ', {})
+                nq  = market_context.get('NQ', {})
                 tnx = market_context.get('TNX', {})
-                im_str = (
-                    f"• <b>DXY:</b> {dxy.get('trend', 'N/A')} (<code>{dxy.get('change_5m',0):+.2f}%</code>)\n"
-                    f"• <b>NQ:</b> {nq.get('trend', 'N/A')} (<code>{nq.get('change_5m',0):+.2f}%</code>)\n"
-                    f"• <b>TNX:</b> {tnx.get('trend', 'N/A')} (<code>{tnx.get('change_5m',0):+.2f}%</code>)"
-                )
-            
-            # 7. Market State Table (ASCII)
-            market_table = self._get_market_overview_ascii()
-            
-            # 8. Latest High-Score Setup (Database)
-            db_scan = ""
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("""
-                SELECT * FROM scans 
-                WHERE verdict != 'SCAN_HEARTBEAT' 
-                AND ai_score > 0
-                ORDER BY timestamp DESC LIMIT 1
-            """)
-            row = c.fetchone()
-            conn.close()
-            
-            if row:
-                ts_str = row['timestamp']
-                try:
-                    ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                    if ts.tzinfo is None: ts = ts.replace(tzinfo=timezone.utc)
-                except: ts = datetime.now(timezone.utc)
-                delta = datetime.now(timezone.utc) - ts
-                minutes_ago = int(delta.total_seconds() / 60)
-                
-                db_scan = (
-                    f"💎 <b>LATEST HIGH-SCORE:</b> <code>{row['symbol']}</code> ({minutes_ago}m ago)\n"
-                    f"• <b>Formation:</b> <code>{row['formations'] or row['pattern']}</code>\n"
-                    f"• <b>Regime:</b> <code>{row['shadow_regime']}</code> (AI: <code>{row['ai_score']}/10</code>)\n"
-                    f"• <b>Logic:</b> <i>{row['ai_reasoning']}</i>\n"
+                confluence_str = (
+                    f"• <b>DXY:</b> <code>{dxy.get('trend','N/A')}</code> (<code>{dxy.get('change_5m',0):+.2f}%</code>)\n"
+                    f"• <b>NQ:</b> <code>{nq.get('trend','N/A')}</code> (<code>{nq.get('change_5m',0):+.2f}%</code>)\n"
+                    f"• <b>TNX:</b> <code>{tnx.get('trend','N/A')}</code> (<code>{tnx.get('change_5m',0):+.2f}%</code>)"
                 )
             else:
-                db_scan = "<i>No high-conviction setups in database.</i>\n"
+                confluence_str = '<i>No intermarket data cached — run a cycle first.</i>'
 
-            # CONSTRUCT FULL RICH REPORT
+            # ── 6. Alpha Persistence ───────────────────────────────────────────
+            alpha_mult      = getattr(self, 'alpha_mult', 1.0)
+            alpha_reasoning = getattr(self, 'alpha_reasoning', 'Initial baseline.')
+
+            # ── 7. Market State Table (with Hurst strategy labels) ──────────────
+            if self.scan_results:
+                table_lines = [
+                    '┌────────┬──────────┬────────┬──────┬─────────────┐',
+                    '│ Symbol │ Bias     │ Regime │ Hurst│ Strategy    │',
+                    '├────────┼──────────┼────────┼──────┼─────────────┤',
+                ]
+                for sym_full, data in self.scan_results.items():
+                    sym    = sym_full.split('/')[0][:6]
+                    bias   = str(data.get('bias', 'NEUTRAL'))[:8]
+                    regime = str(data.get('regime', 'CHOP'))[:6]
+                    h      = data.get('hurst', 0.5)
+                    h_str  = f'{h:.2f}'
+                    strat  = 'Turtle Soup' if h < 0.45 else ('Trend Align' if h > 0.55 else 'Structure  ')
+                    table_lines.append(f'│ {sym:<6} │ {bias:<8} │ {regime:<6} │ {h_str:<4} │ {strat:<11} │')
+                table_lines.append('└────────┴──────────┴────────┴──────┴─────────────┘')
+                market_table = '\n'.join(table_lines)
+            else:
+                market_table = 'No scan data yet — trigger a cycle first.'
+
+            # ── 8. Latest High-Score Setup (DB) ────────────────────────────────
+            db_scan = ''
+            try:
+                conn = get_db_connection()
+                row  = conn.execute(
+                    "SELECT * FROM scans WHERE verdict != 'SCAN_HEARTBEAT' AND ai_score > 0 ORDER BY timestamp DESC LIMIT 1"
+                ).fetchone()
+                conn.close()
+                if row:
+                    try:
+                        ts = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
+                        if ts.tzinfo is None: ts = ts.replace(tzinfo=timezone.utc)
+                    except: ts = datetime.now(timezone.utc)
+                    mins_ago = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
+                    db_scan = (
+                        f"💎 <b>LATEST SETUP:</b> <code>{row['symbol']}</code> ({mins_ago}m ago)\n"
+                        f"• Formation: <code>{row.get('formations') or row.get('pattern','N/A')}</code>"
+                        f" | AI: <code>{row.get('ai_score','N/A')}/10</code>\n"
+                        f"• Regime: <code>{row.get('shadow_regime','N/A')}</code>\n"
+                        f"• <i>{row.get('ai_reasoning','No reasoning available.')}</i>\n"
+                    )
+                else:
+                    db_scan = '<i>No high-conviction setups in database.</i>\n'
+            except Exception as _db_err:
+                db_scan = f'<i>DB query error: {_db_err}</i>\n'
+
+            # ── ASSEMBLE FULL REPORT ───────────────────────────────────────────────
             msg = (
-                f"🔍 <b>BAYESIAN PIVOT: MISSION CONTROL</b>\n\n"
-                f"🛡️ <b>Security & Health:</b>\n"
-                f"• Status: <code>{security}</code> | Uptime: <code>{uptime}</code> | Cycle: <code>#{self._cycle_count}</code>\n\n"
-                f"💰 <b>Account Balance:</b>\n"
-                f"{accounts_str}\n"
-                f"📂 <b>Open Positions ({len(open_positions)}):</b>\n"
+                f"{header}\n\n"
+
+                f"💰 <b>Account</b>\n"
+                f"• Total Equity: <code>${total_equity:,.2f}</code>\n\n"
+
+                f"📂 <b>Open Positions ({len(open_positions)})</b>\n"
                 f"{open_str}\n"
-                f"📈 <b>Trade Performance ({total_closed} trades tracked):</b>\n"
+
+                f"📈 <b>Performance ({total_cl} trades)</b>\n"
                 f"• Win Rate: <code>{win_rate:.1f}%</code> | Avg RR: <code>{avg_rr:.2f}</code>\n"
                 f"• Avg Win: <code>${avg_win:+.2f}</code> | Avg Loss: <code>-${avg_loss:.2f}</code>\n\n"
-                f"🕔 <b>Last 5 Closed Trades:</b>\n"
-                f"{recent_closed_str}\n"
-                f"✨ <b>Alpha Persistence:</b>\n"
-                f"• Multiplier: <code>{alpha_mult:.2f}x</code> — <i>{alpha_reasoning}</i>\n\n"
-                f"🌍 <b>Intermarket Context:</b>\n"
-                f"{im_str}\n\n"
-                f"📊 <b>Market State Overview:</b>\n"
+
+                f"🕔 <b>Last 5 Closed</b>\n"
+                f"{recent_str}\n"
+
+                f"📐 <b>Confluence (Intermarket)</b>\n"
+                f"{confluence_str}\n\n"
+
+                f"✨ <b>Alpha Persistence:</b> <code>{alpha_mult:.2f}x</code> — <i>{alpha_reasoning}</i>\n\n"
+
+                f"📊 <b>Market State</b> (Hurst-labeled)\n"
                 f"<pre>{market_table}</pre>\n\n"
+
                 f"{db_scan}"
             )
-            
+
             self.notifier._send_message(msg)
         except Exception as e:
             logger.error(f"Failed to fetch enriched scan report: {e}", exc_info=True)
-
 
     def _send_command_guide(self):
         """Sends the pinned command guide to Telegram."""
