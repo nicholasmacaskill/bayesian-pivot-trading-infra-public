@@ -45,10 +45,11 @@ def verify_vitals():
         if not api_key:
             raise ValueError("API Key missing")
         client = genai.Client(api_key=api_key)
-        # Lightweight probe
+        # Lightweight probe with increased timeout
         response = client.models.generate_content(
             model='gemini-2.0-flash', 
-            contents="ping"
+            contents="ping",
+            config={'http_options': {'timeout': 15}}
         )
         if response.text:
             report["checks"]["AI Validator (Gemini)"] = "✅ Connected"

@@ -134,6 +134,10 @@ class TradeLockerHelper:
                     return total_equity
                 except Exception:
                     return 0.0
+            elif resp.status_code == 401:
+                logger.warning(f"401 Unauthorized for {self.email}. Re-authenticating...")
+                if self.login():
+                    return self.get_equity()
             return 0.0
         except Exception:
             return 0.0
@@ -181,6 +185,10 @@ class TradeLockerHelper:
                             'status': 'OPEN'
                         })
                 return trades
+            elif resp.status_code == 401:
+                logger.warning(f"401 Unauthorized for {self.email} on positions. Re-authenticating...")
+                if self.login():
+                    return self.get_open_positions()
             else:
                  return []
         except Exception as e:
@@ -199,6 +207,11 @@ class TradeLockerHelper:
             url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/ordersHistory"
             resp = requests.get(url, headers=self._get_headers(auth=True), params={'limit': 500}, timeout=15)
             
+            if resp.status_code == 401:
+                logger.warning(f"401 Unauthorized for {self.email} on history. Re-authenticating...")
+                if self.login():
+                    return self.get_recent_history(hours)
+                return []
             if resp.status_code != 200:
                 logger.error(f"ordersHistory failed: {resp.status_code} - {resp.text[:200]}")
                 return []

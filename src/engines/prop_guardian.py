@@ -1,12 +1,15 @@
 import os
 import json
 import sqlite3
+import logging
 from datetime import datetime, timedelta
 import re
 from google import genai
 import requests
 from src.core.config import Config
 from src.core.database import get_db_connection
+
+logger = logging.getLogger(__name__)
 
 class PropGuardian:
     def __init__(self):
@@ -124,15 +127,25 @@ class PropGuardian:
             report['total_drawdown'] = total_dd
 
             # 2. Daily Drawdown Calculation
-            # Fetch equity at the start of the day (first sync_state entry for 'today')
-            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-            # Note: This simplified logic assumes we track daily starting equity
+            # Fetch equity at the start of the day
             c.execute("SELECT value FROM sync_state WHERE key = 'daily_start_equity'")
             day_start_row = c.fetchone()
-            day_start_equity = float(day_start_row['value']) if day_start_row else current_equity
+            
+            if not day_start_row or float(day_start_row['value']) <= 0:
+                # CRITICAL FIX: If no anchor exists or is invalid, anchor to current equity
+                logger.warning("🛡️ PropGuardian: No valid daily anchor found. Anchoring to current equity.")
+                self.update_daily_start(current_equity)
+                day_start_equity = current_equity
+            else:
+                day_start_equity = float(day_start_row['value'])
 
-            daily_dd = (day_start_equity - current_equity) / day_start_equity if day_start_equity > 0 else 0
-            report['daily_drawdown'] = daily_dd
+            # Guard against division by zero or nonsensical drawdown calculation
+            if day_start_equity > 0 and current_equity > 0:
+                daily_dd = (day_start_equity - current_equity) / day_start_equity
+            else:
+                daily_dd = 0.0
+            
+            report['daily_drawdown'] = max(0, daily_dd) # Drawdown is always non-negative
 
             # 3. Performance Stats (Last 30 days)
             thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
@@ -145,12 +158,12 @@ class PropGuardian:
 
             if trades:
                 wins = len([t for t in trades if t['pnl'] > 0])
-                losses = len([t for t in trades if t['pnl'] <= 0])
+                losses = len([t for t in trades if t['pnl'] < 0])
                 report['win_rate'] = wins / len(trades)
                 
                 # Simple R:R estimation (Average Win / Average Loss)
                 avg_win = sum(t['pnl'] for t in trades if t['pnl'] > 0) / wins if wins > 0 else 0
-                avg_loss = abs(sum(t['pnl'] for t in trades if t['pnl'] < 0) / losses) if losses > 0 else 1
+                avg_loss = abs(sum(t['pnl'] for t in trades if t['pnl'] < 0) / losses) if losses > 0 else 0
                 report['avg_rr'] = avg_win / avg_loss if avg_loss > 0 else 0
 
             # --- HARD GUARD LOGIC ---
