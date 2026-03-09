@@ -20,6 +20,7 @@ from src.clients.tl_client import TradeLockerClient
 from src.clients.telegram_notifier import TelegramNotifier, send_alert, send_system_error
 from src.engines.execution_audit import ExecutionAuditEngine
 from src.engines.guard_engine import GuardEngine
+from src.engines.local_llm_handler import LocalLLMHandler
 # ── NEW: 5-Feature Suite ─────────────────────────────────────────────────────
 from src.engines.correlation_gate import CorrelationGate
 from src.engines.calendar_filter  import CalendarFilter
@@ -28,6 +29,32 @@ from src.engines.trade_ledger      import TradeLedger
 from src.engines.retraining_loop   import RetrainingLoop
 from src.engines.psychology_engine import PsychologyEngine
 from src.engines.biometric_engine  import BiometricEngine
+
+# ── ICT Killzone Definitions (UTC hours) ─────────────────────────────────────
+ICT_KILLZONES = [
+    {'name': 'Asian',  'open': 0,  'close': 4},
+    {'name': 'London', 'open': 7,  'close': 10},
+    {'name': 'NY AM',  'open': 12, 'close': 15},
+    {'name': 'NY PM',  'open': 18, 'close': 20},
+]
+
+def _get_active_killzone(utc_hour: int) -> dict | None:
+    """Returns the active ICT killzone dict for the given UTC hour, or None."""
+    for kz in ICT_KILLZONES:
+        if kz['open'] <= utc_hour < kz['close']:
+            return kz
+    return None
+
+def _is_presession_window(utc_hour: int, utc_minute: int) -> dict | None:
+    """Returns killzone dict if we are within 15 minutes before its open, else None."""
+    for kz in ICT_KILLZONES:
+        pre_hour   = (kz['open'] - 1) % 24
+        pre_minute = 45
+        if utc_hour == pre_hour and utc_minute >= pre_minute:
+            return kz
+        if utc_hour == kz['open'] and utc_minute < 5:  # First 5 mins counts too
+            return kz
+    return None
 
 # Configure Logging
 logging.basicConfig(
@@ -117,11 +144,20 @@ class LocalScannerRunner:
         self.guard.start()
         logger.info("🛡️  Sovereign Guard active — securing your edge.")
         # ────────────────────────────────────────────────────────────────────
-        
+
+        # ── Llama3 Local Fallback Validator ───────────────────────────────────
+        self.local_llm = LocalLLMHandler(model="llama3")
+        if self.local_llm.is_available():
+            logger.info("🦙 Llama3 local validator: ONLINE")
+        else:
+            logger.warning("🦙 Llama3 local validator: OFFLINE (Ollama not running)")
+        # ─────────────────────────────────────────────────────────────────────
+
         self.last_market_pulse = 0
         self._cycle_count = 0
         self._last_signal_time = None
         self._last_scan_results = [] # Track results for /scan report
+        self._presession_scanned = set()  # Track which sessions have been pre-scanned this cycle
 
         # Shutdown handler
         signal.signal(signal.SIGINT, self.shutdown)
@@ -553,31 +589,97 @@ class LocalScannerRunner:
             
             scan_list = Config.SYMBOLS + Config.ALT_SYMBOLS
             setups_found = 0
-            
+
             # 3. INTERMARKET CONTEXT BATCHING
             market_context = self.scanner.intermarket.get_market_context()
-            self._last_market_context = market_context # Cache for /scan report
-            
+            self._last_market_context = market_context
+            dxy_trend = market_context.get('DXY', {}).get('trend', 'N/A') if market_context else 'N/A'
+
+            # 4. ICT SESSION CLASSIFICATION
+            utc_now      = datetime.now(timezone.utc)
+            utc_h, utc_m = utc_now.hour, utc_now.minute
+            active_kz    = _get_active_killzone(utc_h)
+            presession_kz = _is_presession_window(utc_h, utc_m)
+
+            quartile_data = self.scanner.get_session_quartile()
+            session_info  = {
+                'name':  active_kz['name'] if active_kz else 'OFF-HOURS',
+                'phase': quartile_data.get('phase', 'Unknown'),
+            }
+
+            # 5. PRE-SESSION GUARD SCAN (15 min before each killzone open, once per session)
+            if presession_kz:
+                scan_key = f"{presession_kz['name']}_{utc_now.date()}"
+                if scan_key not in self._presession_scanned:
+                    logger.info(f"🛡️ PRE-SESSION GUARD SCAN: {presession_kz['name']} opens in ~15 min")
+                    # Run all lightweight scans synchronously (already in guard thread, just fetch result)
+                    guard_ctx = self.guard.get_security_context()
+                    self.notifier._send_message(
+                        f"🛡️ <b>PRE-SESSION SWEEP: {presession_kz['name']}</b>\n"
+                        f"Environment check 15 min before killzone open.\n"
+                        f"• Result: <code>{guard_ctx}</code>"
+                    )
+                    self._presession_scanned.add(scan_key)
+                    # Prune old keys to avoid unbounded growth
+                    if len(self._presession_scanned) > 20:
+                        self._presession_scanned.pop()
+
             for symbol in scan_list:
                 cached_ctx = {'intermarket': market_context} if market_context else None
-                bias_full = self.scanner.get_detailed_bias(symbol, index_context=market_context)
-                bias_score = bias_full.split('(')[0].strip() if '(' in bias_full else bias_full
-                
-                # Track state for overview
+
+                # ── Bias Synthesis (Daily + 4H + DXY) ────────────────────────
+                daily_bias = self.scanner.get_detailed_bias(symbol, index_context=market_context)
+                htf_bias   = self.scanner.get_4h_bias(symbol)
+                bias_score = daily_bias.split('(')[0].strip() if '(' in daily_bias else daily_bias
+                bias_data  = {
+                    'daily':     daily_bias,
+                    'htf':       htf_bias,
+                    'dxy_trend': dxy_trend,
+                    'smt_score': f"{market_context.get('DXY', {}).get('change_5m', 0):+.2f}%" if market_context else 'N/A',
+                }
+
+                # ── Hurst Exponent + Strategy Label ───────────────────────────
                 hurst_val = 0.5
                 try:
                     df_tmp = self.scanner.fetch_data(symbol, Config.TIMEFRAME, limit=100)
                     if df_tmp is not None:
-                         hurst_val = self.scanner.get_hurst_exponent(df_tmp['close'].values)
+                        hurst_val = self.scanner.get_hurst_exponent(df_tmp['close'].values)
                 except: pass
-                
-                quartile_data = self.scanner.get_session_quartile()
+
+                if hurst_val < 0.45:
+                    hunt_label = "Turtle Soup / Fade Search"
+                elif hurst_val > 0.55:
+                    hunt_label = "Trend Alignment / Displacement Search"
+                else:
+                    hunt_label = "Neutral / Structure Search"
+
+                # ── HTF POI — Liquidity Gravity ───────────────────────────────
+                liquidity_targets = None
+                try:
+                    pois = self.scanner.detect_htf_pois(symbol)
+                    if pois:
+                        # Prefer the closest unmitigated POI to current price
+                        try:
+                            df_1m  = self.scanner.fetch_data(symbol, '1m', limit=1)
+                            price  = float(df_1m.iloc[-1]['close']) if df_1m is not None else 0
+                        except: price = 0
+                        nearest = min(pois, key=lambda p: abs(p['level'] - price)) if price else pois[0]
+                        pip_size = 0.0001 if 'JPY' not in symbol else 0.01
+                        dist_pips = abs(nearest['level'] - price) / pip_size if price else 0
+                        liquidity_targets = {
+                            'target_price': nearest['level'],
+                            'target_type':  nearest['type'],
+                            'distance_pips': dist_pips,
+                        }
+                except Exception as _poi_err:
+                    logger.debug(f"HTF POI error for {symbol}: {_poi_err}")
+
                 self.scan_results[symbol] = {
-                    'bias': bias_score,
-                    'regime': 'CHOP',
-                    'hurst': hurst_val,
-                    'smt': market_context.get('DXY', {}).get('change_5m', 0) if market_context else 0.0,
-                    'quartile': f"Q{quartile_data['num']}: {quartile_data['phase'][:7]}"
+                    'bias':     bias_score,
+                    'regime':   'CHOP',
+                    'hurst':    hurst_val,
+                    'smt':      market_context.get('DXY', {}).get('change_5m', 0) if market_context else 0.0,
+                    'quartile': f"Q{quartile_data['num']}: {quartile_data['phase'][:7]}",
                 }
 
                 # Gates
@@ -606,13 +708,39 @@ class LocalScannerRunner:
                     df_1h = self.scanner.fetch_data(symbol, '1h', limit=200)
                     regime_result = self.regime_filter.classify(symbol, df_1h, df)
                     if not regime_result.allowed: continue
-                    
+
                     self.scan_results[symbol]['regime'] = regime_result.regime.value
-                    
-                    # AI Validation
-                    ai_result = validate_setup(setup, self.sentiment_engine.get_market_sentiment(symbol), self.sentiment_engine.get_whale_confluence(), df=df, exchange=self.scanner.exchange, hurst_exponent=hurst_val)
-                    live = ai_result.get('live_execution', ai_result)
-                    live_score = live.get('score', 0)
+
+                    # ── AI Validation (Cloud → Llama3 fallback) ───────────────
+                    session_info_for_llm = session_info
+                    try:
+                        ai_result = validate_setup(
+                            setup, self.sentiment_engine.get_market_sentiment(symbol),
+                            self.sentiment_engine.get_whale_confluence(),
+                            df=df, exchange=self.scanner.exchange, hurst_exponent=hurst_val
+                        )
+                        live = ai_result.get('live_execution', ai_result)
+                        live_score = live.get('score', 0)
+                    except Exception as _cloud_err:
+                        logger.warning(f"☁️ Cloud AI failed for {symbol}: {_cloud_err} — trying Llama3...")
+                        if self.local_llm.is_available():
+                            try:
+                                local_result = self.local_llm.score_setup(
+                                    setup, market_context=market_context,
+                                    hurst=hurst_val, session_info=session_info_for_llm
+                                )
+                                live = local_result
+                                live_score = local_result.get('score', 0)
+                                logger.info(f"🦙 Llama3 fallback score for {symbol}: {live_score}")
+                            except Exception as _llm_err:
+                                logger.error(f"🦙 Llama3 also failed: {_llm_err}")
+                                continue
+                        else:
+                            continue
+
+                    # Hurst-aware pattern label
+                    base_pattern = setup.get('pattern', 'Unknown')
+                    enriched_pattern = f"{hunt_label} — {base_pattern}"
 
                     # Threshold
                     is_asian_fade = setup.get('is_asian_fade', False)
@@ -621,19 +749,36 @@ class LocalScannerRunner:
                     if live_score >= threshold:
                         setups_found += 1
                         self._last_signal_time = datetime.now(timezone.utc)
-                        
+
                         # Sizing
                         calc_equity = live_equity if live_equity > 0 else 100000.0
                         base_risk   = calc_equity * Config.RISK_PER_TRADE
                         risk_amt    = base_risk * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
                         lots = round(risk_amt / abs(setup['entry'] - setup['stop_loss']), 2) if abs(setup['entry'] - setup['stop_loss']) > 0 else 0
-                        
-                        risk_calc = {"entry": setup['entry'], "stop_loss": setup['stop_loss'], "position_size": lots, "regime_mult": regime_result.suggested_size_mult, "psych_mult": psych_mult, "alpha_mult": self.alpha_mult}
+
+                        risk_calc = {
+                            "entry": setup['entry'], "stop_loss": setup['stop_loss'],
+                            "position_size": lots, "regime_mult": regime_result.suggested_size_mult,
+                            "psych_mult": psych_mult, "alpha_mult": self.alpha_mult
+                        }
 
                         signal_id = self.ledger.sign_signal(setup, live_score) if self.ledger else "UNSIGNED"
                         self.corr_gate.register(signal_id, symbol, direction)
 
-                        self.notifier.send_alert(symbol=symbol, timeframe=Config.TIMEFRAME, pattern=setup['pattern'], ai_score=live_score, reasoning=live.get('reasoning', ''), risk_calc=risk_calc, security_status=self.guard.get_security_context())
+                        self.notifier.send_alert(
+                            symbol=symbol,
+                            timeframe=Config.TIMEFRAME,
+                            pattern=enriched_pattern,
+                            ai_score=live_score,
+                            reasoning=live.get('reasoning', ''),
+                            risk_calc=risk_calc,
+                            regime_result=regime_result,
+                            health_report=health_report,
+                            bias_data=bias_data,
+                            liquidity_targets=liquidity_targets,
+                            session_info=session_info,
+                            security_status=self.guard.get_security_context(),
+                        )
             
             if self._cycle_count % 15 == 0:
                 self.audit_engine.run_audit(hours_back=12)
