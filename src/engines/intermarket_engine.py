@@ -157,10 +157,6 @@ class IntermarketEngine:
             logger.error(f"Error in detect_true_smt: {e}")
             return None, 0.0
 
-        except Exception as e:
-            logger.error(f"Error in detect_true_smt: {e}")
-            return None
-
 if __name__ == "__main__":
     engine = IntermarketEngine()
     print("Market Context:", engine.get_market_context())

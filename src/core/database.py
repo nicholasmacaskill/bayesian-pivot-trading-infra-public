@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from src.core.config import Config
 from src.core.supabase_client import supabase
 
@@ -34,7 +34,15 @@ def init_db():
                 status TEXT DEFAULT 'PENDING',
                 verdict TEXT DEFAULT 'N/A',
                 shadow_regime TEXT DEFAULT 'Unknown',
-                shadow_multiplier REAL DEFAULT 1.0
+                shadow_multiplier REAL DEFAULT 1.0,
+                session TEXT,
+                killzone TEXT,
+                hurst REAL,
+                adf_p REAL,
+                daily_pnl REAL,
+                total_pnl REAL,
+                smt REAL,
+                formations TEXT
             )
         ''')
         
@@ -50,6 +58,12 @@ def init_db():
         try:
             c.execute("ALTER TABLE scans ADD COLUMN shadow_multiplier REAL DEFAULT 1.0")
         except sqlite3.OperationalError: pass
+
+        # New metadata for enriched /scan
+        for col in [('session', 'TEXT'), ('killzone', 'TEXT'), ('hurst', 'REAL'), ('adf_p', 'REAL'), ('daily_pnl', 'REAL'), ('total_pnl', 'REAL'), ('smt', 'REAL'), ('formations', 'TEXT')]:
+            try:
+                c.execute(f"ALTER TABLE scans ADD COLUMN {col[0]} {col[1]}")
+            except sqlite3.OperationalError: pass
         
         # Journal Table (AI Audit Reports)
         c.execute('''
@@ -155,11 +169,12 @@ def log_scan(scan_data, ai_result):
     c.execute('''
         INSERT INTO scans (
             timestamp, symbol, timeframe, pattern, bias, 
-            ai_score, ai_reasoning, verdict, shadow_regime, shadow_multiplier
+            ai_score, ai_reasoning, verdict, shadow_regime, shadow_multiplier,
+            session, killzone, hurst, adf_p, daily_pnl, total_pnl, smt, formations
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
-        scan_data.get('timestamp', datetime.now().isoformat()),
+        scan_data.get('timestamp', datetime.now(timezone.utc).isoformat()),
         scan_data['symbol'],
         Config.TIMEFRAME,
         scan_data['pattern'],
@@ -168,7 +183,15 @@ def log_scan(scan_data, ai_result):
         ai_result['reasoning'],
         verdict,
         shadow_regime,
-        shadow_multiplier
+        shadow_multiplier,
+        scan_data.get('session'),
+        scan_data.get('killzone'),
+        scan_data.get('hurst'),
+        scan_data.get('adf_p'),
+        scan_data.get('daily_pnl'),
+        scan_data.get('total_pnl'),
+        scan_data.get('smt_strength', 0.0),
+        scan_data.get('formations', '')
     ))
     scan_id = c.lastrowid
     conn.commit()
