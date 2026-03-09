@@ -1,13 +1,6 @@
 {
   "sessions": [
     {
-      "timestamp": "2026-03-08T16:26:26.783209",
-      "tilt_score": 1,
-      "sentiment": "Calm",
-      "text": "Periodic scan check.",
-      "physio_tilt": 1.0
-    },
-    {
       "timestamp": "2026-03-08T16:27:26.943602",
       "tilt_score": 1,
       "sentiment": "Calm",
@@ -348,6 +341,13 @@
       "tilt_score": 1,
       "sentiment": "Calm",
       "text": "Periodic scan check.",
+      "physio_tilt": 1.0
+    },
+    {
+      "timestamp": "2026-03-09T01:43:18.131843",
+      "tilt_score": 1,
+      "sentiment": "Calm",
+      "text": "./run",
       "physio_tilt": 1.0
     }
   ]

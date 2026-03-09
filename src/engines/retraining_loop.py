@@ -378,3 +378,64 @@ class RetrainingLoop:
     def force_run(self) -> dict:
         """Force an immediate retraining cycle regardless of schedule."""
         return self.run(force=True)
+
+    def get_alpha_persistence(self, window: int = 10) -> dict:
+        """
+        Calculates the 'Alpha Persistence' (Performance Momentum).
+        
+        Returns:
+            dict: {
+                'multiplier': float (0.5 to 1.5),
+                'streak': int (positive for wins, negative for losses),
+                'reasoning': str
+            }
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            # Fetch last N outcomes from signed_ledger
+            rows = conn.execute("""
+                SELECT outcome, pnl 
+                FROM signed_ledger 
+                WHERE outcome NOT IN ('PENDING', 'UNKNOWN')
+                ORDER BY timestamp DESC 
+                LIMIT ?
+            """, (window,)).fetchall()
+            
+            if not rows:
+                return {'multiplier': 1.0, 'streak': 0, 'reasoning': "No recent trade history."}
+            
+            outcomes = [r['outcome'] for r in rows]
+            
+            # Calculate streak
+            streak = 0
+            first_outcome = outcomes[0]
+            for o in outcomes:
+                if o == first_outcome:
+                    streak += 1 if o == 'WIN' else -1
+                else:
+                    break
+            
+            # Calculate multiplier (Logarithmic scaling)
+            # Max boost: 1.25x for 4+ wins
+            # Max penalty: 0.5x for 3+ losses
+            if streak >= 3:
+                multiplier = 1.25
+                reasoning = f"🔥 HOT HAND: {streak} consecutive wins. Aggressive sizing enabled."
+            elif streak <= -2:
+                multiplier = 0.5
+                reasoning = f"⚠️ SYSTEM TILT: {abs(streak)} consecutive losses. Defensive sizing (50%) enabled."
+            else:
+                multiplier = 1.0
+                reasoning = f"⚖️ STABLE: Mixed performance. Standard sizing active."
+                
+            return {
+                'multiplier': multiplier,
+                'streak': streak,
+                'reasoning': reasoning
+            }
+        except Exception as e:
+            logger.error(f"[AlphaPersistence] Calculation failed: {e}")
+            return {'multiplier': 1.0, 'streak': 0, 'reasoning': "Calculation error."}
+        finally:
+            conn.close()

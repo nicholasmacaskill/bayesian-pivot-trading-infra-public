@@ -112,6 +112,7 @@ class LocalScannerRunner:
         self.last_market_pulse = 0
         self._cycle_count = 0
         self._last_signal_time = None
+        self._last_scan_results = [] # Track results for /scan report
 
         # Shutdown handler
         signal.signal(signal.SIGINT, self.shutdown)
@@ -177,6 +178,14 @@ class LocalScannerRunner:
     def _send_latest_scan_report(self):
         """Sends the most recent high-score scan result via Telegram."""
         try:
+            # 1. Get Dashboard
+            dashboard = self._get_dashboard_string()
+            
+            # 2. Get Recent Logs
+            logs = self._get_recent_logs(n=15)
+            
+            # 3. Get Database Scan (if any)
+            db_scan = ""
             conn = get_db_connection()
             c = conn.cursor()
             c.execute("""
@@ -190,19 +199,42 @@ class LocalScannerRunner:
             
             if row:
                 delta = datetime.now() - datetime.fromisoformat(row['timestamp'])
-                scan_msg = (
-                    f"🔍 <b>BAYESIAN PIVOT: LATEST SCAN</b>\n\n"
-                    f"💎 <b>Asset:</b> <code>{row['symbol']}</code>\n"
-                    f"🕒 <b>Time:</b> <code>{int(delta.total_seconds() / 60)}m ago</code>\n"
-                    f"🧩 <b>Pattern:</b> <code>{row['pattern']}</code>\n"
-                    f"🤖 <b>AI Score:</b> <code>{row['ai_score']}/10</code>\n"
-                    f"⚖️ <b>Verdict:</b> <code>{row['verdict']}</code>\n"
-                    f"🌎 <b>Regime:</b> <code>{row['shadow_regime']}</code>\n\n"
-                    f"<b>Reasoning:</b> <i>{row['ai_reasoning'][:200]}...</i>"
+                # Use full reasoning from DB, don't truncate
+                db_scan = (
+                    f"\n💎 <b>Latest High-Score Setup:</b>\n"
+                    f"• {row['symbol']} ({int(delta.total_seconds() / 60)}m ago)\n"
+                    f"• Pattern: <code>{row['pattern']}</code>\n"
+                    f"• AI Score: <code>{row['ai_score']}/10</code>\n"
+                    f"• Verdict: <code>{row['verdict']}</code>\n"
+                    f"• Reasoning: <i>{row['ai_reasoning']}</i>\n"
                 )
-                self.notifier._send_message(scan_msg)
-            else:
-                self.notifier._send_message("❌ No recent high-quality scans found.")
+
+            # 4. Construct Full Message
+            msg = (
+                f"🔍 <b>LATEST ANALYSIS STREAM</b>\n"
+                f"<pre>{dashboard}</pre>\n"
+                f"{db_scan}\n"
+                f"📝 <b>Recent Analysis Logs:</b>\n"
+                f"<code>{logs}</code>"
+            )
+            
+            # 5. Add Market Trend Stats (if available)
+            try:
+                btc_data = self.scanner.fetch_data("BTC/USD", "1h", limit=100)
+                if btc_data is not None:
+                    hurst = self.scanner.get_hurst_exponent(btc_data['close'].values)
+                    adf = self.scanner.get_adf_test(btc_data['close'].values)
+                    
+                    trend_stats = (
+                        f"\n🌎 <b>Market Regime Stats:</b>\n"
+                        f"• Hurst: <code>{hurst:.2f}</code> ({'Trending' if hurst > 0.5 else 'Mean-Reverting'})\n"
+                        f"• ADF p-value: <code>{adf:.4f}</code> ({'Stationary' if adf < 0.05 else 'Non-Stationary'})\n"
+                    )
+                    msg += trend_stats
+            except Exception as te:
+                logger.error(f"Failed to add trend stats to report: {te}")
+
+            self.notifier._send_message(msg)
         except Exception as e:
             logger.error(f"Failed to fetch latest scan: {e}")
 
@@ -228,11 +260,75 @@ class LocalScannerRunner:
             auth_key = os.environ.get("SYNC_AUTH_KEY")
             payload = {"key": auth_key, "symbol": "YARD_HUB"}
             
-            response = requests.post(url, json=payload, timeout=5)
+            # INCREASED TIMEOUT: From 5s to 15s to account for Modal cold starts
+            response = requests.post(url, json=payload, timeout=15)
             response.raise_for_status()
             logger.info("💓 Pulse Sent: Yard Mode is Live.")
         except Exception as e:
-            logger.warning(f"⚠️ Pulse Failed (Modal might be throttled): {e}")
+            logger.warning(f"⚠️ Pulse Failed (Modal might be throttled or cold): {e}")
+
+    def _get_recent_logs(self, n=15):
+        """Reads the last n lines of the runner log and cleans them for Telegram."""
+        try:
+            log_path = "logs/local_runner.log"
+            if not os.path.exists(log_path):
+                return "No logs found."
+            
+            with open(log_path, "r") as f:
+                lines = f.readlines()
+            
+            recent = lines[-n:]
+            clean_lines = []
+            for line in recent:
+                # Remove common log metadata to save space: "2026-03-09 01:33:40,123 - Name - LEVEL - "
+                # We look for the fourth ' - ' or similar
+                parts = line.split(" - ")
+                if len(parts) >= 3:
+                    clean_lines.append(parts[-1].strip())
+                else:
+                    clean_lines.append(line.strip())
+            
+            return "\n".join(clean_lines)
+        except Exception as e:
+            return f"Error reading logs: {e}"
+
+    def _get_dashboard_string(self):
+        """Generates the same ASCII dashboard printed to terminal as a string."""
+        now = datetime.now()
+        cycle_time = now.strftime("%H:%M:%S")
+        hour = now.hour
+        session = "NY/LON" if 12 <= hour < 20 else ("LON" if 7 <= hour < 12 else "ASIA")
+        
+        q_data = self.scanner.get_session_quartile()
+        kz_icon = "KZ: ON" if self.scanner.is_killzone() else "KZ: OFF"
+        if self.scanner.is_asian_fade_window(): kz_icon = "⭐ FADE"
+        
+        perf = getattr(self, 'current_perf', {})
+        dd_str = f"DD: {perf.get('daily_drawdown', 0):.1%} / {perf.get('total_drawdown', 0):.1%}"
+        wr_rr = f"WR: {perf.get('win_rate', 0):.0%} | RR: {perf.get('avg_rr', 0):.1f}"
+        mood = "FLOW" if self.risk_multiplier >= 1.0 else ("STRESS" if self.risk_multiplier > 0 else "HALT")
+        
+        active_positions = self.tl.get_open_positions()
+        pos_count = len(active_positions)
+        total_pnl = sum(p['pnl'] for p in active_positions)
+        pnl_str = f"PnL: ${total_pnl:>+7.2f}"
+
+        # Compact ASCII Box
+        dash = [
+            f"┌{'─'*38}┐",
+            f"│ CYC #{self._cycle_count:<4} {cycle_time} {session:<6} {kz_icon:<8}│",
+            f"│ {dd_str:<18} {wr_rr:<18} │",
+            f"│ Mood: {mood:<10} {pnl_str:<18} │"
+        ]
+        
+        if pos_count > 0:
+            dash.append(f"├{'─'*38}┤")
+            for p in active_positions[:2]: # Show max 2 to save space
+                side = "L" if p['side'] == 'BUY' else "S"
+                dash.append(f"│ {side} {p['symbol']:<10} @ {p['price']:<8.1f} PnL:${p['pnl']:>+6.1f} │")
+        
+        dash.append(f"└{'─'*38}┘")
+        return "\n".join(dash)
 
     def _print_cycle_header(self):
         """Prints a high-fidelity dashboard of the current system state."""
@@ -340,6 +436,16 @@ class LocalScannerRunner:
                          self.awaiting_psych_response = False
 
             self.current_tilt_score = self.last_psych_state.get('tilt_score', 1)
+            
+            # 3b. Alpha Persistence Audit (Autonomous Risk Management)
+            self.alpha_mult = 1.0
+            self.alpha_reasoning = "N/A"
+            if self.retrain_loop:
+                alpha_data = self.retrain_loop.get_alpha_persistence()
+                self.alpha_mult = alpha_data['multiplier']
+                self.alpha_reasoning = alpha_data['reasoning']
+                if self.alpha_mult != 1.0:
+                    logger.info(f"✨ Alpha Persistence: {self.alpha_reasoning}")
 
             # --- Alpha Interview Response Handler ---
             if self.awaiting_alpha_interview:
@@ -470,6 +576,13 @@ class LocalScannerRunner:
                     # ────────────────────────────────────────────────────────
 
                     # AI Validation (Vision Proxy + RAG Active)
+                    # Calculate Hurst for Shadow Optimizer
+                    hurst = 0.5 # Default
+                    try:
+                        hurst = self.scanner.get_hurst_exponent(df['close'].values)
+                    except Exception as he:
+                        logger.warning(f"Failed to calculate Hurst for {symbol}: {he}")
+
                     ai_result = validate_setup(
                         setup,
                         market_data,
@@ -477,7 +590,8 @@ class LocalScannerRunner:
                         image_path=generated_chart,
                         df=df,
                         exchange=self.scanner.exchange,
-                        memory_context=memory_context  # Reverted back to original memory context
+                        memory_context=memory_context,
+                        hurst_exponent=hurst
                     )
                     
                     live = ai_result.get('live_execution', ai_result)
@@ -517,8 +631,9 @@ class LocalScannerRunner:
                         # 💰 Risk Calculation (with regime size multiplier applied)
                         calc_equity = live_equity if live_equity > 0 else 100000.0
                         base_risk   = calc_equity * Config.RISK_PER_TRADE
-                        # Apply both Regime and Psychology risk multipliers
-                        risk_amt    = base_risk * regime_size_mult * self.risk_multiplier
+                        # Apply Regime, Psychology (current), and Alpha Persistence risk multipliers
+                        psych_mult  = self.psychology.get_risk_multiplier(self.current_tilt_score)
+                        risk_amt    = base_risk * regime_size_mult * psych_mult * self.alpha_mult
                         distance    = abs(setup['entry'] - setup['stop_loss'])
                         
                         # Unit-based sizing (Standard for Crypto/Indices)
@@ -532,7 +647,8 @@ class LocalScannerRunner:
                             "position_size": lots,
                             "equity_basis":  calc_equity,
                             "regime_mult":   regime_size_mult,
-                            "psych_mult":    self.risk_multiplier,
+                            "psych_mult":    psych_mult,
+                            "alpha_mult":    self.alpha_mult,
                             "tilt_score":    self.current_tilt_score
                         }
 
@@ -560,7 +676,7 @@ class LocalScannerRunner:
                                 reasoning=live.get('reasoning', ''),
                                 verdict=live.get('verdict', 'N/A'),
                                 risk_calc=risk_calc,
-                                shadow_insights=shadow,
+                                shadow_insights={**shadow, "alpha_persistence": self.alpha_reasoning},
                                 security_status=security_status
                             )
                             # Append signal_id to the alert message as a separate line

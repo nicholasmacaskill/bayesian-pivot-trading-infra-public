@@ -2,16 +2,13 @@ import os
 import json
 import numpy as np
 import pandas as pd
-from google import genai
 from src.core.config import Config
+from src.engines.ai_hub import SovereignAIHub
 
 class AIValidator:
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        if self.api_key:
-            self.client = genai.Client(api_key=self.api_key)
-        else:
-            self.client = None
+        self.hub = SovereignAIHub()
             
         # Load ICT Oracle Knowledge Base (Attempt Sovereign Core first)
         self.kb_path = os.path.join(os.getcwd(), "src", "sovereign_core", "ict_oracle_kb.json")
@@ -303,7 +300,7 @@ class AIValidator:
             }
         }
 
-    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
+    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, hurst_exponent=None):
         """
         Calls Gemini API to validate the setup with DUAL-TRACK analysis.
         
@@ -319,7 +316,7 @@ class AIValidator:
         Returns:
             dict: Dual-track analysis with live_execution and shadow_optimizer sections
         """
-        if not self.client:
+        if not self.hub.has_ai:
             # Fallback to hard logic if AI unavailable
             return self.hard_logic_audit(setup, df)
 
@@ -329,6 +326,12 @@ class AIValidator:
         # Detect market regime for shadow track
         regime = self.detect_market_regime(df) if df is not None else "Unknown"
         
+        # Integrate Hurst status into regime description
+        if hurst_exponent is not None:
+            regime_detail = f"{regime} (Hurst: {hurst_exponent:.2f} - {'Trending' if hurst_exponent > 0.45 else 'Mean-Reverting' if hurst_exponent < 0.35 else 'Neutral'})"
+        else:
+            regime_detail = regime
+
         # Calculate slippage estimate
         entry_price = setup.get('entry', 0)
         position_size = setup.get('position_size_estimate', 1.0)  # Estimate for slippage calc
@@ -357,7 +360,7 @@ class AIValidator:
                 news=setup.get('news_context', 'Clear'),
                 sentiment=sentiment,
                 whales=whales,
-                regime=regime,
+                regime=regime_detail,
                 slippage_pct=slippage_info.get('slippage_pct', 'N/A'),
                 slippage_quality=slippage_info.get('quality', 'Unknown'),
                 threshold=Config.get('AI_THRESHOLD', 5.5),
@@ -373,9 +376,13 @@ class AIValidator:
             
             - Pattern: {setup.get('pattern', 'SMC Logic')}
             - SMT Strength: {setup.get('smt_strength', 0)}
-            - Regime: {regime}
+            - Regime: {regime_detail}
             - Confluences: {oracle_rules}
             
+            ### STRATEGIC FOCUS:
+            If Hurst < 0.40 (Mean-Reverting), PRIORITIZE 'Institutional Fades' and 'Liq Sweeps'.
+            If Hurst > 0.55 (Trending), PRIORITIZE 'Trend Pullbacks' and 'Expansion continuations'.
+
             Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
             """
 
@@ -434,51 +441,18 @@ class AIValidator:
                 img = Image.open(image_path)
                 contents.append(img)
 
-            # NEXT-GEN MULTI-TRY LOGIC
-            models_to_try = [
-                'gemini-2.0-flash',     # Confirmed working
-                'gemini-2.5-flash',     # Latest generation fallback
-                'gemini-1.5-flash',     # Reliable last resort
-            ]
+            # NEW-GEN MULTI-MODEL HUB
+            result = self.hub.analyze_setup(prompt, image_path)
             
-            text = None
-            last_err = None
-            for model_name in models_to_try:
-                try:
-                    response = self.client.models.generate_content(
-                        model=model_name, 
-                        contents=contents
-                    )
-                    text = response.text
-                    break
-                except Exception as e:
-                    last_err = e
-                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
-                        break
-            
-            if not text:
-                raise last_err or Exception("All Gemini models failed")
-            
-            # Extract JSON from response (Robust extraction)
-            import re
-            json_match = re.search(r'\{.*\}', text, re.DOTALL)
-            if json_match:
-                try:
-                    result = json.loads(json_match.group())
-                    # Validate structure
-                    if 'live_execution' not in result or 'shadow_optimizer' not in result:
-                        print("⚠️ AI returned incomplete dual-track structure. Using fallback.")
-                        return self.hard_logic_audit(setup, df)
-                    return result
-                except json.JSONDecodeError:
-                    print(f"⚠️ AI returned invalid JSON. Raw output first 100 chars: {text[:100]}...")
-                    return self.hard_logic_audit(setup, df)
-            else:
-                print(f"⚠️ AI Output Parsing Error (No JSON block found). Raw output first 100 chars: {text[:100]}...")
+            # Validate structure (ensure both tracks exist)
+            if 'live_execution' not in result or 'shadow_optimizer' not in result:
+                print("⚠️ AI returned incomplete dual-track structure. Using fallback.")
                 return self.hard_logic_audit(setup, df)
+            
+            return result
                 
         except Exception as e:
-            print(f"⚠️ AI Timeout/Error: {e}. Switching to HARD LOGIC FALLBACK.")
+            print(f"⚠️ AI Hub Failure: {e}. Switching to HARD LOGIC FALLBACK.")
             return self.hard_logic_audit(setup, df)
 
     def get_visual_bias(self, image_path):
@@ -486,58 +460,13 @@ class AIValidator:
         VISION AUDIT: Determines Trend Bias from Chart Image.
         Returns: +1 (Bullish), -1 (Bearish), 0 (Neutral)
         """
-        if not self.client or not image_path or not os.path.exists(image_path):
-            return 0
-            
-        prompt = """
-        ACT AS A PROFESSIONAL TECHNICAL ANALYST.
-        Analyze this 4H Market Structure Chart.
-        
-        Focus on:
-        1. EMA 20 (Green) vs EMA 50 (Red) Slope and Separation.
-        2. Market Structure (Higher Highs/Lows vs Lower Highs/Lows).
-        
-        VERDICT OPTIONS:
-        - BULLISH (Green over Red, Higher Highs)
-        - BEARISH (Red over Green, Lower Lows)
-        - NEUTRAL (Choppy, EMAs flat/twisting)
-        
-        Return ONLY one word: BULLISH, BEARISH, or NEUTRAL.
-        """
-        
         try:
-            from PIL import Image
-            img = Image.open(image_path)
-            
-            # NEXT-GEN MULTI-TRY LOGIC (VISION)
-            models_to_try = [
-                'gemini-2.0-flash',     # Confirmed working, vision-capable
-                'gemini-2.5-flash',     # Latest generation fallback
-                'gemini-1.5-flash',     # Reliable last resort
-            ]
-            
-            verdict = "NEUTRAL"
-            for model_name in models_to_try:
-                try:
-                    response = self.client.models.generate_content(
-                        model=model_name, 
-                        contents=[prompt, img]
-                    )
-                    verdict = response.text.upper().strip()
-                    break
-                except Exception as e:
-                    if "404" not in str(e) and "NOT_FOUND" not in str(e):
-                        break
-            
-            if "BULLISH" in verdict: return 1
-            if "BEARISH" in verdict: return -1
-            return 0
-            
+            return self.hub.get_visual_bias(image_path)
         except Exception as e:
             print(f"⚠️ Visual Bias Check Failed: {e}")
             return 0
 
-def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None):
+def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, hurst_exponent=None):
     """
     Main entry point for trade validation with dual-track analysis.
     
@@ -549,9 +478,10 @@ def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=
         df: Optional dataframe for regime detection
         exchange: Optional CCXT exchange for slippage estimation
         memory_context: Optional historical context from RAG
+        hurst_exponent: Optional Hurst exponent for market regime
     
     Returns:
         dict: Dual-track analysis result
     """
     validator = AIValidator()
-    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context)
+    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context, hurst_exponent)
