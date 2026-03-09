@@ -213,17 +213,57 @@ class LocalScannerRunner:
             security = self.guard.get_security_context()
             uptime = str(timedelta(seconds=int(time.time() - self.session_start_time)))
             
-            # 2. Account Meta
-            accounts_str = ""
-            for acc in self.tl.accounts:
-                balance = float(acc.get('accountBalance', 0))
-                accounts_str += f"• `{acc.get('name', 'ID:'+acc['id'])}`: <code>${balance:,.2f}</code>\n"
+            # 2. Account Balances (per-account)
+            total_equity = self.tl.get_total_equity()
+            accounts_str = f"• <b>Total Equity:</b> <code>${total_equity:,.2f}</code>\n"
             
-            # 3. Alpha Persistence
+            # 3. Open Positions
+            open_positions = self.tl.get_open_positions()
+            if open_positions:
+                open_str = ""
+                for p in open_positions:
+                    side = "BUY" if p.get('side', '').upper() == 'BUY' else "SELL"
+                    pnl = p.get('pnl', 0)
+                    pnl_icon = "🟢" if pnl >= 0 else "🔴"
+                    open_str += (
+                        f"  {pnl_icon} <code>{p.get('symbol', 'N/A')}</code> {side} "
+                        f"@ <code>{p.get('price', 0):.4f}</code> → "
+                        f"PnL: <code>{pnl:+.2f}</code>\n"
+                    )
+            else:
+                open_str = "  <i>No open positions.</i>\n"
+            
+            # 4. Closed Trade History (last 5 + stats over 720h)
+            history = self.tl.get_recent_history(hours=720)
+            history_sorted = sorted(history, key=lambda x: x.get('close_time', ''), reverse=True)
+            
+            # Compute win % and avg RR from all available history
+            winning = [t for t in history if t.get('pnl', 0) > 0]
+            losing  = [t for t in history if t.get('pnl', 0) < 0]
+            total_closed = len(history)
+            win_rate = (len(winning) / total_closed * 100) if total_closed > 0 else 0
+            avg_win  = (sum(t['pnl'] for t in winning) / len(winning)) if winning else 0
+            avg_loss = (abs(sum(t['pnl'] for t in losing)) / len(losing)) if losing else 1
+            avg_rr   = (avg_win / avg_loss) if avg_loss > 0 else 0
+
+            # Format recent 5 closed trades
+            recent_closed_str = ""
+            for t in history_sorted[:5]:
+                pnl = t.get('pnl', 0)
+                pnl_icon = "🟢" if pnl >= 0 else "🔴"
+                ts = t.get('close_time', '')[:10]
+                recent_closed_str += (
+                    f"  {pnl_icon} <code>{t.get('symbol', 'N/A')}</code> {t.get('side','')}"
+                    f" {ts} → <code>{pnl:+.2f}</code>\n"
+                )
+            if not recent_closed_str:
+                recent_closed_str = "  <i>No closed history found.</i>\n"
+            
+            # 5. Alpha Persistence
             alpha_reasoning = getattr(self, 'alpha_reasoning', 'Initial baseline.')
             alpha_mult = getattr(self, 'alpha_mult', 1.0)
             
-            # 4. Intermarket Context (Last Batched)
+            # 6. Intermarket Context (Last Batched)
             market_context = getattr(self, '_last_market_context', {})
             im_str = "<i>No intermarket data found.</i>"
             if market_context:
@@ -236,10 +276,10 @@ class LocalScannerRunner:
                     f"• <b>TNX:</b> {tnx.get('trend', 'N/A')} (<code>{tnx.get('change_5m',0):+.2f}%</code>)"
                 )
             
-            # 5. Market State Table (ASCII)
+            # 7. Market State Table (ASCII)
             market_table = self._get_market_overview_ascii()
             
-            # 6. Latest High-Score Setup (Database)
+            # 8. Latest High-Score Setup (Database)
             db_scan = ""
             conn = get_db_connection()
             c = conn.cursor()
@@ -274,13 +314,18 @@ class LocalScannerRunner:
             msg = (
                 f"🔍 <b>BAYESIAN PIVOT: MISSION CONTROL</b>\n\n"
                 f"🛡️ <b>Security & Health:</b>\n"
-                f"• System Status: <code>{security}</code>\n"
-                f"• Uptime: <code>{uptime}</code> | Cycle: <code>#{self._cycle_count}</code>\n\n"
-                f"💰 <b>Account Meta:</b>\n"
+                f"• Status: <code>{security}</code> | Uptime: <code>{uptime}</code> | Cycle: <code>#{self._cycle_count}</code>\n\n"
+                f"💰 <b>Account Balance:</b>\n"
                 f"{accounts_str}\n"
+                f"📂 <b>Open Positions ({len(open_positions)}):</b>\n"
+                f"{open_str}\n"
+                f"📈 <b>Trade Performance ({total_closed} trades tracked):</b>\n"
+                f"• Win Rate: <code>{win_rate:.1f}%</code> | Avg RR: <code>{avg_rr:.2f}</code>\n"
+                f"• Avg Win: <code>${avg_win:+.2f}</code> | Avg Loss: <code>-${avg_loss:.2f}</code>\n\n"
+                f"🕔 <b>Last 5 Closed Trades:</b>\n"
+                f"{recent_closed_str}\n"
                 f"✨ <b>Alpha Persistence:</b>\n"
-                f"• Multiplier: <code>{alpha_mult:.2f}x</code>\n"
-                f"• Narrative: <i>{alpha_reasoning}</i>\n\n"
+                f"• Multiplier: <code>{alpha_mult:.2f}x</code> — <i>{alpha_reasoning}</i>\n\n"
                 f"🌍 <b>Intermarket Context:</b>\n"
                 f"{im_str}\n\n"
                 f"📊 <b>Market State Overview:</b>\n"
@@ -291,6 +336,7 @@ class LocalScannerRunner:
             self.notifier._send_message(msg)
         except Exception as e:
             logger.error(f"Failed to fetch enriched scan report: {e}", exc_info=True)
+
 
     def _send_command_guide(self):
         """Sends the pinned command guide to Telegram."""
