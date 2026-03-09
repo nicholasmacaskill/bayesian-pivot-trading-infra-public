@@ -243,46 +243,44 @@ class LocalScannerRunner:
         return "\n".join(lines)
 
     def _send_latest_scan_report(self):
-        """Sends a full Sovereign Market Briefing via Telegram on /scan."""
+        """Sends the V3 Sovereign Briefing via Telegram on /scan."""
         try:
-            # ── 1. Security & Session Header ─────────────────────────────────
-            security   = self.guard.get_security_context()
-            trust      = self.guard.get_trust_score()
-            uptime     = str(timedelta(seconds=int(time.time() - self.session_start_time)))
             utc_now    = datetime.now(timezone.utc)
             active_kz  = _get_active_killzone(utc_now.hour)
-            kz_name    = active_kz['name'] if active_kz else 'OFF-HOURS'
             quartile_d = self.scanner.get_session_quartile()
-            sess_phase = quartile_d.get('phase', 'Unknown')
 
-            health_report = getattr(self, 'current_perf', {})
-            dd_pct = (health_report.get('daily_drawdown', 0.0) * 100) if health_report else 0.0
-            integrity_badge = '⚠️ <b>[INTEGRITY: WARNING]</b>' if dd_pct >= 3.0 else '🛡️ <b>[INTEGRITY: SECURE]</b>'
+            health_report = getattr(self, 'current_perf', {}) or {}
+            dd_pct        = health_report.get('daily_drawdown', 0.0) * 100
 
-            header = (
-                f"🔍 <b>BAYESIAN PIVOT: SOVEREIGN BRIEFING</b>\n"
-                f"{integrity_badge} | Trust: <code>{trust}/100</code>\n"
-                f"📉 DD: <code>{dd_pct:.1f}% / 4.0%</code> | ⏱️ <b>{kz_name}</b> ({sess_phase})\n"
-                f"🕒 Uptime: <code>{uptime}</code> | Cycle <code>#{self._cycle_count}</code>\n"
-                f"🔐 <code>{security}</code>"
-            )
+            # ── Equity Buffer (Distance to Daily Stop in USD) ─────────────────
+            live_equity = self.tl.get_total_equity()
+            try:
+                conn        = get_db_connection()
+                dse_row     = conn.execute("SELECT value FROM sync_state WHERE key='daily_start_equity'").fetchone()
+                conn.close()
+                day_start   = float(dse_row['value']) if dse_row else live_equity
+            except: day_start = live_equity
+            daily_stop_level = day_start * (1 - self.prop_guardian.max_daily_drawdown)
+            equity_buffer_usd = max(0.0, live_equity - daily_stop_level)
+            health_report['equity_buffer_usd'] = equity_buffer_usd
 
-            # ── 2. Account Balance ─────────────────────────────────────────────
-            total_equity = self.tl.get_total_equity()
+            # ── Header data ───────────────────────────────────────────────────
+            header_data = {
+                'trust':           self.guard.get_trust_score(),
+                'security':        self.guard.get_security_context(),
+                'uptime':          str(timedelta(seconds=int(time.time() - self.session_start_time))),
+                'cycle':           self._cycle_count,
+                'kz_name':         active_kz['name'] if active_kz else 'OFF-HOURS',
+                'sess_phase':      quartile_d.get('phase', 'Unknown'),
+                'dd_pct':          dd_pct,
+                'equity_buffer_usd': equity_buffer_usd,
+            }
 
-            # ── 3. Open Positions ──────────────────────────────────────────────
+            # ── Account data ──────────────────────────────────────────────────
             open_positions = self.tl.get_open_positions()
-            if open_positions:
-                open_str = ''
-                for p in open_positions:
-                    side = 'BUY' if p.get('side','').upper() == 'BUY' else 'SELL'
-                    pnl  = p.get('pnl', 0)
-                    icon = '🟢' if pnl >= 0 else '🔴'
-                    open_str += f"  {icon} <code>{p.get('symbol','N/A')}</code> {side} @ <code>{p.get('price',0):.4f}</code> → <code>{pnl:+.2f}</code>\n"
-            else:
-                open_str = '  <i>No open positions.</i>\n'
+            account_data   = {'equity': live_equity, 'positions': open_positions}
 
-            # ── 4. Trade Stats (720h) ─────────────────────────────────────────
+            # ── Trade performance (720h) ──────────────────────────────────────
             history        = self.tl.get_recent_history(hours=720)
             history_sorted = sorted(history, key=lambda x: x.get('close_time', ''), reverse=True)
             winning  = [t for t in history if t.get('pnl', 0) > 0]
@@ -291,112 +289,85 @@ class LocalScannerRunner:
             win_rate = (len(winning) / total_cl * 100) if total_cl > 0 else 0
             avg_win  = (sum(t['pnl'] for t in winning) / len(winning)) if winning else 0
             avg_loss = (abs(sum(t['pnl'] for t in losing)) / len(losing)) if losing else 1
-            avg_rr   = (avg_win / avg_loss) if avg_loss > 0 else 0
+            avg_rr   = avg_win / avg_loss if avg_loss > 0 else 0
+            performance_data = {
+                'total_trades': total_cl,
+                'win_rate':     win_rate,
+                'avg_rr':       avg_rr,
+                'avg_win':      avg_win,
+                'avg_loss':     avg_loss,
+                'recent':       history_sorted[:5],
+            }
 
-            recent_str = ''
-            for t in history_sorted[:5]:
-                pnl  = t.get('pnl', 0)
-                icon = '🟢' if pnl >= 0 else '🔴'
-                ts   = t.get('close_time', '')[:10]
-                recent_str += f"  {icon} <code>{t.get('symbol','N/A')}</code> {t.get('side','')} {ts} → <code>{pnl:+.2f}</code>\n"
-            if not recent_str:
-                recent_str = '  <i>No closed history found.</i>\n'
+            # ── Confluence (intermarket) ───────────────────────────────────────
+            mc  = getattr(self, '_last_market_context', {}) or {}
+            confluence_data = {
+                'dxy':             mc.get('DXY', {}),
+                'nq':              mc.get('NQ',  {}),
+                'tnx':             mc.get('TNX', {}),
+                'alpha_mult':      getattr(self, 'alpha_mult', 1.0),
+                'alpha_reasoning': getattr(self, 'alpha_reasoning', 'Initial baseline.'),
+            }
 
-            # ── 5. Intermarket Confluence ───────────────────────────────────────
-            market_context = getattr(self, '_last_market_context', {})
-            if market_context:
-                dxy = market_context.get('DXY', {})
-                nq  = market_context.get('NQ', {})
-                tnx = market_context.get('TNX', {})
-                confluence_str = (
-                    f"• <b>DXY:</b> <code>{dxy.get('trend','N/A')}</code> (<code>{dxy.get('change_5m',0):+.2f}%</code>)\n"
-                    f"• <b>NQ:</b> <code>{nq.get('trend','N/A')}</code> (<code>{nq.get('change_5m',0):+.2f}%</code>)\n"
-                    f"• <b>TNX:</b> <code>{tnx.get('trend','N/A')}</code> (<code>{tnx.get('change_5m',0):+.2f}%</code>)"
-                )
-            else:
-                confluence_str = '<i>No intermarket data cached — run a cycle first.</i>'
+            # ── Market rows (with live HTF draw per symbol) ───────────────────
+            market_rows = []
+            for sym_full, data in self.scan_results.items():
+                draw_str = None
+                try:
+                    pois = self.scanner.detect_htf_pois(sym_full)
+                    if pois:
+                        df1m  = self.scanner.fetch_data(sym_full, '1m', limit=1)
+                        price = float(df1m.iloc[-1]['close']) if df1m is not None else 0
+                        nearest = min(pois, key=lambda p: abs(p['level'] - price)) if price else pois[0]
+                        draw_str = f"{nearest['level']:,.4f} ({nearest['type']})"
+                except: pass
+                market_rows.append({
+                    'symbol': sym_full,
+                    'bias':   data.get('bias', 'N/A'),
+                    'regime': data.get('regime', 'CHOP'),
+                    'hurst':  data.get('hurst', 0.5),
+                    'draw':   draw_str,
+                })
 
-            # ── 6. Alpha Persistence ───────────────────────────────────────────
-            alpha_mult      = getattr(self, 'alpha_mult', 1.0)
-            alpha_reasoning = getattr(self, 'alpha_reasoning', 'Initial baseline.')
-
-            # ── 7. Market State Table (with Hurst strategy labels) ──────────────
-            if self.scan_results:
-                table_lines = [
-                    '┌────────┬──────────┬────────┬──────┬─────────────┐',
-                    '│ Symbol │ Bias     │ Regime │ Hurst│ Strategy    │',
-                    '├────────┼──────────┼────────┼──────┼─────────────┤',
-                ]
-                for sym_full, data in self.scan_results.items():
-                    sym    = sym_full.split('/')[0][:6]
-                    bias   = str(data.get('bias', 'NEUTRAL'))[:8]
-                    regime = str(data.get('regime', 'CHOP'))[:6]
-                    h      = data.get('hurst', 0.5)
-                    h_str  = f'{h:.2f}'
-                    strat  = 'Turtle Soup' if h < 0.45 else ('Trend Align' if h > 0.55 else 'Structure  ')
-                    table_lines.append(f'│ {sym:<6} │ {bias:<8} │ {regime:<6} │ {h_str:<4} │ {strat:<11} │')
-                table_lines.append('└────────┴──────────┴────────┴──────┴─────────────┘')
-                market_table = '\n'.join(table_lines)
-            else:
-                market_table = 'No scan data yet — trigger a cycle first.'
-
-            # ── 8. Latest High-Score Setup (DB) ────────────────────────────────
-            db_scan = ''
+            # ── Latest DB setup (sqlite3.Row → dict to fix .get() errors) ─────
+            latest_setup = None
             try:
                 conn = get_db_connection()
                 row  = conn.execute(
-                    "SELECT * FROM scans WHERE verdict != 'SCAN_HEARTBEAT' AND ai_score > 0 ORDER BY timestamp DESC LIMIT 1"
+                    "SELECT * FROM scans WHERE verdict!='SCAN_HEARTBEAT' AND ai_score>0 "
+                    "ORDER BY timestamp DESC LIMIT 1"
                 ).fetchone()
                 conn.close()
                 if row:
+                    row = dict(row)   # ← FIX: cast sqlite3.Row → dict
                     try:
                         ts = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
                         if ts.tzinfo is None: ts = ts.replace(tzinfo=timezone.utc)
                     except: ts = datetime.now(timezone.utc)
-                    mins_ago = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
-                    db_scan = (
-                        f"💎 <b>LATEST SETUP:</b> <code>{row['symbol']}</code> ({mins_ago}m ago)\n"
-                        f"• Formation: <code>{row.get('formations') or row.get('pattern','N/A')}</code>"
-                        f" | AI: <code>{row.get('ai_score','N/A')}/10</code>\n"
-                        f"• Regime: <code>{row.get('shadow_regime','N/A')}</code>\n"
-                        f"• <i>{row.get('ai_reasoning','No reasoning available.')}</i>\n"
-                    )
-                else:
-                    db_scan = '<i>No high-conviction setups in database.</i>\n'
+                    latest_setup = {
+                        'symbol':  row.get('symbol', 'N/A'),
+                        'pattern': row.get('formations') or row.get('pattern', 'N/A'),
+                        'ai_score': row.get('ai_score', 'N/A'),
+                        'regime':  row.get('shadow_regime', 'N/A'),
+                        'reasoning': row.get('ai_reasoning', ''),
+                        'mins_ago': int((datetime.now(timezone.utc) - ts).total_seconds() / 60),
+                    }
             except Exception as _db_err:
-                db_scan = f'<i>DB query error: {_db_err}</i>\n'
+                logger.warning(f"DB latest setup error: {_db_err}")
 
-            # ── ASSEMBLE FULL REPORT ───────────────────────────────────────────────
-            msg = (
-                f"{header}\n\n"
-
-                f"💰 <b>Account</b>\n"
-                f"• Total Equity: <code>${total_equity:,.2f}</code>\n\n"
-
-                f"📂 <b>Open Positions ({len(open_positions)})</b>\n"
-                f"{open_str}\n"
-
-                f"📈 <b>Performance ({total_cl} trades)</b>\n"
-                f"• Win Rate: <code>{win_rate:.1f}%</code> | Avg RR: <code>{avg_rr:.2f}</code>\n"
-                f"• Avg Win: <code>${avg_win:+.2f}</code> | Avg Loss: <code>-${avg_loss:.2f}</code>\n\n"
-
-                f"🕔 <b>Last 5 Closed</b>\n"
-                f"{recent_str}\n"
-
-                f"📐 <b>Confluence (Intermarket)</b>\n"
-                f"{confluence_str}\n\n"
-
-                f"✨ <b>Alpha Persistence:</b> <code>{alpha_mult:.2f}x</code> — <i>{alpha_reasoning}</i>\n\n"
-
-                f"📊 <b>Market State</b> (Hurst-labeled)\n"
-                f"<pre>{market_table}</pre>\n\n"
-
-                f"{db_scan}"
+            # ── Delegate rendering to V3 notifier ─────────────────────────────
+            self.notifier.send_scan_briefing(
+                header_data      = header_data,
+                account_data     = account_data,
+                performance_data = performance_data,
+                confluence_data  = confluence_data,
+                market_rows      = market_rows,
+                latest_setup     = latest_setup,
             )
-
-            self.notifier._send_message(msg)
         except Exception as e:
-            logger.error(f"Failed to fetch enriched scan report: {e}", exc_info=True)
+            logger.error(f"V3 scan briefing failed: {e}", exc_info=True)
+
+
 
     def _send_command_guide(self):
         """Sends the pinned command guide to Telegram."""
@@ -559,6 +530,18 @@ class LocalScannerRunner:
             # 2. Account Health & Accountability Audit
             logger.info("🛡️ Prop Guardian: Auditing Account Health...")
             health_report = self.prop_guardian.check_account_health(live_equity)
+            
+            # ── V3 Equity Buffer calculation ─────────────────────────────────
+            try:
+                conn = get_db_connection()
+                dse_row = conn.execute("SELECT value FROM sync_state WHERE key = 'daily_start_equity'").fetchone()
+                conn.close()
+                day_start = float(dse_row['value']) if dse_row else live_equity
+            except: day_start = live_equity
+                
+            daily_stop_level = day_start * (1 - self.prop_guardian.max_daily_drawdown)
+            equity_buffer_usd = max(0.0, live_equity - daily_stop_level)
+            health_report['equity_buffer_usd'] = equity_buffer_usd
             self.current_perf = health_report
             
             # 3. Biometric & Psychology Audit
@@ -802,6 +785,7 @@ class LocalScannerRunner:
                             liquidity_targets=liquidity_targets,
                             session_info=session_info,
                             security_status=self.guard.get_security_context(),
+                            psych_data={'mood': self.last_psych_state.get('sentiment', 'Unknown')}
                         )
             
             if self._cycle_count % 15 == 0:
