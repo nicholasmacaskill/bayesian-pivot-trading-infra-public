@@ -365,13 +365,13 @@ class TradeLockerClient:
 
                     for acc in accounts:
                         acc_id = acc['id']
-                        logger.info(f"🔍 RAW ACCOUNT META: {acc}")
+                        logger.debug(f"Account Discovery Meta: {acc}")
                         if acc_id in seen_account_ids:
-                            print(f"   Skipping duplicate account {acc_id} (already counted)")
+                            logger.debug(f"Skipping duplicate account {acc_id}")
                             continue
                             
                         equity = float(acc.get('projectedEquity') or acc.get('accountBalance', 0.0))
-                        print(f"   Account {acc_id}: ${equity:,.2f}")
+                        logger.debug(f"Account {acc_id}: ${equity:,.2f}")
                         total_equity += equity
                         seen_account_ids.add(acc_id)
                 else:
