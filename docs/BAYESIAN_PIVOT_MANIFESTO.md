@@ -8,7 +8,7 @@ The Bayesian Pivot system is not a retail bot. It is an automated institutional 
 ## 🛡️ CORE ICT PROTOCOLS
 The system tracks the movement of Smart Money by monitoring the interaction between Price and Time.
 
-- **Killzone Synchronization**: Operates exclusively during the **NY Session (7:00 AM - 15:00 EST)**. Outside of this window, the system is dormant to avoid low-liquidity "retail noise."
+- **Global Liquidity Synchronization**: Operates 24/7 across all ICT Killzones (Asian, London, NY AM/PM). The system dynamically adjusts its bias based on the active session's volatility and institutional intent.
 - **PO3 & Judas Swings**: Identifies **Power of 3** (Accumulation -> Manipulation -> Distribution). It specifically hunts for the **Judas Swing** (false move) that sweeps liquidity before the true trend begins.
 - **Displacement Engine**: Scans for **Fair Value Gaps (FVG)** and "Long Body" candles. A setup is only valid if it shows true institutional displacement.
 - **Bi-Directional Bias**: Leverages the **1H Timeframe** to determine the daily narrative, ensuring intraday trades align with the institutional "Large Order Flow."

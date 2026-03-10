@@ -107,6 +107,12 @@ class PropGuardian:
             "message": "Account within safe parameters."
         }
 
+        # --- Periodic Rule Sync (Every 12 Hours) ---
+        last_sync = getattr(self, '_last_sync_time', 0)
+        if time.time() - last_sync > 43200: # 12 hours
+            self._sync_dynamic_rules()
+            self._last_sync_time = time.time()
+
         try:
             conn = get_db_connection()
             c = conn.cursor()
