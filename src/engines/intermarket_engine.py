@@ -55,23 +55,37 @@ class IntermarketEngine:
     
     def calculate_cross_asset_divergence(self, btc_direction, context):
         """
-        Legacy simple trend alignment (Score-based).
+        Sovereign Mode: Session-relative weighting for intermarket confluence.
+        US Hours: Prioritize NQ/ES. 
+        Asian/London: Prioritize DXY/TNX.
         """
         if not context:
             return 0
         
+        from datetime import datetime, timezone
+        utc_hour = datetime.now(timezone.utc).hour
+        
+        # Define weights based on session
+        # US Equity Core (13:30 - 20:00 UTC)
+        is_us_equities = 13 <= utc_hour < 20
+        
+        if is_us_equities:
+             w_nq, w_dxy, w_tnx = 0.5, 0.3, 0.2
+        else:
+             w_nq, w_dxy, w_tnx = 0.1, 0.5, 0.4 # Crypto-native SMT (DXY/Yields)
+        
         score = 0
         if 'TNX' in context:
             yield_trend = context['TNX']['trend']
-            score += 0.4 if (btc_direction == 'LONG' and yield_trend == 'DOWN') or (btc_direction == 'SHORT' and yield_trend == 'UP') else 0.0
+            score += w_tnx if (btc_direction == 'LONG' and yield_trend == 'DOWN') or (btc_direction == 'SHORT' and yield_trend == 'UP') else 0.0
         
         if 'NQ' in context:
             nq_trend = context['NQ']['trend']
-            score += 0.3 if (btc_direction == 'LONG' and nq_trend == 'UP') or (btc_direction == 'SHORT' and nq_trend == 'DOWN') else 0.0
+            score += w_nq if (btc_direction == 'LONG' and nq_trend == 'UP') or (btc_direction == 'SHORT' and nq_trend == 'DOWN') else 0.0
             
         if 'DXY' in context:
             dxy_trend = context['DXY']['trend']
-            score += 0.3 if (btc_direction == 'LONG' and dxy_trend == 'DOWN') or (btc_direction == 'SHORT' and dxy_trend == 'UP') else 0.0
+            score += w_dxy if (btc_direction == 'LONG' and dxy_trend == 'DOWN') or (btc_direction == 'SHORT' and dxy_trend == 'UP') else 0.0
             
         return max(-1.0, min(1.0, score))
 

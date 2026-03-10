@@ -212,43 +212,29 @@ class SMCScanner:
         return is_high, is_low
 
     def is_killzone(self, current_time=None):
-        """Checks if current time is within any active trading session and NOT during blackout."""
+        """
+        Global Liquidity Mode: Returns True 24/7, but logs session context.
+        """
         from datetime import datetime
         now = current_time or datetime.utcnow()
         hour = now.hour
 
-        # 1. Check NY Lunch Blackout (12:00 - 13:00 EST / 17:00 - 18:00 UTC)
+        # 1. Check NY Lunch Blackout (17:00 - 18:00 UTC)
+        # In Global Liquidity Mode, we still flag it but don't hard-gate unless specified.
         lunch_start, lunch_end = Config.get('NY_LUNCH_BLACKOUT', (17, 18))
         if hour >= lunch_start and hour < lunch_end:
-            logger.debug("Killzone: NY_LUNCH_BLACKOUT")
-            return False
+            logger.debug("Sovereign Context: NY_LUNCH_BLACKOUT (Reduced Liquidity)")
+            return True # Always True in Global Mode
 
-        # 2. London Session (7 - 10 UTC)
-        lon_start, lon_end = Config.KILLZONE_LONDON
-        if lon_start <= hour < lon_end:
-            logger.debug("Killzone: LONDON")
-            return True
+        # Labeling for internal context
+        if 7 <= hour < 10:
+             logger.debug("Sovereign Context: LONDON")
+        elif 0 <= hour < 4:
+             logger.debug("Sovereign Context: ASIA")
+        elif 12 <= hour < 20:
+             logger.debug("Sovereign Context: NY_CONTINUOUS")
 
-        # 3. Asian session (0 - 4 UTC)
-        asia_start, asia_end = Config.KILLZONE_ASIA
-        if asia_start <= hour < asia_end:
-            logger.debug("Killzone: ASIA")
-            return True
-
-        # 4. Asian Fade prime window (4 - 7 UTC)
-        fade_start, fade_end = Config.KILLZONE_ASIAN_FADE
-        if fade_start <= hour < fade_end:
-            logger.debug("Killzone: ASIAN_FADE")
-            return True
-
-        # 5. NY continuous session (12 - 20 UTC)
-        ny_start, ny_end = Config.KILLZONE_NY_CONTINUOUS
-        if ny_start <= hour < ny_end:
-            logger.debug("Killzone: NY_CONTINUOUS")
-            return True
-
-        logger.debug("Killzone: CLOSED")
-        return False
+        return True
 
     def is_asian_fade_window(self, hour=None):
         """Returns True if we are in the 11 PM – 2 AM EST (4–7 AM UTC) Asian Fade prime window."""
@@ -697,6 +683,87 @@ class SMCScanner:
         
         return body_size > (atr * 1.5)
 
+    def get_displacement_metrics(self, df, direction):
+        """
+        Calculates mathematical metrics for the last candle to audit institutional displacement.
+        """
+        if df is None or len(df) < 5:
+            return {}
+            
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
+        atr = self.calculate_atr(df).iloc[-1]
+        
+        # 1. Wick-to-Body Ratio
+        body_size = abs(last['close'] - last['open'])
+        high_wick = last['high'] - max(last['close'], last['open'])
+        low_wick = min(last['close'], last['open']) - last['low']
+        
+        rejection_wick = low_wick if direction == 'LONG' else high_wick
+        wick_to_body = rejection_wick / body_size if body_size > 0 else 1.0
+        
+        # 2. Displacement Multipliers
+        disp_atr = body_size / atr if atr > 0 else 0
+        
+        # 3. Volume Z-Score (Session-Relative)
+        recent_vols = df['volume'].iloc[-20:]
+        avg_vol = recent_vols.mean()
+        std_vol = recent_vols.std()
+        
+        # Calculate Z-score: (Current - Mean) / Std
+        # This remains sensitive during low-vol Asian hours
+        vol_zscore = (last['volume'] - avg_vol) / std_vol if std_vol > 0 else 0
+        
+        return {
+            "wick_to_body_ratio": round(wick_to_body, 2),
+            "displacement_atr": round(disp_atr, 2),
+            "volume_delta": round(last['volume'] / avg_vol if avg_vol > 0 else 1.0, 2),
+            "volume_zscore": round(vol_zscore, 2),
+            "wick_rejection_atr": round(rejection_wick / atr, 2) if atr > 0 else 0
+        }
+
+    def get_technical_metadata_payload(self, df, current_quartiles=None):
+        """
+        Aggregates all detected structures (FVG, OB, Liquidity) into a visualizable payload.
+        """
+        metadata = []
+        
+        # 1. Detect FVGs (unmitigated in last 25)
+        recent = df.iloc[-25:]
+        for i in range(2, len(recent)):
+            c0 = recent.iloc[i]
+            c2 = recent.iloc[i-2]
+            
+            # Bullish FVG
+            if c2['high'] < c0['low']:
+                metadata.append({
+                    "type": "FVG",
+                    "direction": "BULLISH",
+                    "top": c0['low'],
+                    "bottom": c2['high'],
+                    "start_time": recent.index[i-2],
+                    "end_time": recent.index[i]
+                })
+            # Bearish FVG
+            elif c2['low'] > c0['high']:
+                metadata.append({
+                    "type": "FVG",
+                    "direction": "BEARISH",
+                    "top": c2['low'],
+                    "bottom": c0['high'],
+                    "start_time": recent.index[i-2],
+                    "end_time": recent.index[i]
+                })
+        
+        # 2. Liquidity Pools (PDH, PDL)
+        p_high = df['high'].iloc[-288:-1].max()
+        p_low = df['low'].iloc[-288:-1].min()
+        
+        metadata.append({"type": "LIQ_POOL", "label": "PDH", "price": p_high})
+        metadata.append({"type": "LIQ_POOL", "label": "PDL", "price": p_low})
+        
+        return metadata
+
     def detect_inducement_trap(self, df, direction):
         """
         Detects 'Retail Inducement' (minor highs/lows) swept just before reversal.
@@ -957,12 +1024,31 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         recent_low = df['low'].iloc[-288:-1].min()
 
         # TIER 1: Time Series Analysis (New Quant Layer)
-        # We want Mean Reversion (Hurst < 0.5) for "Sweeps"
         closes = df['close'].values
         hurst = self.get_hurst_exponent(closes)
         adf_p = self.get_adf_test(closes)
-        # We don't filter HARD on this yet, just log it
-        is_mean_reverting = hurst < 0.5 or adf_p < 0.05
+        
+        # --- Hurst 'Chaos' Buffer Reduction (Gate 1 Refinement) ---
+        # Capture transitions from consolidation to expansion by skipping 0.48 - 0.52
+        if 0.48 <= hurst <= 0.52:
+            logger.debug(f"Hurst Chaos Buffer: Skipping random walk ({hurst:.3f})")
+            return None
+
+        # --- Dynamic Session Calibration (Regime Override) ---
+        utc_hour = (current_time_override or datetime.utcnow()).hour
+        is_asian_london = (0 <= utc_hour < 10) or (20 <= utc_hour <= 23)
+        
+        # Asian/Late NY Mode: Prioritize Mean-Reversion (Fades)
+        if is_asian_london and hurst > 0.55:
+            logger.debug(f"Session Calibration: Skipping Expansion during Low-Vol Asian/London hours (Hurst: {hurst:.2f})")
+            return None
+            
+        # London/NY Open Mode: Prioritize Expansion (Continuations)
+        if not is_asian_london and hurst < 0.45:
+             logger.debug(f"Session Calibration: Skipping Mean-Reversion during Trending NY hours (Hurst: {hurst:.2f})")
+             return None
+
+        is_mean_reverting = hurst < 0.48 or adf_p < 0.05
 
         setup = None
         entry_type = None

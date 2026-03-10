@@ -282,6 +282,19 @@ class AIValidator:
             score += 2
             reasoning_parts.append("Valid Quartile")
         
+        # --- Sovereign Score Normalization (Global Mode) ---
+        # If markets are closed (cross_asset == 0), normalize score to 10-base
+        # Institutional Grade (>8.5) MUST be achievable via crypto-native SMT alone
+        from datetime import datetime, timezone
+        utc_hour = datetime.now(timezone.utc).hour
+        is_us_equities = 13 <= utc_hour < 20
+        
+        if not is_us_equities and abs(cross_asset) < 0.1:
+            # We are in Asian/London, Equity Markets closed.
+            # Scale score from 7-max to 10-max (approx)
+            score = (score / 7.0) * 10 if score > 0 else 0
+            reasoning_parts.append("Session Normalized (US Closed)")
+        
         # Detect regime for shadow track
         regime = self.detect_market_regime(df) if df is not None else "Unknown"
         news_context = setup.get('news_context', 'Clear')
@@ -346,6 +359,19 @@ class AIValidator:
             exchange
         )
 
+        # Detect Session for Normalization
+        from datetime import datetime, timezone
+        utc_hour = datetime.now(timezone.utc).hour
+        is_us_equities = 13 <= utc_hour < 20
+        normalization_hint = ""
+        if not is_us_equities:
+            normalization_hint = (
+                "\n### GLOBAL LIQUIDITY MODE (NON-US HOURS):\n"
+                "- US Equities (NQ/ES) are closed. Shift weighting HEAVILY to DXY and Treasury Yields.\n"
+                "- Ensure Institutional Grade (>8.5) can be achieved via Crypto-Native SMT alone.\n"
+                "- Do NOT penalize the setup for neutral NQ/ES data.\n"
+            )
+
         # DUAL-TRACK PROMPT CONSTRUCTION
         if self.sovereign_prompt:
             # Full Sovereign Version (Master Theory active)
@@ -370,6 +396,7 @@ class AIValidator:
                 threshold=Config.get('AI_THRESHOLD', 5.5),
                 memory_context=safe_memory
             ).replace("[ORACLE_RULES_PLACEHOLDER]", oracle_rules)
+            prompt += normalization_hint
         else:
             # Public Lite Version (General ICT logic)
             prompt = f"""
