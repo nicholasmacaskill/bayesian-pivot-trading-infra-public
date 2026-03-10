@@ -54,7 +54,7 @@ def test_alert():
         reasoning=ai_result["reasoning"],
         risk_calc=risk_calc
     )
-    print("✅ Test alert sent! Check your Telegram (@SovSMCbot)")
+    print("✅ Test alert sent! Check your Telegram (@bayesianpivot_bot)")
 
 if __name__ == "__main__":
     test_alert()

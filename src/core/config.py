@@ -135,3 +135,8 @@ class Config:
     @classmethod
     def get(cls, key, default=None):
         return getattr(cls, key, default)
+
+    @staticmethod
+    def get_modal_secrets():
+        import modal
+        return [modal.Secret.from_name("smc-secrets")]

@@ -64,6 +64,7 @@ PROTECTED_SESSION_DOMAINS = [
 
 SESSION_MONITOR_BROWSERS = [
     'chrome', 'brave', 'edge', 'arc', 'safari', 'firefox', 'opera', 'vivaldi',
+    'node', 'npm', 'tsx', 'chrome-headless-shell'
 ]
 
 SAFE_PROCESSES = [
@@ -72,7 +73,7 @@ SAFE_PROCESSES = [
     'PowerChime', 'loginwindow', 'distnoted', 'cfprefsd',
     'UserEventAgent', 'sharingd', 'commcenter', 'notification_center',
     'kernel_task', 'launchd', 'sysmond', 'logd', 'mdworker',
-    'python', 'python3',  # allow our own process
+    'python', 'python3', 'node', 'npm', 'tsx', 'chrome-headless-shell'
 ]
 
 # Crypto address patterns for clipper detection
@@ -418,12 +419,14 @@ class GuardEngine:
 
                     # --no-sandbox (sandboxless browser)
                     if '--no-sandbox' in cmdline and any(b in name for b in ['chrome', 'brave', 'edge']):
-                        threats.append({
-                            'type': 'SANDBOX_BYPASS',
-                            'severity': 'HIGH',
-                            'title': '⚠️ SANDBOX BYPASS DETECTED',
-                            'summary': f"`{info.get('name')}` is running without sandbox. Possible session isolation attack."
-                        })
+                        # Whitelist playwright's headless shell
+                        if 'chrome-headless-shell' not in name:
+                            threats.append({
+                                'type': 'SANDBOX_BYPASS',
+                                'severity': 'HIGH',
+                                'title': '⚠️ SANDBOX BYPASS DETECTED',
+                                'summary': f"`{info.get('name')}` is running without sandbox. Possible session isolation attack."
+                            })
 
                 except (Exception,):
                     continue
