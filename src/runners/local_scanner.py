@@ -243,7 +243,7 @@ class LocalScannerRunner:
         return "\n".join(lines)
 
     def _send_latest_scan_report(self):
-        """Sends the V3 Sovereign Briefing via Telegram on /scan."""
+        """Sends the V3 Sovereign Briefing via Telegram on /scan, followed by reasoning and regime stats."""
         try:
             utc_now    = datetime.now(timezone.utc)
             active_kz  = _get_active_killzone(utc_now.hour)
@@ -311,6 +311,7 @@ class LocalScannerRunner:
 
             # ── Market rows (with live HTF draw per symbol) ───────────────────
             market_rows = []
+            primary_symbol = "BTC/USD"
             for sym_full, data in self.scan_results.items():
                 draw_str = None
                 try:
@@ -329,8 +330,8 @@ class LocalScannerRunner:
                     'draw':   draw_str,
                 })
 
-            # ── Latest DB setup (sqlite3.Row → dict to fix .get() errors) ─────
-            latest_setup = None
+            # ── Latest DB setup reasoning ──
+            latest_setup_data = None
             try:
                 conn = get_db_connection()
                 row  = conn.execute(
@@ -339,33 +340,65 @@ class LocalScannerRunner:
                 ).fetchone()
                 conn.close()
                 if row:
-                    row = dict(row)   # ← FIX: cast sqlite3.Row → dict
+                    row = dict(row)
                     try:
                         ts = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
                         if ts.tzinfo is None: ts = ts.replace(tzinfo=timezone.utc)
                     except: ts = datetime.now(timezone.utc)
-                    latest_setup = {
+                    latest_setup_data = {
                         'symbol':  row.get('symbol', 'N/A'),
                         'pattern': row.get('formations') or row.get('pattern', 'N/A'),
                         'ai_score': row.get('ai_score', 'N/A'),
                         'regime':  row.get('shadow_regime', 'N/A'),
-                        'reasoning': row.get('ai_reasoning', ''),
+                        'reasoning': row.get('ai_reasoning', 'No reasoning available.'),
                         'mins_ago': int((datetime.now(timezone.utc) - ts).total_seconds() / 60),
+                        'smt': row.get('smt_sponsorship', 'N/A')
                     }
-            except Exception as _db_err:
-                logger.warning(f"DB latest setup error: {_db_err}")
+            except: pass
 
-            # ── Delegate rendering to V3 notifier ─────────────────────────────
+            # ── 1. SEND MAIN BRIEFING ──────────────────────────
             self.notifier.send_scan_briefing(
                 header_data      = header_data,
                 account_data     = account_data,
                 performance_data = performance_data,
                 confluence_data  = confluence_data,
                 market_rows      = market_rows,
-                latest_setup     = latest_setup,
+                latest_setup     = latest_setup_data,
             )
+
+            # ── 2. SEND STRATEGIC REASONING (Follow-up) ────────
+            if latest_setup_data:
+                reasoning_msg = (
+                    f"🧠 <b>STRATEGIC REASONING:</b>\n"
+                    f"• Setup: <code>{latest_setup_data['symbol']}</code> ({latest_setup_data['pattern']})\n"
+                    f"• AI Score: <code>{latest_setup_data['ai_score']}/10</code>\n"
+                    f"• SMT Sponsorship: <code>{latest_setup_data['smt']}</code>\n\n"
+                    f"<i>{latest_setup_data['reasoning']}</i>"
+                )
+                self.notifier._send_message(reasoning_msg)
+
+            # ── 3. SEND MARKET REGIME STATS (Follow-up) ────────
+            try:
+                # Use BTC/USD for general regime stats
+                df_hr = self.scanner.fetch_data(primary_symbol, Config.TIMEFRAME, limit=100)
+                if df_hr is not None:
+                    closes = df_hr['close'].values
+                    hurst = self.scanner.get_hurst_exponent(closes)
+                    adf_p = self.scanner.get_adf_test(closes)
+                    
+                    hurst_label = "Trending" if hurst > 0.55 else ("Mean-Reverting" if hurst < 0.45 else "Random Walk")
+                    adf_label   = "Non-Stationary" if adf_p > 0.05 else "Stationary"
+                    
+                    regime_msg = (
+                        f"🌎 <b>Market Regime Stats ({primary_symbol}):</b>\n"
+                        f"• Hurst: <code>{hurst:.2f}</code> ({hurst_label})\n"
+                        f"• ADF p-value: <code>{adf_p:.4f}</code> ({adf_label})"
+                    )
+                    self.notifier._send_message(regime_msg)
+            except: pass
+
         except Exception as e:
-            logger.error(f"V3 scan briefing failed: {e}", exc_info=True)
+            logger.error(f"High-Fidelity scan briefing failed: {e}", exc_info=True)
 
 
 
