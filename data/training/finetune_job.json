@@ -1,8 +1,0 @@
-{
-  "job_name": "sovereign-gatekeeper-20260301-1916",
-  "resource_name": "projects/1050410267846/locations/us-central1/tuningJobs/2024735183487369216",
-  "submitted_at": "2026-03-01T19:16:53.552264",
-  "training_file": "data/training/sovereign_trades.jsonl",
-  "base_model": "gemini-2.0-flash-001",
-  "status": "RUNNING"
-}
