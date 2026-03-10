@@ -69,20 +69,30 @@ class SupabaseBridge:
                 "timeframe": scan_data.get('timeframe', "5m"),
                 "pattern": scan_data['pattern'],
                 "bias": scan_data['bias'],
+                "direction": scan_data.get('direction', 'N/A'),
                 "ai_score": float(ai_result.get('score', 0.0)),
                 "ai_reasoning": ai_result.get('reasoning', ""),
                 "status": scan_data.get('status', 'PENDING'),
                 "verdict": verdict,
                 "shadow_regime": shadow_regime,
                 "shadow_multiplier": float(shadow_multiplier),
-                # --- Trade Levels (for outcome resolution + fine-tuning) ---
                 "entry": scan_data.get('entry'),
                 "stop_loss": scan_data.get('stop_loss'),
                 "target": scan_data.get('target'),
                 "r_multiple": float(scan_data.get('r_multiple', 3.0)),
-                "outcome": 'OPEN',  # Resolved later by resolve_scan_outcomes.py
+                "outcome": 'OPEN',
             }
-            self.client.table("scans").insert(data).execute()
+            try:
+                self.client.table("scans").insert(data).execute()
+            except Exception as e:
+                err_str = str(e)
+                # PGRST204: column not in schema cache — retry without new columns
+                if 'PGRST204' in err_str or 'schema cache' in err_str:
+                    logger.warning(f"Supabase schema missing new columns — retrying with base fields: {e}")
+                    safe_data = {k: v for k, v in data.items() if k not in ('direction', 'entry', 'stop_loss', 'target', 'r_multiple', 'outcome')}
+                    self.client.table("scans").insert(safe_data).execute()
+                else:
+                    raise
             return True
         except Exception as e:
             logger.error(f"Supabase Scan Sync Error: {e}")

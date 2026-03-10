@@ -29,6 +29,7 @@ def init_db():
                 timeframe TEXT,
                 pattern TEXT,
                 bias TEXT,
+                direction TEXT,
                 ai_score REAL,
                 ai_reasoning TEXT,
                 status TEXT DEFAULT 'PENDING',
@@ -57,6 +58,10 @@ def init_db():
         
         try:
             c.execute("ALTER TABLE scans ADD COLUMN shadow_multiplier REAL DEFAULT 1.0")
+        except sqlite3.OperationalError: pass
+
+        try:
+            c.execute("ALTER TABLE scans ADD COLUMN direction TEXT")
         except sqlite3.OperationalError: pass
 
         # New metadata for enriched /scan
@@ -168,17 +173,18 @@ def log_scan(scan_data, ai_result):
     
     c.execute('''
         INSERT INTO scans (
-            timestamp, symbol, timeframe, pattern, bias, 
+            timestamp, symbol, timeframe, pattern, bias, direction,
             ai_score, ai_reasoning, verdict, shadow_regime, shadow_multiplier,
             session, killzone, hurst, adf_p, daily_pnl, total_pnl, smt, formations
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         scan_data.get('timestamp', datetime.now(timezone.utc).isoformat()),
         scan_data['symbol'],
         Config.TIMEFRAME,
         scan_data['pattern'],
         scan_data['bias'],
+        scan_data.get('direction', 'N/A'),
         ai_result['score'],
         ai_result['reasoning'],
         verdict,
