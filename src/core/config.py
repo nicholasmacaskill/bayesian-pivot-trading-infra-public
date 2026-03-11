@@ -111,7 +111,8 @@ class Config:
     # Exit Parameters
     TP1_R_MULTIPLE = 2.5
     TP2_R_MULTIPLE = 4.0
-    STOP_LOSS_ATR_MULTIPLIER = 2.0
+    STOP_LOSS_ATR_MULTIPLIER = 2.5
+    ENTRY_OFFSET_ATR_MULTIPLIER = 0.5
     
     # Killzones (UTC)
     KILLZONE_ASIA = (0, 4)
