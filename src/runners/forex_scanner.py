@@ -34,7 +34,7 @@ class ForexAlphaScanner:
         print(f"\n🌍 Analyzing {symbol} Alpha Profiles...")
         
         # 1. Fetch Data
-        df_list = self.forex_data.fetch_ohlcv(symbol, timeframe='5m', limit=200)
+        df_list = self.forex_data.fetch_ohlcv(symbol, timeframe=Config.TIMEFRAME, limit=200)
         if not df_list:
             print(f"❌ Failed to fetch data for {symbol}")
             return None
@@ -62,7 +62,7 @@ class ForexAlphaScanner:
 
         # 4. SMC Pattern Check
         # We wrap the df in the format SMCScanner expects if it were coming from CCXT
-        result = self.smc.scan_pattern(symbol, timeframe="5m", provided_df=df)
+        result = self.smc.scan_pattern(symbol, timeframe=Config.TIMEFRAME, provided_df=df)
         
         if result:
             setup, _ = result

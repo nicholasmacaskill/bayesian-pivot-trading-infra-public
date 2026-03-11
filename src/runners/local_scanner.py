@@ -391,16 +391,21 @@ class LocalScannerRunner:
             )
 
             # ── 2. SEND STRATEGIC REASONING (Follow-up) ────────
+            # Only send reasoning if the setup is "Fresh" (< 15 mins) or specifically requested
             main_setup = latest_accepted or latest_rejected
-            if main_setup:
+            is_fresh = main_setup and main_setup.get('mins_ago', 99) < 15
+            
+            if main_setup and is_fresh:
                 reasoning_msg = (
-                    f"🧠 <b>STRATEGIC REASONING:</b>\n"
+                    f"🧠 <b>STRATEGIC REASONING (ACTIVE):</b>\n"
                     f"• Setup: <code>{main_setup['symbol']}</code> ({main_setup['pattern']})\n"
                     f"• AI Score: <code>{main_setup['ai_score']}/10</code>\n"
                     f"• SMT Sponsorship: <code>{main_setup['smt']}</code>\n\n"
                     f"<i>{main_setup['reasoning']}</i>"
                 )
                 self.notifier._send_message(reasoning_msg)
+            elif main_setup:
+                logger.info(f"Skipping reasoning follow-up: Stale setup detected ({main_setup.get('mins_ago')}m ago)")
 
             # ── 3. SEND MARKET REGIME STATS (Follow-up) ────────
             try:
@@ -700,7 +705,7 @@ class LocalScannerRunner:
                     'daily':     daily_bias,
                     'htf':       htf_bias,
                     'dxy_trend': dxy_trend,
-                    'smt_score': f"{market_context.get('DXY', {}).get('change_5m', 0):+.2f}%" if market_context else 'N/A',
+                    'smt_score': f"{market_context.get('DXY', {}).get('change_ltf', 0):+.2f}%" if market_context else 'N/A',
                 }
 
                 # ── Hurst Exponent + Strategy Label ───────────────────────────
@@ -743,7 +748,7 @@ class LocalScannerRunner:
                     'bias':     bias_score,
                     'regime':   'CHOP',
                     'hurst':    hurst_val,
-                    'smt':      market_context.get('DXY', {}).get('change_5m', 0) if market_context else 0.0,
+                    'smt':      market_context.get('DXY', {}).get('change_ltf', 0) if market_context else 0.0,
                     'quartile': f"Q{quartile_data['num']}: {quartile_data['phase'][:7]}",
                 }
 
@@ -817,9 +822,21 @@ class LocalScannerRunner:
 
                         # Sizing
                         calc_equity = live_equity if live_equity > 0 else 100000.0
-                        base_risk   = calc_equity * Config.RISK_PER_TRADE
-                        risk_amt    = base_risk * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
+                        
+                        # Apply Fixed Risk Hard-Cap ($500 Defensive Mode)
+                        if hasattr(Config, 'FIXED_RISK_USD') and Config.FIXED_RISK_USD > 0:
+                            base_risk = Config.FIXED_RISK_USD
+                        else:
+                            base_risk = calc_equity * Config.RISK_PER_TRADE
+                            
+                        risk_amt = base_risk * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
                         lots = round(risk_amt / abs(setup['entry'] - setup['stop_loss']), 2) if abs(setup['entry'] - setup['stop_loss']) > 0 else 0
+                        
+                        # Asset-Specific Spread & Liquidity Caps
+                        max_allowed_size = getattr(Config, 'MAX_POSITION_SIZES', {}).get(symbol)
+                        if max_allowed_size is not None and lots > max_allowed_size:
+                            logger.warning(f"⚠️ {symbol} position size ({lots}) exceeds hard cap. Capping to {max_allowed_size}.")
+                            lots = max_allowed_size
 
                         risk_calc = {
                             "entry": setup['entry'], "stop_loss": setup['stop_loss'],
@@ -861,7 +878,7 @@ class LocalScannerRunner:
                                 'session': session_info['name'],
                                 'killzone': 'ON' if self.scanner.is_killzone() else 'OFF',
                                 'hurst': hurst_val,
-                                'smt_strength': market_context.get('DXY', {}).get('change_5m', 0) if market_context else 0.0,
+                                'smt_strength': market_context.get('DXY', {}).get('change_ltf', 0) if market_context else 0.0,
                                 'daily_pnl': self.current_perf.get('daily_pnl', 0),
                                 'total_pnl': self.current_perf.get('total_pnl', 0)
                             }

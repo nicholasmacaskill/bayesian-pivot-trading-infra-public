@@ -229,9 +229,9 @@ class TelegramNotifier:
 
         confluence_block = (
             f"📐 <b>Confluence (Intermarket)</b>\n"
-            f"• DXY: <code>{dxy.get('trend','N/A')}</code> (<code>{dxy.get('change_5m',0):+.2f}%</code>)\n"
-            f"• NQ: <code>{nq.get('trend','N/A')}</code> (<code>{nq.get('change_5m',0):+.2f}%</code>)\n"
-            f"• TNX: <code>{tnx.get('trend','N/A')}</code> (<code>{tnx.get('change_5m',0):+.2f}%</code>)\n"
+            f"• DXY: <code>{dxy.get('trend','N/A')}</code> (<code>{dxy.get('change_ltf',0):+.2f}%</code>)\n"
+            f"• NQ: <code>{nq.get('trend','N/A')}</code> (<code>{nq.get('change_ltf',0):+.2f}%</code>)\n"
+            f"• TNX: <code>{tnx.get('trend','N/A')}</code> (<code>{tnx.get('change_ltf',0):+.2f}%</code>)\n"
             f"✨ Alpha: <code>{alpha_mult:.2f}x</code> — <i>{alpha_reasoning}</i>"
         )
 
