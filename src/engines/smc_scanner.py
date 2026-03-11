@@ -149,7 +149,7 @@ class SMCScanner:
             
             # Map timeframe to yfinance format
             interval_map = {'5m': '5m', '15m': '15m', '1h': '1h', '4h': '60m', '1d': '1d'} 
-            yf_interval = interval_map.get(timeframe, '5m')
+            yf_interval = interval_map.get(timeframe, '15m')
             
             # Fetch data (5 days is safe buffer for indicators)
             import yfinance as yf
@@ -260,15 +260,16 @@ class SMCScanner:
         if not self.is_asian_fade_window():
             return None  # Only fire during the prime window
 
-        df = self.fetch_data(symbol, '5m', limit=500)
+        df = self.fetch_data(symbol, Config.TIMEFRAME, limit=150)
         if df is None or len(df) < 100:
             return None
 
         try:
 
-            # Step 1: Extract Asian Range candles (00:00 – 04:00 UTC)
+            # Extract Asian Range candles (00:00 – 04:00 UTC)
             df['hour'] = df['timestamp'].dt.hour
-            asian_candles = df[df['hour'].between(0, 3)].tail(48)  # Last ~4 hours of 5m candles
+            # 4 hours = sixteen 15m candles
+            asian_candles = df[df['hour'].between(0, 3)].tail(48)
 
             if len(asian_candles) < 5:
                 logger.debug(f"Insufficient Asian candles for {symbol}")
@@ -804,16 +805,16 @@ class SMCScanner:
         mean_atr = atr.iloc[-50:].mean()  # 50-period mean
         current_atr = atr.iloc[-1]
         
-        # Calculate stop loss to determine minimum 3R target
+        # Calculate stop loss to determine dynamic minimum target
         stop_buffer = current_atr * Config.STOP_LOSS_ATR_MULTIPLIER
         if direction == 'LONG':
             stop_loss = entry_price - stop_buffer
             risk = entry_price - stop_loss
-            min_target_3r = entry_price + (3.0 * risk)
+            min_target_dynamic = entry_price + (Config.TP1_R_MULTIPLE * risk)
         else:  # SHORT
             stop_loss = entry_price + stop_buffer
             risk = stop_loss - entry_price
-            min_target_3r = entry_price - (3.0 * risk)
+            min_target_dynamic = entry_price - (Config.TP1_R_MULTIPLE * risk)
         
         # High Volatility: Expanded Targets
         if current_atr > mean_atr * 1.5:
@@ -831,13 +832,13 @@ class SMCScanner:
         else:
             target = session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg')
         
-        # CRITICAL: Enforce minimum 3R for all institutional setups
-        if direction == 'LONG' and target < min_target_3r:
-            logger.warning(f"⚠️ Target {target:.2f} < 3R floor {min_target_3r:.2f}. Using 3R minimum.")
-            return min_target_3r
-        elif direction == 'SHORT' and target > min_target_3r:
-            logger.warning(f"⚠️ Target {target:.2f} > 3R floor {min_target_3r:.2f}. Using 3R minimum.")
-            return min_target_3r
+        # CRITICAL: Enforce minimum Config target for all institutional setups
+        if direction == 'LONG' and target < min_target_dynamic:
+            logger.warning(f"⚠️ Target {target:.2f} < {Config.TP1_R_MULTIPLE}R floor {min_target_dynamic:.2f}. Using Config minimum.")
+            return min_target_dynamic
+        elif direction == 'SHORT' and target > min_target_dynamic:
+            logger.warning(f"⚠️ Target {target:.2f} > {Config.TP1_R_MULTIPLE}R floor {min_target_dynamic:.2f}. Using Config minimum.")
+            return min_target_dynamic
             
         return target
             
@@ -956,7 +957,7 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         return False
 
     @safe_scan("Scanner.scan_pattern")
-    def scan_pattern(self, symbol, timeframe='5m', cached_context=None, provided_df=None, current_time_override=None, visual_check=True):
+    def scan_pattern(self, symbol, timeframe=Config.TIMEFRAME, cached_context=None, provided_df=None, current_time_override=None, visual_check=True):
         """
         Main Scanning Function.
         Checks: Killzone -> Trend Bias -> Price Quartiles -> SMC Pattern
@@ -1016,11 +1017,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         # Current and recent data
         current = df.iloc[-1]
         
-        # Recent high/low for liquidity levels (24h Lookback - PDH/PDL)
         # 288 candles * 5m = 1440m = 24 hours
         recent_high = df['high'].iloc[-288:-1].max()
-        recent_low = df['low'].iloc[-288:-1].min()
-
         recent_low = df['low'].iloc[-288:-1].min()
 
         # TIER 1: Time Series Analysis (New Quant Layer)
@@ -1269,6 +1267,15 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         if not self.is_killzone():
             return None
 
+        # DEDUPLICATION GATE: Prevent the same symbol from firing multiple times per candle window
+        now_ts = datetime.utcnow().timestamp()
+        cache_key = symbol
+        last_fired = self._signal_cache.get(cache_key, 0)
+        cooldown_secs = self._signal_cooldown_mins * 60
+        if (now_ts - last_fired) < cooldown_secs:
+            logger.debug(f"🔇 Deduplicated order flow signal for {symbol} ({int(cooldown_secs - (now_ts - last_fired))}s left)")
+            return None
+
         # 2. BIAS CHECK (Hard Gate)
         # We reuse the detailed bias logic
         index_context = cached_context or self.intermarket.get_market_context()
@@ -1350,7 +1357,11 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             'true_smt': true_smt_type
         }
         
-        return setup, df
+        if setup:
+            # Stamp cache so this symbol is deduplicated for the next cooldown window
+            self._signal_cache[cache_key] = now_ts
+            return setup, df
+        return None
 
     def detect_mss(self, df, lookback=50):
         """

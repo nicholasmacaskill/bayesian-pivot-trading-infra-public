@@ -11,7 +11,11 @@ class Config:
     HTF_TIMEFRAME = '1h'
     
     # Risk Management
-    RISK_PER_TRADE = 0.007  # 0.7%
+    RISK_PER_TRADE = 0.007  # 0.7% (Default)
+    FIXED_RISK_USD = 500    # Defensive Mode: Hard cap at $500 per trade
+    MAX_POSITION_SIZES = {
+        "SOL/USD": 30.0  # User constraint: Spread too high for >30 SOL
+    }
     MAX_DRAWDOWN_LIMIT = 0.06  # 6% Total Account Drawdown
     DAILY_DRAWDOWN_LIMIT = 0.025 # 2.5% Daily Drawdown
     DAILY_TRADE_LIMIT = 2
@@ -108,7 +112,7 @@ class Config:
     AI_THRESHOLD = 7.0
     AI_THRESHOLD_ASIAN_FADE = 6.5
     
-    # Exit Parameters
+    # Exit Parameters (Scalp Optimized)
     TP1_R_MULTIPLE = 2.5
     TP2_R_MULTIPLE = 4.0
     STOP_LOSS_ATR_MULTIPLIER = 2.5

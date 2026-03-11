@@ -8,15 +8,22 @@
   },
   "statistics": {
     "median_monthly_roi": 21.1,
-    "mean_monthly_roi": 21.92,
-    "std_dev": 13.02,
-    "best_month": 78.74,
-    "worst_month": -6.26,
-    "prob_of_pnl_at_least_10pct": 82.62,
-    "prob_of_pnl_at_least_5pct": 89.34
+    "mean_monthly_roi": 21.95,
+    "std_dev": 12.89,
+    "best_month": 69.07,
+    "worst_month": -6.32,
+    "prob_of_pnl_at_least_10pct": 82.54,
+    "prob_of_pnl_at_least_5pct": 89.32
   },
   "risk_metrics": {
     "prob_of_daily_drawdown_breach": 0.0,
-    "prob_of_total_drawdown_breach": 15.55
+    "prob_of_total_drawdown_breach": 15.28
+  },
+  "black_swan_metrics": {
+    "iterations": 10000,
+    "mean_monthly_roi": -0.86,
+    "worst_case_month": -8.49,
+    "prob_of_daily_breaker_hit": 0.0,
+    "prob_of_monthly_breaker_hit": 17.73
   }
 }

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from src.engines.smc_scanner import SMCScanner
-from config import Config
+from src.core.config import Config
 import json
 
 class BacktestEngine:
@@ -82,69 +82,113 @@ class BacktestEngine:
             'pnl_pct': pnl_pct * 100  # Convert to percentage
         }
     
+    def calculate_atr(self, df, period=14):
+        high_low = df['high'] - df['low']
+        high_close = np.abs(df['high'] - df['close'].shift())
+        low_close = np.abs(df['low'] - df['close'].shift())
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = np.max(ranges, axis=1)
+        return true_range.rolling(period).mean()
+
+    def is_news_blackout(self, dt):
+        """Simulate news blackout window (e.g., 13:30 UTC for CPI, 18:00 UTC for FOMC, +/- 15 mins)"""
+        if dt.hour == 13 and 15 <= dt.minute <= 45: return True
+        if dt.hour == 18 and 45 <= dt.minute <= 59: return True
+        if dt.hour == 19 and 0 <= dt.minute <= 15: return True
+        return False
+
     def run_backtest(self):
         """Runs the backtest by replaying historical data."""
         df = self.fetch_historical_data()
+        df['atr'] = self.calculate_atr(df)
         
-        print(f"\n🔄 Running Skeptic's Stress Test (12 Months)...")
-        print(f"⚙️  Parameters: Win Rate 42% (FAIL) | RR 2.2 | Friction 0.15%")
+        print(f"\n🔄 Running Skeptic's Stress Test with Institutional Friction (12 Months)...")
+        print(f"⚙️  Parameters: Slippage | Vision Decay (15%) | Spread Widening | Latency")
         
         # Group by day to respect daily trade limits
         df['date'] = df['timestamp'].dt.date
+        skipped_vision_decay = 0
         
         for date, day_data in df.groupby('date'):
             trades_today = 0
             
-            # Flow Trader Frequency (Same)
+            # Flow Trader Frequency
             if np.random.random() < 0.95: 
                 num_trades = np.random.poisson(lam=2.5)
                 num_trades = max(1, min(num_trades, 5))
                 
                 for _ in range(num_trades):
+                    # Pick a random row from day_data for realistic ATR and time
+                    row = day_data.sample(1).iloc[0]
+                    trade_time = row['timestamp']
+                    current_atr = row['atr'] if not pd.isna(row['atr']) else row['close'] * 0.005
+                    entry_price = row['close']
+                    
+                    # 1. AI "Vision Decay"
+                    if np.random.random() < 0.15:
+                        skipped_vision_decay += 1
+                        continue # AI gatekeeper assigned Sovereign Score < 8.5 due to 'bad vibes'
+                        
                     pattern = 'Stress Test Entry'
                     is_bullish = np.random.random() > 0.5
                     
-                    # R:R Distribution (Same)
+                    # R:R Distribution
                     rr_ratio = np.random.gamma(shape=2.2, scale=1.0) 
                     rr_ratio = max(1.5, rr_ratio) 
                     
-                    setup = {
-                        'timestamp': day_data['timestamp'].iloc[0] + timedelta(hours=np.random.randint(8, 16)),
-                        'symbol': self.symbol,
-                        'pattern': pattern,
-                        'entry': 100000, 
-                        'stop_loss': 99000,
-                        'target': 100000 + (1000 * rr_ratio),
-                        'bias': 'BULLISH' if is_bullish else 'BEARISH'
-                    }
+                    # 2. Dynamic Slippage Model
+                    slippage_penalty = current_atr * 0.005 # 0.5% of ATR
+                    
+                    # 3. Variable Spread/Commission
+                    base_spread = 0.0008 # 0.08% round trip
+                    is_blackout = self.is_news_blackout(trade_time)
+                    if is_blackout:
+                        base_spread *= 2 # Spread Widening
+                        
+                    # 4. Execution Latency Simulation
+                    latency_penalty = 0
+                    latency_ms = 0
+                    if np.random.random() < 0.10: # 10% chance of stale price
+                        latency_ms = np.random.randint(500, 2000)
+                        # Penalty scaled by latency severity (worse slippage for high latency)
+                        latency_penalty = current_atr * (0.002 * (latency_ms / 500))
+                    
+                    # Calculate total entry wording in absolute price
+                    total_entry_penalty = slippage_penalty + latency_penalty
+                    
+                    # Convert absolute penalty to percentage impact on the trade
+                    penalty_pct = total_entry_penalty / entry_price
+                    
+                    setup_target = entry_price * (1 + (0.005 * rr_ratio)) if is_bullish else entry_price * (1 - (0.005 * rr_ratio))
+                    setup_stop = entry_price * 0.995 if is_bullish else entry_price * 1.005
                     
                     # STRESS TEST WIN RATE
-                    # We assume the AI is WRONG most of the time.
-                    # 42% Win Rate = Losing Trader standard.
                     win_prob = 0.42
                     win = np.random.random() < win_prob
                     
                     # GROSS PnL
                     gross_pnl_percent = 0.005 * rr_ratio if win else -0.005
                     
-                    # FRICTION
-                    friction_cost = 0.00085 
-                    
-                    net_pnl_percent = gross_pnl_percent - friction_cost
+                    # NET PnL = Gross - Spread - Slippage/Latency penalties
+                    net_pnl_percent = gross_pnl_percent - base_spread - penalty_pct
                     
                     trade_result = {
-                        'timestamp': setup['timestamp'],
-                        'symbol': setup['symbol'],
-                        'pattern': setup['pattern'],
-                        'entry': setup['entry'],
-                        'stop': setup['stop_loss'],
-                        'target': setup['target'],
+                        'timestamp': trade_time,
+                        'symbol': self.symbol,
+                        'pattern': pattern,
+                        'entry': entry_price,
+                        'stop': setup_stop,
+                        'target': setup_target,
                         'rr_ratio': round(rr_ratio, 2),
                         'outcome': 'WIN' if win else 'LOSS',
-                        'pnl_pct': net_pnl_percent * 100 
+                        'pnl_pct': net_pnl_percent * 100,
+                        'friction_spread': base_spread * 100,
+                        'friction_slippage_pct': penalty_pct * 100,
+                        'latency_ms': latency_ms
                     }
                     self.trades.append(trade_result)
         
+        print(f"🚫 Trades rejected by AI Vision Decay: {skipped_vision_decay}")
         return self.analyze_results()
     
     def analyze_results(self):

@@ -234,7 +234,7 @@ class ExecutionAuditEngine:
             start_dt = trade_dt - timedelta(hours=12)
             
             # Fetch from scanner
-            df = self.scanner.fetch_historical_data(symbol, timeframe='5m', limit=200) 
+            df = self.scanner.fetch_historical_data(symbol, timeframe=Config.TIMEFRAME, limit=100) 
             # Note: tl_client.get_candles might be better for exact historical point,
             # but SMCScanner.fetch_... is already normalized.
             

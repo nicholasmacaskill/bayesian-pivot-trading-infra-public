@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import logging
+from src.core.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +24,8 @@ class IntermarketEngine:
         context = {}
         try:
             for key, ticker in self.symbols.items():
-                # Fetch recent 5m data (5d period ensure we have data on weekends)
-                data = yf.download(ticker, period="5d", interval="5m", progress=False)
+                # Fetch recent LTF data (5d period ensure we have data on weekends)
+                data = yf.download(ticker, period="5d", interval=Config.TIMEFRAME, progress=False)
                 
                 if data is not None and len(data) > 2:
                     # Handle potential MultiIndex columns from yfinance
@@ -43,7 +44,7 @@ class IntermarketEngine:
                     
                     context[key] = {
                         "price": current_close,
-                        "change_5m": round(float(data['Close'].iloc[-1] - data['Close'].iloc[-2]) / data['Close'].iloc[-2] * 100, 3),
+                        "change_ltf": round(float(data['Close'].iloc[-1] - data['Close'].iloc[-2]) / data['Close'].iloc[-2] * 100, 3),
                         "trend": trend,
                         "high_1h": float(data['High'].iloc[-12:].max()),
                         "low_1h": float(data['Low'].iloc[-12:].min())
@@ -101,8 +102,8 @@ class IntermarketEngine:
             return None, 0.0
 
         try:
-            # 1. Fetch historical data for correlation (last 50 candles, 5m)
-            corr_df = yf.download(correlated_ticker, period="5d", interval="5m", progress=False)
+            # 1. Fetch historical data for correlation (last 50 candles)
+            corr_df = yf.download(correlated_ticker, period="5d", interval=Config.TIMEFRAME, progress=False)
             if corr_df is None or len(corr_df) < 20:
                 return None, 0.0
             

@@ -95,6 +95,75 @@ def run_monte_carlo(
     
     return report
 
+def run_black_swan_monte_carlo(
+    initial_balance=100000,
+    risk_per_trade=0.0075,
+    avg_loss_multiplier=1.2, # Accounting for slippage during a crash
+    daily_drawdown_limit=0.04,
+    total_drawdown_limit=0.06,
+    iterations=10000
+):
+    results = []
+    ruin_count_daily = 0
+    ruin_count_total = 0
+    
+    print("\n🦢 Executing Black Swan Subroutine...")
+    print("Simulating correlated crashes (BTC, ETH, SOL simultaneously stopping out).")
+    
+    for i in range(iterations):
+        balance = initial_balance
+        peak_balance = initial_balance
+        daily_start_balance = initial_balance
+        is_ruined = False
+        
+        # Simulate 22 days
+        days = 22
+        
+        for day in range(days):
+            daily_start_balance = balance
+            
+            # The Black Swan probability
+            if np.random.random() < 0.05: # 5% chance of a correlated crash day
+                # 3 pairs hit stop loss almost instantly with slippage
+                crash_loss = 3 * (balance * risk_per_trade * avg_loss_multiplier)
+                balance -= crash_loss
+            else:
+                # Normal day: a few trades, simulated roughly
+                balance += balance * np.random.normal(0.001, 0.005)
+                
+            if balance > peak_balance:
+                peak_balance = balance
+            
+            # Drawdown breakers
+            if (daily_start_balance - balance) / daily_start_balance >= daily_drawdown_limit:
+                ruin_count_daily += 1
+                is_ruined = True
+                break
+                
+            if (peak_balance - balance) / peak_balance >= total_drawdown_limit:
+                ruin_count_total += 1
+                is_ruined = True
+                break
+                
+        if not is_ruined:
+            monthly_return = (balance - initial_balance) / initial_balance
+            results.append(monthly_return * 100)
+        else:
+            results.append(((balance - initial_balance) / initial_balance) * 100)
+
+    results = np.array(results)
+    
+    report = {
+        "black_swan_metrics": {
+            "iterations": iterations,
+            "mean_monthly_roi": round(float(np.mean(results)), 2),
+            "worst_case_month": round(float(np.min(results)), 2),
+            "prob_of_daily_breaker_hit": round(float(ruin_count_daily / iterations * 100), 2),
+            "prob_of_monthly_breaker_hit": round(float(ruin_count_total / iterations * 100), 2)
+        }
+    }
+    return report
+
 if __name__ == "__main__":
     # Parameters from our Volume Mode backtest
     # 0.7% Risk, 42.1% Win Rate, 3.0 RR, ~60 trades (limited by daily 2)
@@ -109,6 +178,11 @@ if __name__ == "__main__":
     
     print(json.dumps(report, indent=2))
     
+    black_swan_report = run_black_swan_monte_carlo()
+    print(json.dumps(black_swan_report, indent=2))
+    
+    combined_report = {**report, **black_swan_report}
+    
     # Save to file
     with open('backtesting/monte_carlo_results.json', 'w') as f:
-        json.dump(report, f, indent=2)
+        json.dump(combined_report, f, indent=2)
