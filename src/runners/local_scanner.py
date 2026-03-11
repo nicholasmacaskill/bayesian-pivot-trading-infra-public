@@ -338,15 +338,16 @@ class LocalScannerRunner:
             try:
                 conn = get_db_connection()
                 
-                # 1. Fetch Latest Accepted (The Call)
+                # 1. Fetch Latest Setup (Any Valid Setup that isn't a Heartbeat)
                 row_acc = conn.execute(
-                    "SELECT * FROM scans WHERE verdict='ACCEPTED' AND ai_score>0 "
+                    "SELECT * FROM scans "
+                    "WHERE symbol != 'HEARTBEAT' AND verdict != 'SCAN_HEARTBEAT' "
                     "ORDER BY timestamp DESC LIMIT 1"
                 ).fetchone()
                 
-                # 2. Fetch Latest Rejected (Market Awareness)
-                row_rej = conn.execute(
-                    "SELECT * FROM scans WHERE verdict='REJECTED' AND ai_score>0 "
+                # 2. Fetch Latest Accepted (The "Live" setup if any)
+                row_live = conn.execute(
+                    "SELECT * FROM scans WHERE verdict='ACCEPTED' "
                     "ORDER BY timestamp DESC LIMIT 1"
                 ).fetchone()
                 
@@ -375,7 +376,7 @@ class LocalScannerRunner:
                     }
 
                 latest_accepted = _map_row(row_acc)
-                latest_rejected = _map_row(row_rej)
+                latest_rejected = _map_row(row_live) if row_live and (not row_acc or row_live['id'] != row_acc['id']) else None
             except Exception as db_err:
                 logger.error(f"Failed to fetch dual setups: {db_err}")
 
@@ -584,11 +585,25 @@ class LocalScannerRunner:
         
         try:
             # 1. Update Daily Start Equity (Anchor for drawdown)
+            # Re-anchor if the stored value is from a previous day/session
             live_equity = self.tl.get_total_equity()
             if live_equity > 0:
-                state = get_db_connection().execute("SELECT value FROM sync_state WHERE key = 'daily_start_equity'").fetchone()
+                conn = get_db_connection()
+                state = conn.execute("SELECT value, last_updated FROM sync_state WHERE key = 'daily_start_equity'").fetchone()
+                
+                needs_anchor = False
                 if not state:
+                    needs_anchor = True
+                else:
+                    last_updated = datetime.fromisoformat(state['last_updated'])
+                    # If last updated more than 18 hours ago, or on a different calendar day
+                    if (datetime.now() - last_updated).total_seconds() > 64800 or last_updated.day != datetime.now().day:
+                        needs_anchor = True
+                
+                if needs_anchor:
+                    logger.info(f"🔄 Re-anchoring Daily Start Equity to ${live_equity:,.2f}")
                     self.prop_guardian.update_daily_start(live_equity)
+                conn.close()
             
             # 2. Account Health & Accountability Audit
             logger.info("🛡️ Prop Guardian: Auditing Account Health...")
@@ -896,8 +911,9 @@ class LocalScannerRunner:
             if setups_found == 0:
                 btc_bias = self.scanner.get_detailed_bias("BTC/USD", index_context=market_context)
                 log_scan({'timestamp': datetime.now(timezone.utc).isoformat(), 'symbol': 'HEARTBEAT', 'pattern': 'System Active', 'bias': btc_bias, 'direction': 'NEUTRAL', 'verdict': 'SCAN_HEARTBEAT'}, {'score': 0, 'reasoning': 'Active Polling'})
-                if (time.time() - self.last_market_pulse > 14400) or ("STRONG" in btc_bias):
-                    self._send_market_pulse("BTC/USD", btc_bias)
+                # Opinionated Bias: 15-minute Market Pulse (Terminal Consciousness)
+                if (time.time() - self.last_market_pulse > 900) or ("STRONG" in btc_bias):
+                    self.scanner.log_market_pulse("BTC/USD")
                     self.last_market_pulse = time.time()
                 
         except Exception as e:

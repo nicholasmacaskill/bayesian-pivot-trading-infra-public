@@ -1,0 +1,13 @@
+🎲 Running 1000 Monte Carlo iterations...
+
+========================================
+🎲 MONTE CARLO RISK REPORT
+========================================
+Iterations:      1000
+Initial Balance: $100,000
+Mean Final:      $28,935,449
+95% Confidence:  $15,562,170 - $48,977,465
+Avg Max DD:      5.96%
+Worst Case DD:   12.25%
+Risk of Ruin:    0.00% (50% DD)
+========================================

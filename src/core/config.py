@@ -112,6 +112,12 @@ class Config:
     AI_THRESHOLD = 7.0
     AI_THRESHOLD_ASIAN_FADE = 6.5
     
+    # --- Opinionated Bias Mode ---
+    HURST_CHAOS_RANGE = (0.495, 0.505)  # Narrower buffer = more signals
+    HIGH_SENSITIVITY_MODE = True       # Relaxed Displacement (1.1x vs 1.5x)
+    BIAS_PRIORITIZE_MACRO = True       # 4H/1D EMA alignment is king
+    # -----------------------------
+    
     # Exit Parameters (Scalp Optimized)
     TP1_R_MULTIPLE = 2.5
     TP2_R_MULTIPLE = 4.0

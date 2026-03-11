@@ -4,8 +4,9 @@ from datetime import datetime
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env or .env.local
 load_dotenv()
+load_dotenv(".env.local")
 
 logger = logging.getLogger(__name__)
 
