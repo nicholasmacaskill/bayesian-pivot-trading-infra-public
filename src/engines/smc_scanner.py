@@ -1114,13 +1114,18 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                     target = self.get_next_institutional_target(df, "LONG", current['close'])
 
                 # STRATEGY: WIDE NET
+                # ATR-based Limit Offset for better entries
                 atr = self.calculate_atr(df).iloc[-1]
                 if pd.isna(atr): atr = current['close'] * 0.005
+                
+                # Bulls want to buy a dip (lower limit price)
+                limit_entry = current['close'] - (atr * Config.ENTRY_OFFSET_ATR_MULTIPLIER)
+                
                 stop_buffer = atr * Config.STOP_LOSS_ATR_MULTIPLIER
                 
                 direction = 'LONG'
-                stop_loss = current['close'] - stop_buffer
-                risk = current['close'] - stop_loss
+                stop_loss = limit_entry - stop_buffer
+                risk = limit_entry - stop_loss
                 
                 # Trinity Check
                 cross_asset_div = self.intermarket.calculate_cross_asset_divergence('LONG', index_context)
@@ -1130,10 +1135,10 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                     "symbol": symbol,
                     "pattern": f"Bullish {entry_type}",
                     "bias": bias_full,
-                    "entry": current['close'],
+                    "entry": limit_entry,
                     "stop_loss": stop_loss,
                     "target": target,
-                    'tp1': current['close'] + (risk * Config.TP1_R_MULTIPLE),
+                    'tp1': limit_entry + (risk * Config.TP1_R_MULTIPLE),
                     'direction': direction,
                     "time_quartile": time_quartile,
                     "price_quartiles": price_quartiles,
@@ -1209,11 +1214,15 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                 
                 atr = self.calculate_atr(df).iloc[-1]
                 if pd.isna(atr): atr = current['close'] * 0.005
+                
+                # Bears want to sell a pump (higher limit price)
+                limit_entry = current['close'] + (atr * Config.ENTRY_OFFSET_ATR_MULTIPLIER)
+                
                 stop_buffer = atr * Config.STOP_LOSS_ATR_MULTIPLIER
                 
                 direction = 'SHORT'
-                stop_loss = current['close'] + stop_buffer
-                risk = stop_loss - current['close']
+                stop_loss = limit_entry + stop_buffer
+                risk = stop_loss - limit_entry
                 
                 cross_asset_div = self.intermarket.calculate_cross_asset_divergence('SHORT', index_context)
                 
@@ -1221,10 +1230,10 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                     "symbol": symbol,
                     "pattern": f"Bearish {entry_type}",
                     "bias": bias_full,
-                    "entry": current['close'],
+                    "entry": limit_entry,
                     "stop_loss": stop_loss,
                     "target": target,
-                    'tp1': current['close'] - (risk * Config.TP1_R_MULTIPLE),
+                    'tp1': limit_entry - (risk * Config.TP1_R_MULTIPLE),
                     'direction': direction,
                     "time_quartile": time_quartile,
                     "price_quartiles": price_quartiles,
