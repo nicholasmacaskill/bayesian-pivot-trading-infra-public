@@ -392,3 +392,6 @@ def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A",
 
 def send_system_error(component, error):
     TelegramNotifier().send_system_error(component, error)
+
+def send_message(text, buttons=None):
+    TelegramNotifier()._send_message(text, buttons=buttons)
