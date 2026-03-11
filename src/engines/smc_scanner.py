@@ -47,6 +47,14 @@ def safe_scan(component):
         return wrapper
     return decorator
 
+def send_pulse_to_telegram(message):
+    """Bridge to send pulse updates to Telegram via individual bot or shared utility"""
+    try:
+        from src.clients.telegram_notifier import send_message
+        send_message(message)
+    except Exception as e:
+        logger.error(f"Pulse Telegram Error: {e}")
+
 class SMCScanner:
     def __init__(self):
         # Initialize public exchange for data fetching (free tier)
@@ -66,6 +74,53 @@ class SMCScanner:
         self._signal_cache = {}
         self._signal_cooldown_mins = 15  # Minimum minutes between signals for the same symbol
         self.bias_cache = {} # Protect against redundant calls
+        self.last_pulse_time = 0
+
+    def log_market_pulse(self, symbol):
+        """
+        Terminal Consciousness: Sends a periodic 'System Sentiment' update to Telegram.
+        Triggered every 15 minutes by the local runner.
+        """
+        try:
+            now = time.time()
+            # 1. Fetch Data
+            df = self.fetch_data(symbol, Config.TIMEFRAME, limit=300)
+            if df is None: return
+            
+            # 2. Extract Hurst & SMT
+            closes = df['close'].values
+            hurst = self.get_hurst_exponent(closes)
+            
+            # Identify Regime
+            regime = "CHOP / RANDOM"
+            h_low, h_high = Config.get('HURST_CHAOS_RANGE', (0.495, 0.505))
+            if hurst > h_high: regime = "EXPANSION (Momentum)"
+            elif hurst < h_low: regime = "MEAN REVERSION (Range)"
+            
+            # 3. Get Macro Bias
+            bias_full = self.get_detailed_bias(symbol)
+            
+            # 4. SMT Context
+            smt_strength = self.intermarket.get_smt_strength(symbol, df)
+            
+            # 5. Format Message
+            pulse_msg = (
+                f"🧠 *Sovereign System Sentiment* | `{symbol}`\n"
+                f"───────────────────\n"
+                f"🏛️ **Macro Bias:** {bias_full}\n"
+                f"🌀 **Hurst Regime:** {regime} ({hurst:.3f})\n"
+                f"⚡ **SMT Divergence:** {smt_strength:.2f}/1.0\n"
+                f"───────────────────\n"
+                f"🛡️ *9-Gate Funnel: ARMED & SCANNING*"
+            )
+            
+            logger.info(f"Pulse: {pulse_msg.replace('*', '').replace('`', '')}")
+            send_pulse_to_telegram(pulse_msg)
+            self.last_pulse_time = now
+            return True
+        except Exception as e:
+            logger.error(f"Error generating Market Pulse: {e}")
+            return False
 
     def get_hurst_exponent(self, time_series):
         """
@@ -396,6 +451,19 @@ class SMCScanner:
                 if not (is_strong_expansion and price_dist_20 > 0):
                     score -= 1.0
 
+        # --- Opinionated Bias: Macro Alignment Bonus ---
+        if Config.get('BIAS_PRIORITIZE_MACRO', True):
+            # If 4H and Daily EMAs are on the same page, we have a "Macro Narrative"
+            ema_bullish = latest['ema_20'] > latest['ema_50'] and latest_d['ema_20'] > latest_d['ema_50']
+            ema_bearish = latest['ema_20'] < latest['ema_50'] and latest_d['ema_20'] < latest_d['ema_50']
+            
+            if ema_bullish:
+                score += 1.0  # Extra conviction for macro long alignment
+                logger.info(f"🦁 Macro Narrative: BULLISH alignment detected for {symbol}")
+            elif ema_bearish:
+                score -= 1.0  # Extra conviction for macro short alignment
+                logger.info(f"🦁 Macro Narrative: BEARISH alignment detected for {symbol}")
+
         # 3. Intermarket (DXY Trend)
         if index_context and 'DXY' in index_context:
             dxy_trend = index_context['DXY']['trend']
@@ -682,7 +750,9 @@ class SMCScanner:
         atr = self.calculate_atr(df).iloc[-1]
         body_size = abs(last['close'] - last['open'])
         
-        return body_size > (atr * 1.5)
+        # Opinionated Bias: High Sensitivity Mode (1.1x ATR) or Standard (1.5x)
+        multiplier = 1.1 if Config.get('HIGH_SENSITIVITY_MODE', False) else 1.5
+        return body_size > (atr * multiplier)
 
     def get_displacement_metrics(self, df, direction):
         """
@@ -1027,8 +1097,9 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         adf_p = self.get_adf_test(closes)
         
         # --- Hurst 'Chaos' Buffer Reduction (Gate 1 Refinement) ---
-        # Capture transitions from consolidation to expansion by skipping 0.48 - 0.52
-        if 0.48 <= hurst <= 0.52:
+        # Opinionated Bias: Narrower range to let more moves flow through
+        hurst_low, hurst_high = Config.get('HURST_CHAOS_RANGE', (0.48, 0.52))
+        if hurst_low <= hurst <= hurst_high:
             logger.debug(f"Hurst Chaos Buffer: Skipping random walk ({hurst:.3f})")
             return None
 
@@ -1046,7 +1117,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
              logger.debug(f"Session Calibration: Skipping Mean-Reversion during Trending NY hours (Hurst: {hurst:.2f})")
              return None
 
-        is_mean_reverting = hurst < 0.48 or adf_p < 0.05
+        hurst_low_val = Config.get('HURST_CHAOS_RANGE', (0.48, 0.52))[0]
+        is_mean_reverting = hurst < hurst_low_val or adf_p < 0.05
 
         setup = None
         entry_type = None
