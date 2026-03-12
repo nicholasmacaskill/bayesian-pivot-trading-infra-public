@@ -131,19 +131,32 @@ class AIValidator:
         multiplier = 1.0
         reasoning = []
         
-        # 1. Non-linear scaling based on Gemini/Hard-Logic score
-        if score >= 9.2:
-            multiplier = 1.33  # Scale to 1.0%
-            reasoning.append("A++ Tier Setup (Score >= 9.2)")
-        elif score >= 8.5:
-            multiplier = 1.15  # Scale to ~0.86%
-            reasoning.append("A Tier Setup (Score >= 8.5)")
-        elif score >= 7.0:
-            multiplier = 1.0
-            reasoning.append("Standard Grade Setup (Score >= 7.0)")
+        # 1. 98% Standard: Staged Risk Scaling (Tiered by Trust/Score)
+        # Trust Score logic is prioritized for the final risk cap
+        trust_score = setup.get('guard_trust_score', 100) if setup else 100
+        
+        # Tiered Tiering (Task 5)
+        if trust_score >= Config.get('AI_TRUST_TIER_AGGRESSIVE', 90) and score >= 9.0:
+            multiplier = 1.33 # Scale 0.75% -> 1.0%
+            reasoning.append(f"AGGRESSIVE SNIPER: High Trust ({trust_score}) + Elite Score ({score})")
+        elif trust_score >= Config.get('AI_TRUST_TIER_CONSERVATIVE', 75):
+            multiplier = 0.67 # Scale 0.75% -> 0.5%
+            reasoning.append(f"CONSERVATIVE MODE: Trust {trust_score} (75-89 Tier)")
         else:
-            multiplier = 0.5 # Aggressive penalty for low score
-            reasoning.append("Sub-Optimal Grade (Score < 7.0) -> 50% Size")
+            multiplier = 0.0
+            reasoning.append(f"MONITOR ONLY: Trust {trust_score} below minimum reliability threshold.")
+            return {
+                "multiplier": 0.0,
+                "suggested_risk_pct": 0.0,
+                "reasoning": " | ".join(reasoning)
+            }
+
+        # 1.5. Score-based adjustments within the permitted Tier
+        if score >= 9.2:
+            multiplier *= 1.1 
+            multiplier = min(multiplier, 1.33)
+        elif score < 7.5:
+            multiplier *= 0.8
 
         # 2. Institutional Convergence (Macro + HTF OB + 5M MSS)
         # We look for a high SMT + Alignment in setup

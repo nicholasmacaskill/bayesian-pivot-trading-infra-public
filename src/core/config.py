@@ -127,6 +127,11 @@ class Config:
     TP1_RATIO = 0.5                    # 50% scale out
     BE_TRIGGER_R = 1.5                 # Move SL to entry at 1.5R
     AI_MIN_SMT_CONVERGENCE = 0.7       # Threshold for "Institutional Convergence"
+    
+    # ── Tiered Risk Scaling (Final 98% Standard) ──────────────
+    AI_TRUST_TIER_AGGRESSIVE = 90      # Score 90+ -> 1.0% Risk
+    AI_TRUST_TIER_CONSERVATIVE = 75    # Score 75-89 -> 0.5% Risk
+    AI_TRUST_TIER_MINIMUM = 75         # < 75 -> 0% Risk (Monitor)
     # ──────────────────────────────────────────────────────────
     
     # Exit Parameters (Scalp Optimized)

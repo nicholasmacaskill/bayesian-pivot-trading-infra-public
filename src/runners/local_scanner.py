@@ -818,7 +818,8 @@ class LocalScannerRunner:
                         ai_result = validate_setup(
                             setup, self.sentiment_engine.get_market_sentiment(symbol),
                             self.sentiment_engine.get_whale_confluence(),
-                            df=df, exchange=self.scanner.exchange, hurst_exponent=hurst_val
+                            df=df, exchange=self.scanner.exchange, hurst_exponent=hurst_val,
+                            guard_trust_score=self.guard.get_trust_score()
                         )
                         live = ai_result.get('live_execution', ai_result)
                         live_score = live.get('score', 0)
@@ -854,15 +855,15 @@ class LocalScannerRunner:
                         # Sizing
                         calc_equity = live_equity if live_equity > 0 else 100000.0
                         
-                        # 98% Reliability: Staged Risk Reduction
-                        trust_score = self.guard.get_trust_score()
-                        guard_risk_mult = 1.0
-                        if trust_score <= 25: guard_risk_mult = 0.0
-                        elif trust_score <= 50: guard_risk_mult = 0.25
-                        elif trust_score <= 70: guard_risk_mult = 0.5
+                        # 98% Reliability: Staged Risk Reduction (Consolidated into AIValidator)
+                        shadow = ai_result.get('shadow_optimizer', {})
+                        ai_multiplier = shadow.get('suggested_risk_multiplier', 1.0)
                         
-                        risk_amt = base_risk * regime_result.suggested_size_mult * psych_mult * self.alpha_mult * guard_risk_mult
-                        lots = round(risk_amt / abs(setup['entry'] - setup['stop_loss']), 2) if abs(setup['entry'] - setup['stop_loss']) > 0 else 0
+                        # Final Risk Calculation
+                        base_risk_pct = Config.RISK_PER_TRADE
+                        risk_amt = calc_equity * base_risk_pct * ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
+                        
+                        lots = round(risk_amt / abs(setup['entry'] - setup['stop_loss']), 4) if abs(setup['entry'] - setup['stop_loss']) > 0 else 0
                         
                         # 1. Asset-Specific Symbol Caps (from config.py) 
                         max_allowed_size = getattr(Config, 'MAX_POSITION_SIZES', {}).get(symbol)
