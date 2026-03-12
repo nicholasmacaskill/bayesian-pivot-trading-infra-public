@@ -116,7 +116,12 @@ class Config:
     HURST_CHAOS_RANGE = (0.495, 0.505)  # Narrower buffer = more signals
     HIGH_SENSITIVITY_MODE = True       # Relaxed Displacement (1.1x vs 1.5x)
     BIAS_PRIORITIZE_MACRO = True       # 4H/1D EMA alignment is king
-    # -----------------------------
+    
+    # --- High-Alpha ROI Optimization ---
+    ROI_OPTIMIZATION_ENABLED = True
+    TP1_RATIO = 0.5                    # 50% scale out
+    BE_TRIGGER_R = 1.5                 # Move SL to entry at 1.5R
+    # ---------------------------------
     
     # Exit Parameters (Scalp Optimized)
     TP1_R_MULTIPLE = 2.5
