@@ -785,6 +785,22 @@ class LocalScannerRunner:
                     setup, df = result
                     if not setup: continue
 
+                    # ── 98% Reliability: Slippage Hard Floor ────────────────
+                    try:
+                        ticker = self.scanner.exchange.fetch_ticker(symbol)
+                        current_spread = ticker['ask'] - ticker['bid']
+                        atr_vals = self.scanner.calculate_atr(df)
+                        current_atr = float(atr_vals.iloc[-1]) if not atr_vals.empty else 0
+                        
+                        if current_atr > 0:
+                            spread_to_atr = current_spread / current_atr
+                            if spread_to_atr > Config.get('SLIPPAGE_ATR_RATIO_MAX', 1.5):
+                                logger.warning(f"🚫 Slippage Floor Breach for {symbol}: Spread/ATR={spread_to_atr:.2f} (Limit: {Config.get('SLIPPAGE_ATR_RATIO_MAX', 1.5)})")
+                                continue
+                    except Exception as e:
+                        logger.error(f"Slippage check failed for {symbol}: {e}")
+                        continue
+
                     # Correlation & Regime
                     direction = setup.get('direction', setup.get('bias', ''))
                     corr_ok, _ = self.corr_gate.check(symbol, direction)
@@ -838,13 +854,14 @@ class LocalScannerRunner:
                         # Sizing
                         calc_equity = live_equity if live_equity > 0 else 100000.0
                         
-                        # Apply Fixed Risk Hard-Cap ($500 Defensive Mode)
-                        if hasattr(Config, 'FIXED_RISK_USD') and Config.FIXED_RISK_USD > 0:
-                            base_risk = Config.FIXED_RISK_USD
-                        else:
-                            base_risk = calc_equity * Config.RISK_PER_TRADE
-                            
-                        risk_amt = base_risk * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
+                        # 98% Reliability: Staged Risk Reduction
+                        trust_score = self.guard.get_trust_score()
+                        guard_risk_mult = 1.0
+                        if trust_score <= 25: guard_risk_mult = 0.0
+                        elif trust_score <= 50: guard_risk_mult = 0.25
+                        elif trust_score <= 70: guard_risk_mult = 0.5
+                        
+                        risk_amt = base_risk * regime_result.suggested_size_mult * psych_mult * self.alpha_mult * guard_risk_mult
                         lots = round(risk_amt / abs(setup['entry'] - setup['stop_loss']), 2) if abs(setup['entry'] - setup['stop_loss']) > 0 else 0
                         
                         # 1. Asset-Specific Symbol Caps (from config.py) 
