@@ -205,22 +205,22 @@ class RegimeFilter:
         reason = ""
 
         if is_chaos_zone:
-            # Task 2: Chaos Zone strict requirements
-            po3_detected = self._detect_po3_accumulation(df)
+            # 98% Standard: Chaos Zone REQUIRES confirmatory wick manipulation
+            po3_detected, po3_reason = self._detect_po3_accumulation(df)
             if not po3_detected:
                 return RegimeResult(
                     regime=Regime.CHOPPY,
                     allowed=False,
                     confidence=0.9,
-                    reason=f"CHAOS ZONE DETECTED (H={hurst:.4f}). No PO3 Accumulation found. Blocking to prevent chop losses.",
+                    reason=f"CHAOS ZONE BLOCKED: {po3_reason} (H={hurst:.4f}). High-volume wick confirmation missing.",
                     adx=adx, hurst=hurst, atr_pct=atr_pct, atr_percentile=atr_pctile, suggested_size_mult=0.0
                 )
             else:
                 regime = Regime.RANGING
                 allowed = True
                 size_mult = 0.8
-                confidence = 0.7
-                reason = f"CHAOS ZONE PO3: Valid accumulation detected within random walk (H={hurst:.4f}). Standard EMA alignment bypassed."
+                confidence = 0.8
+                reason = f"CHAOS ZONE PASSED: {po3_reason} (H={hurst:.4f})."
 
         # HIGH VOLATILITY: ATR in top 90th percentile
         elif atr_pctile >= 90:
@@ -270,31 +270,6 @@ class RegimeFilter:
             confidence = 0.4
             reason     = f"BORDERLINE REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}. Sized at 65%."
 
-    def _detect_po3_accumulation(self, df: pd.DataFrame, lookback: int = 20) -> bool:
-        """
-        PO3 (Power of 3) Filter: Identifies institutional accumulation (consolidation).
-        Institutional footprints: Price contraction + volume neutrality.
-        """
-        try:
-            recent = df.iloc[-lookback:]
-            # 1. Price Contraction (BB-style width)
-            std_dev = recent['close'].std()
-            price_avg = recent['close'].mean()
-            relative_std = std_dev / price_avg
-            
-            # 2. Volume Consistency (No massive spikes during accumulation)
-            vol_avg = recent['volume'].mean()
-            vol_std = recent['volume'].std()
-            vol_cv = vol_std / vol_avg if vol_avg > 0 else 0
-            
-            # Thresholds for 'Accumulation'
-            is_contracted = relative_std < 0.002 # 0.2% price variation
-            is_quiet_vol = vol_cv < 0.5          # Low volume variance
-            
-            return is_contracted and is_quiet_vol
-        except Exception:
-            return False
-
         result = RegimeResult(
             regime=regime,
             allowed=allowed,
@@ -310,3 +285,40 @@ class RegimeFilter:
         emoji = "✅" if allowed else "❌"
         logger.info(f"{emoji} [RegimeFilter] {symbol}: {result}")
         return result
+
+    def _detect_po3_accumulation(self, df: pd.DataFrame, lookback: int = 20) -> tuple[bool, str]:
+        """
+        PO3 (Power of 3) Filter: Identifies institutional accumulation + Manipulation/Distribution.
+        Requires detected "Manipulation" (Judas Swing) via high-volume wicks into liquidity.
+        """
+        try:
+            recent = df.iloc[-lookback:]
+            
+            # 1. Price Contraction (Accumulation Phase)
+            std_dev = recent['close'].std()
+            price_avg = recent['close'].mean()
+            relative_std = std_dev / price_avg
+            is_contracted = relative_std < 0.003
+            
+            # 2. Manipulation/Distribution (Wick Check)
+            # High-volume candle wicks into HTF Liquidity
+            last_candle = df.iloc[-1]
+            wick_size = max(last_candle['high'] - max(last_candle['open'], last_candle['close']),
+                            min(last_candle['open'], last_candle['close']) - last_candle['low'])
+            body_size = abs(last_candle['close'] - last_candle['open'])
+            vol_spike = last_candle['volume'] > df['volume'].iloc[-20:].mean() * 1.5
+            
+            # A Judas swing is often a wick > body or significant wick with vol spike
+            is_manipulation = (wick_size > body_size * 0.8) and vol_spike
+            
+            if is_contracted and is_manipulation:
+                return True, "PO3 Confirmed (Manipulation Wick + Accumulation)"
+            elif is_contracted:
+                return False, "Accumulation detected but missing Manipulation/Distribution wick"
+            else:
+                return False, "No clear Accumulation/Contraction found"
+                
+        except Exception:
+            return False, "PO3 Error"
+
+

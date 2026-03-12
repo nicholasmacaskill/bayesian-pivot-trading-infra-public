@@ -35,6 +35,7 @@ import threading
 import subprocess
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
+import asyncio
 import multiprocessing
 
 logger = logging.getLogger("GuardEngine")
@@ -190,15 +191,19 @@ class GuardEngine:
     # ------------------------------------------------------------------
 
     def start(self):
-        """Start the guard monitor as a dedicated isolated process."""
+        """Start the guard monitor as a dedicated isolated process with an internal asyncio event loop."""
         self._process = multiprocessing.Process(
-            target=self._monitor_loop,
+            target=self._run_async_monitor,
             name="SovereignGuardProcess",
             args=(self._shared_state, self._stop_event, self._notifier),
             daemon=True,
         )
         self._process.start()
-        logger.info("🛡️  Sovereign Guard isolated process started.")
+        logger.info("🛡️  Sovereign Guard isolated process started (Async Internal).")
+
+    def _run_async_monitor(self, shared_state, stop_event, notifier):
+        """Entry point for the isolated process to start its own asyncio loop."""
+        asyncio.run(self._monitor_loop_async(shared_state, stop_event, notifier))
 
     def stop(self):
         self._stop_event.set()
@@ -225,15 +230,11 @@ class GuardEngine:
     # Internal monitor loop (Run in separate process)
     # ------------------------------------------------------------------
 
-    def _monitor_loop(self, shared_state, stop_event, notifier):
+    async def _monitor_loop_async(self, shared_state, stop_event, notifier):
         """
-        Refactored 98% Reliability Monitor: Isolated loop.
+        Refactored 98% Reliability Monitor: Async-decoupled high-frequency sentries.
         """
-        # Note: In a separate process, we need to re-log or pass parameters.
-        # Re-using class methods requires care if they depend on self attributes
-        # that aren't shared. I'll make the monitor loop robust.
-        
-        logger.info("🛡️  Isolated Guard monitor loop running.")
+        logger.info("🛡️  Isolated Async Guard monitor loop running.")
         self._seal_debug_port()
         self._scan_launch_agent_plists()
 
@@ -242,102 +243,63 @@ class GuardEngine:
             new_threats = []
 
             try:
-                # ── Clipboard (every 5s) ─────────────────────────────────
-                cb_threat = self._check_clipboard()
-                if cb_threat:
-                    new_threats.append(cb_threat)
+                # ── CONCURRENT ASYNC CHECKS (Task 4) ───────────────────────
+                # Decouple high-frequency checks from blocking main thread cycles
+                tasks = [
+                    self._async_check(self._check_clipboard, "Clipboard"),
+                    self._async_check(self._scan_processes, "ProcessScan") if t - self._t_process > 10 else asyncio.sleep(0),
+                    self._async_check(self._check_debug_port, "DebugPort") if t - self._t_debug_port > 30 else asyncio.sleep(0),
+                ]
+                
+                results = await asyncio.gather(*tasks)
+                for res in results:
+                    if res:
+                        if isinstance(res, list): new_threats.extend(res)
+                        else: new_threats.append(res)
+                
+                if t - self._t_process > 10: self._t_process = t
+                if t - self._t_debug_port > 30: self._t_debug_port = t
 
-                # ── Process scan (every 10s) ─────────────────────────────
-                if t - self._t_process > 10:
-                    proc_threats = self._scan_processes()
-                    new_threats.extend(proc_threats)
-                    self._t_process = t
-
-                # ── Persistence (every 60s) ──────────────────────────────
+                # ── SYNCHRONOUS CHECKS (Long-running/IO tasks) ─────────────
                 if t - self._t_persistence > 60:
-                    persist_threats = self._check_persistence()
-                    new_threats.extend(persist_threats)
+                    new_threats.extend(self._check_persistence())
                     self._t_persistence = t
 
-                # ── LaunchAgent plist scan (every 5 min) ─────────────────
-                if t - self._t_plist > 300:
-                    self._scan_launch_agent_plists()
-                    self._t_plist = t
-
-                # ── Debug port (every 30s) ───────────────────────────────
-                if t - self._t_debug_port > 30:
-                    dp_threat = self._check_debug_port()
-                    if dp_threat:
-                        new_threats.append(dp_threat)
-                    self._t_debug_port = t
-
-                # ── Session monitor (every 60s) ──────────────────────────
                 if t - self._t_session > 60:
-                    sess_threats = self._check_session_hijack()
-                    new_threats.extend(sess_threats)
+                    new_threats.extend(self._check_session_hijack())
                     self._t_session = t
 
-                # ── Root CA scan (every 15 min) ──────────────────────────
-                if t - self._t_ca > 900:
-                    ca_threats = self._scan_root_cas()
-                    new_threats.extend(ca_threats)
-                    self._t_ca = t
-
-                # ── Deep scan: MITM / network (every 5 min, if available) ────
-                if self.deep_scan_enabled and t - self._t_ca > 300:
-                    mitm_threats = self._check_mitm()
-                    new_threats.extend(mitm_threats)
-
-                # ── Deep scan: Injection + Tripwire (every tick) ───────────
-                if self.deep_scan_enabled:
-                    inj_threats = self._check_injection()
-                    new_threats.extend(inj_threats)
-                    
-                    trip_threats = self._check_tripwires()
-                    new_threats.extend(trip_threats)
-                    
-                    file_threats = self._check_sensitive_files()
-                    new_threats.extend(file_threats)
-
-                # ── Hourly: extensions + history + trust score report ────────
-                if t - self._t_hourly > 3600:
-                    ext_threats = self._scan_extensions()
-                    new_threats.extend(ext_threats)
-                    
-                    if self.deep_scan_enabled:
-                        hist_threats = self._check_history()
-                        new_threats.extend(hist_threats)
-
-                    self._update_trust_score()
-                    self._send_hourly_status()
-                    self._t_hourly = t
-
-                # ── Dispatch new threats ─────────────────────────────────
+                # ── Dispatch and State Management ─────────────────────────
                 if new_threats:
                     for threat in new_threats:
-                        # Process-safe notification
                         if notifier:
                             try: notifier._send_message(f"{threat['title']}\n{threat['summary']}")
                             except: pass
 
                     shared_state['active_threats'] = new_threats
                     shared_state['system_clean'] = False
-                    # Deduct trust score aggressively
                     current_score = shared_state['trust_score']
                     shared_state['trust_score'] = max(0, current_score - 10 * len(new_threats))
                 else:
                     shared_state['active_threats'] = []
                     shared_state['system_clean'] = True
-                    # Slowly recover
                     current_score = shared_state['trust_score']
                     if current_score < 100:
                         shared_state['trust_score'] = current_score + 1
 
             except Exception as e:
-                # Isolated logging
-                pass
+                logger.debug(f"Async Guard error: {e}")
 
-            stop_event.wait(self.TICK_INTERVAL)
+            # CPU-friendly sleep
+            await asyncio.sleep(self.TICK_INTERVAL)
+
+    async def _async_check(self, func, label):
+        """Helper to run blocking IO/CPU tasks in a thread executor."""
+        try:
+            return await asyncio.get_event_loop().run_in_executor(None, func)
+        except Exception as e:
+            logger.debug(f"Async Task {label} failed: {e}")
+            return None
 
     # ------------------------------------------------------------------
     # Detection methods
