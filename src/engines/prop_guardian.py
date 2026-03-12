@@ -134,25 +134,39 @@ class PropGuardian:
             report['total_drawdown'] = total_dd
 
             # 2. Daily Drawdown Calculation
-            # Fetch equity at the start of the day
+            # 2a. Fetch Daily Start Equity <!-- id: 14 -->
             c.execute("SELECT value FROM sync_state WHERE key = 'daily_start_equity'")
             day_start_row = c.fetchone()
             
             if not day_start_row or float(day_start_row['value']) <= 0:
-                # CRITICAL FIX: If no anchor exists or is invalid, anchor to current equity
-                logger.warning("🛡️ PropGuardian: No valid daily anchor found. Anchoring to current equity.")
-                self.update_daily_start(current_equity)
-                day_start_equity = current_equity
-            else:
-                day_start_equity = float(day_start_row['value'])
+                logger.critical("🆘 PropGuardian: CRITICAL - No daily start anchor found! System halting to protect principal.")
+                report['status'] = "CRITICAL_MISSING_ANCHOR"
+                report['risk_multiplier'] = 0.0
+                report['message'] = "Daily anchor missing. Risk halted."
+                return report
+            
+            day_start_equity = float(day_start_row['value'])
 
-            # Guard against division by zero or nonsensical drawdown calculation
-            if day_start_equity > 0 and current_equity > 0:
-                daily_dd = (day_start_equity - current_equity) / day_start_equity
+            # 2b. Track Daily High Water Mark for Intra-Day Protection <!-- id: 15 -->
+            c.execute("SELECT value FROM sync_state WHERE key = 'daily_hwm'")
+            daily_hwm_row = c.fetchone()
+            daily_hwm = float(daily_hwm_row['value']) if daily_hwm_row else day_start_equity
+
+            if current_equity > daily_hwm:
+                daily_hwm = current_equity
+                c.execute("INSERT OR REPLACE INTO sync_state (key, value, last_updated) VALUES (?, ?, ?)", 
+                         ("daily_hwm", str(daily_hwm), datetime.now().isoformat()))
+                conn.commit()
+
+            # 2c. Drawdown Calculation (Against Start of Day OR Intra-day Peak)
+            anchor_equity = max(day_start_equity, daily_hwm)
+            
+            if anchor_equity > 0:
+                daily_dd = (anchor_equity - current_equity) / anchor_equity
             else:
                 daily_dd = 0.0
             
-            report['daily_drawdown'] = max(0, daily_dd) # Drawdown is always non-negative
+            report['daily_drawdown'] = max(0, daily_dd)
 
             # 3. Performance Stats (Last 30 days)
             thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()

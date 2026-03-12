@@ -72,7 +72,7 @@ class SMCScanner:
         # Deduplication cache: prevents firing the same signal multiple times per candle window
         # Key: (symbol, pattern_type) | Value: timestamp of last signal
         self._signal_cache = {}
-        self._signal_cooldown_mins = 15  # Minimum minutes between signals for the same symbol
+        self._signal_cooldown_mins = 60  # Increased from 15m to 60m to reduce noise <!-- id: 9 -->
         self.bias_cache = {} # Protect against redundant calls
         self.last_pulse_time = 0
 
@@ -824,12 +824,8 @@ class SMCScanner:
         atr = self.calculate_atr(df).iloc[-1]
         body_size = abs(last['close'] - last['open'])
         
-        # Priority 1: Extreme SMT confluence allows sensitive entry
-        if smt_strength > 0.7:
-             multiplier = 1.1
-        else:
-             # Priority 2: Standard/High Sensitivity toggle
-             multiplier = 1.1 if Config.get('HIGH_SENSITIVITY_MODE', False) else 1.5
+        # 3. Global Displacement Floor (1.5x ATR) <!-- id: 10 -->
+        multiplier = 1.5
              
         return body_size > (atr * multiplier)
 
@@ -1176,8 +1172,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         adf_p = self.get_adf_test(closes)
         
         # --- Hurst 'Chaos' Buffer Reduction (Gate 1 Refinement) ---
-        # Opinionated Bias: Narrower range to let more moves flow through
-        hurst_low, hurst_high = Config.get('HURST_CHAOS_RANGE', (0.48, 0.52))
+        # Update: (0.45, 0.55) must be rejected as CHOP / RANDOM <!-- id: 6 -->
+        hurst_low, hurst_high = Config.get('HURST_CHAOS_RANGE', (0.45, 0.55))
         if hurst_low <= hurst <= hurst_high:
             logger.debug(f"Hurst Chaos Buffer: Skipping random walk ({hurst:.3f})")
             return None
@@ -1190,12 +1186,12 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         has_macro_conviction = "STRONG" in bias_full
         
         # Asian/Late NY Mode: Prioritize Mean-Reversion (Fades)
-        if is_asian_london and hurst > 0.55 and not has_macro_conviction:
+        if is_asian_london and hurst > 0.55:
             logger.debug(f"Session Calibration: Skipping Expansion during Low-Vol Asian/London hours (Hurst: {hurst:.2f})")
             return None
             
         # London/NY Open Mode: Prioritize Expansion (Continuations)
-        if not is_asian_london and hurst < 0.45 and not has_macro_conviction:
+        if not is_asian_london and hurst < 0.45:
              logger.debug(f"Session Calibration: Skipping Mean-Reversion during Trending NY hours (Hurst: {hurst:.2f})")
              return None
 
@@ -1408,6 +1404,14 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
 
 
         if setup:
+            # --- Target Floor Implementation <!-- id: 8 -->
+            entry_px = setup['entry']
+            target_px = setup['target']
+            dist_pct = abs(target_px - entry_px) / entry_px
+            if dist_pct < 0.01:
+                logger.warning(f"🚫 Target Floor Breach for {symbol}: {dist_pct:.2%} (Limit: 1.0%). Rejecting.")
+                return None
+
             # Stamp cache so this symbol is deduplicated for the next cooldown window
             self._signal_cache[cache_key] = now_ts
             return setup, df
