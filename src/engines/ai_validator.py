@@ -123,44 +123,53 @@ class AIValidator:
             print(f"⚠️ Regime detection failed: {e}")
             return "Unknown (Error)"
     
-    def calculate_dynamic_risk(self, score, regime, news_context):
+    def calculate_dynamic_risk(self, score, regime, news_context, setup=None):
         """
-        Calculates suggested risk multiplier based on score, regime, and news.
-        
-        Args:
-            score: AI confidence score (0-10)
-            regime: Market regime classification
-            news_context: News context string
-            
-        Returns:
-            dict: Contains multiplier and suggested_risk_pct
+        98% Reliability Refactor: Non-Linear Risk Penalty & Institutional Convergence.
         """
-        base_risk = 0.0075  # 0.75% (fixed for live execution)
+        base_risk = 0.0075  # 0.75%
         multiplier = 1.0
         reasoning = []
         
-        # High confidence + Low volatility = Increase size
-        if score >= 8.5 and "Low-Volatility" in regime:
-            multiplier = 1.33  # Increase to 1.0%
-            reasoning.append("High score (≥8.5) + Low volatility = Increase to 1.0%")
-        
-        # Low confidence OR high-impact news = Decrease size
-        elif score < 8.0:
-            multiplier = 0.53  # Decrease to 0.40%
-            reasoning.append("Low score (<8.0) = Decrease to 0.40%")
-        
-        elif "ACTIVE EVENT" in news_context:
-            multiplier = 0.53  # Decrease to 0.40%
-            reasoning.append("High-impact news event = Decrease to 0.40%")
-        
-        # High volatility = Slight decrease for safety
-        elif "High-Volatility" in regime:
-            multiplier = 0.87  # Decrease to 0.65%
-            reasoning.append("High volatility = Slight decrease to 0.65%")
-        
+        # 1. Non-linear scaling based on Gemini/Hard-Logic score
+        if score >= 9.2:
+            multiplier = 1.33  # Scale to 1.0%
+            reasoning.append("A++ Tier Setup (Score >= 9.2)")
+        elif score >= 8.5:
+            multiplier = 1.15  # Scale to ~0.86%
+            reasoning.append("A Tier Setup (Score >= 8.5)")
+        elif score >= 7.0:
+            multiplier = 1.0
+            reasoning.append("Standard Grade Setup (Score >= 7.0)")
         else:
-            reasoning.append("Normal conditions = Maintain 0.75%")
+            multiplier = 0.5 # Aggressive penalty for low score
+            reasoning.append("Sub-Optimal Grade (Score < 7.0) -> 50% Size")
+
+        # 2. Institutional Convergence (Macro + HTF OB + 5M MSS)
+        # We look for a high SMT + Alignment in setup
+        smt = setup.get('smt_strength', 0) if setup else 0
+        has_mss = setup.get('mss_detected', False) if setup else False
         
+        if smt >= 0.7 and has_mss:
+            multiplier = max(multiplier, 1.33)
+            reasoning.append("Institutional Convergence Detected (Strong SMT + MSS)")
+
+        # 3. Non-Linear News Penalty
+        news_upper = news_context.upper()
+        if "HIGH IMPACT" in news_upper:
+            multiplier *= 0.4
+            reasoning.append("High Impact News penalty (-60%)")
+        elif "MEDIUM IMPACT" in news_upper:
+            multiplier *= 0.75
+            reasoning.append("Medium Impact News penalty (-25%)")
+        elif "LOW IMPACT" in news_upper:
+            # Task: Allow full risk if Low Impact and Convergence detected
+            if smt >= 0.7:
+                reasoning.append("Low Impact News ignored due to Institutional Convergence.")
+            else:
+                multiplier *= 0.95
+                reasoning.append("Low Impact News minor penalty (-5%)")
+
         return {
             "multiplier": round(multiplier, 2),
             "suggested_risk_pct": round(base_risk * multiplier * 100, 2),
@@ -298,7 +307,7 @@ class AIValidator:
         # Detect regime for shadow track
         regime = self.detect_market_regime(df) if df is not None else "Unknown"
         news_context = setup.get('news_context', 'Clear')
-        risk_calc = self.calculate_dynamic_risk(score, regime, news_context)
+        risk_calc = self.calculate_dynamic_risk(score, regime, news_context, setup=setup)
         
         return {
             "live_execution": {

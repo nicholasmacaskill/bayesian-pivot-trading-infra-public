@@ -174,66 +174,135 @@ class SMCScanner:
         rs = gain / loss
         return 100 - (100 / (1 + rs))
 
-    def fetch_data(self, symbol, timeframe, limit=500):
+    def _aggregate_ohlcv(self, df, timeframe='4h'):
+        """Aggregates lower timeframe data into higher timeframe bars manually."""
+        if timeframe != '4h': return df
+        if df is None or df.empty: return None
+        
+        # Ensure timestamp is index for resample
+        df_copy = df.copy().set_index('timestamp')
+        resampled = df_copy.resample('4H').agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna()
+        return resampled.reset_index()
+
+    def _check_data_synchrony(self, df_ccxt, df_yf):
         """
-        Fetches candle data.
-        Primary: CCXT (Binance) - Real-time, fast.
-        Fallback: yfinance - Robust, no IP blocking, slightly delayed.
+        Synchronized Data Buffer: Compares CCXT vs yfinance.
+        Delta > 0.05% or Latency > 2 mins results in False.
         """
-        # Try CCXT First (Real-Time)
+        if df_ccxt is None or df_yf is None or df_ccxt.empty or df_yf.empty:
+            return False
+            
+        ccxt_latest = df_ccxt.iloc[-1]
+        yf_latest = df_yf.iloc[-1]
+        
+        # 1. Price Delta Check (0.05% default)
+        price_delta = abs(ccxt_latest['close'] - yf_latest['close']) / ccxt_latest['close']
+        if price_delta > Config.get('SYNC_PRICE_DELTA_MAX', 0.0005):
+            logger.warning(f"⚖️ Data Sync Delta Breach: {price_delta:.4%}")
+            return False
+            
+        # 2. Latency Check (2 minutes default)
+        now = datetime.utcnow()
+        ccxt_ts = ccxt_latest['timestamp']
+        latency_sec = (now - ccxt_ts).total_seconds()
+        
+        if latency_sec > Config.get('SYNC_LATENCY_SEC_MAX', 120):
+            logger.warning(f"⏳ Data Sync Latency Breach: {latency_sec:.1f}s")
+            return False
+            
+        return True
+
+    def fetch_data(self, symbol, timeframe, limit=500, synchronized=True):
+        """
+        Fetches candle data with 98% Reliability Standard.
+        - Eliminates 4H proxies via manual aggregation.
+        - Synchronized Data Buffer (CCXT vs yfinance).
+        """
+        df_ccxt = None
+        
+        # ccxt_timeframe = timeframe
+        # if 'coinbase' in str(self.exchange.id).lower() and timeframe == '4h':
+        #     # Coinbase Advanced Trade does NOT support 4h. Use 1h and aggregate.
+        #     raw_ohlcv = self.exchange.fetch_ohlcv(symbol, '1h', limit=limit*4)
+        #     raw_df = pd.DataFrame(raw_ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        #     raw_df['timestamp'] = pd.to_datetime(raw_df['timestamp'], unit='ms')
+        #     df_ccxt = self._aggregate_ohlcv(raw_df, '4h')
+        # else:
+        #     try:
+        #         ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+        #         if ohlcv:
+        #             df_ccxt = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        #             df_ccxt['timestamp'] = pd.to_datetime(df_ccxt['timestamp'], unit='ms')
+        #     except Exception as e:
+        #         logger.warning(f"CCXT Fetch failed: {e}")
+
+        # Re-implementing more cleanly
         try:
-            ccxt_timeframe = timeframe
-            if 'coinbase' in str(self.exchange.id).lower() and timeframe == '4h':
-                # Coinbase Advanced Trade does NOT support 4h. Use 1h as best proxy.
-                ccxt_timeframe = '1h'
+            target_tf = timeframe
+            fetch_tf = timeframe
+            needs_agg = False
+            
+            if timeframe == '4h' and 'coinbase' in str(self.exchange.id).lower():
+                fetch_tf = '1h'
+                needs_agg = True
+                real_limit = limit * 4
+            else:
+                real_limit = limit
 
-            ohlcv = self.exchange.fetch_ohlcv(symbol, ccxt_timeframe, limit=limit)
+            ohlcv = self.exchange.fetch_ohlcv(symbol, fetch_tf, limit=real_limit)
             if ohlcv:
-                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-                return df
+                df_ccxt = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                df_ccxt['timestamp'] = pd.to_datetime(df_ccxt['timestamp'], unit='ms')
+                if needs_agg:
+                    df_ccxt = self._aggregate_ohlcv(df_ccxt, '4h')
         except Exception as e:
-            logger.warning(f"CCXT Fetch failed for {symbol} ({e}). Falling back to yfinance.")
+            logger.warning(f"CCXT Fetch failed: {e}")
 
-        # Fallback to yfinance
+        if not synchronized:
+            return df_ccxt
+
+        # Synchronize with yfinance
         try:
             # Map symbol to yfinance format (BTC/USD -> BTC-USD)
             yf_symbol = symbol.replace('/', '-') if '/' in symbol else symbol
-            # Ensure USDT is converted to USD for yfinance just in case
             if 'USDT' in yf_symbol: yf_symbol = yf_symbol.replace('USDT', 'USD')
             
-            # Map timeframe to yfinance format
-            interval_map = {'5m': '5m', '15m': '15m', '1h': '1h', '4h': '60m', '1d': '1d'} 
-            yf_interval = interval_map.get(timeframe, '15m')
+            interval_map = {'5m': '5m', '15m': '15m', '1h': '1h', '4h': '1h', '1d': '1d'} 
+            yf_interval = interval_map.get(timeframe, '1h')
             
-            # Fetch data (5 days is safe buffer for indicators)
             import yfinance as yf
-            df = yf.download(yf_symbol, period='5d', interval=yf_interval, progress=False)
+            df_yf_raw = yf.download(yf_symbol, period='5d', interval=yf_interval, progress=False)
             
-            if df is None or len(df) < 50:
-                logger.error(f"yfinance fetched insufficient data for {symbol}")
-                return None
+            if df_yf_raw is not None and not df_yf_raw.empty:
+                if isinstance(df_yf_raw.columns, pd.MultiIndex):
+                    df_yf_raw.columns = df_yf_raw.columns.get_level_values(0)
+                df_yf_raw = df_yf_raw.reset_index()
+                df_yf_raw.columns = [c.lower() for c in df_yf_raw.columns]
+                df_yf_raw.rename(columns={'date': 'timestamp', 'datetime': 'timestamp'}, inplace=True)
+                if df_yf_raw['timestamp'].dt.tz is not None:
+                    df_yf_raw['timestamp'] = df_yf_raw['timestamp'].dt.tz_localize(None)
                 
-            # Handle MultiIndex
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            # Normalize columns
-            df = df.reset_index()
-            df.columns = [c.lower() for c in df.columns]
-            df.rename(columns={'date': 'timestamp', 'datetime': 'timestamp'}, inplace=True)
-            
-            # Ensure timestamp is tz-naive for consistent comparison
-            if df['timestamp'].dt.tz is not None:
-                df['timestamp'] = df['timestamp'].dt.tz_localize(None)
-            
-            # Remove duplicate columns (Fix for ValueError: Cannot set a DataFrame with multiple columns)
-            df = df.loc[:, ~df.columns.duplicated()]
-            
-            return df
+                df_yf = df_yf_raw.loc[:, ~df_yf_raw.columns.duplicated()]
+                if timeframe == '4h':
+                    df_yf = self._aggregate_ohlcv(df_yf, '4h')
+                
+                # Perform Synchrony Check
+                if not self._check_data_synchrony(df_ccxt, df_yf):
+                    return None # HOLD state
+            else:
+                logger.warning(f"yfinance sync failed for {symbol} - holding trade.")
+                return None
         except Exception as e:
-            logger.error(f"Error fetching data via yfinance for {symbol}: {e}")
+            logger.error(f"Sync Buffer Error: {e}")
             return None
+
+        return df_ccxt
 
     def calculate_volume_cluster(self, df, lookback=20):
         """
@@ -400,13 +469,12 @@ class SMCScanner:
             logger.error(f"scan_asian_fade error for {symbol}: {e}")
             return None
 
+        return label
+
     def get_detailed_bias(self, symbol, index_context=None, visual_check=False, current_time=None):
         """
-        MULTI-FACTOR BIAS SCORING (Institutional Only):
-        1. 4H Trend (EMA 20 vs 50) - Weight 1
-        2. Daily Trend (EMA 20 vs 50) - Weight 1
-        3. Intermarket (DXY) - Weight 1
-        4. Visual (AI Vision) - Weight 1 (Optional)
+        98% Reliability Refactor: Strict Multi-Timeframe Alignment.
+        Requires 4H Bias == 1H Bias == 5M Flow for strict conviction.
         """
         cache_key = f"bias_{symbol}"
         now = current_time.timestamp() if current_time else time.time()
@@ -415,127 +483,66 @@ class SMCScanner:
         if not hasattr(self, '_bias_cache'): self._bias_cache = {}
         if symbol in self._bias_cache:
             entry = self._bias_cache[symbol]
-            # Use backtest-aware time for caching
-            cache_duration = 900 if not current_time else 1800 # 15/30 min cache
+            cache_duration = 900 if not current_time else 1800
             if (now - entry['timestamp']) < cache_duration:
                 if not visual_check or 'visual' in entry:
                     self.last_bias_score = entry['score']
                     return entry['label']
 
-        score = 0.0
-        price_dist_20 = 0.0
+        # 1. Fetch Aligned Data
+        df_4h = self.fetch_data(symbol, '4h', limit=100)
+        df_1h = self.fetch_data(symbol, '1h', limit=100)
+        df_5m = self.fetch_data(symbol, '5m', limit=100)
         
-        # 1. 4H Trend (Using 1h as proxy if needed)
-        df_4h = self.fetch_data(symbol, Config.HTF_TIMEFRAME, limit=100)
-        if df_4h is not None and len(df_4h) > 50:
-            if 'ema_20' not in df_4h.columns:
-                df_4h['ema_20'] = df_4h['close'].ewm(span=20).mean()
-                df_4h['ema_50'] = df_4h['close'].ewm(span=50).mean()
-            latest = df_4h.iloc[-1]
-            
-            if latest['ema_20'] > latest['ema_50']: score += 1.0
-            elif latest['ema_20'] < latest['ema_50']: score -= 1.0
-            
-            # Displacement Guard
-            price_dist_20 = (latest['close'] / latest['ema_20'] - 1) * 100
-            if price_dist_20 > 0.5: score += 0.5
-            elif price_dist_20 < -0.5: score -= 0.5
+        if any(d is None or d.empty for d in [df_4h, df_1h, df_5m]):
+            return "NEUTRAL (Data Gap)"
 
-        # 2. Daily Trend
-        df_1d = self.fetch_data(symbol, '1d', limit=50)
-        if df_1d is not None and len(df_1d) > 20:
-            if 'ema_20' not in df_1d.columns:
-                df_1d['ema_20'] = df_1d['close'].ewm(span=20).mean()
-                df_1d['ema_50'] = df_1d['close'].ewm(span=50).mean()
-            latest_d = df_1d.iloc[-1]
+        def get_tf_bias(df):
+            ema20 = df['close'].ewm(span=20).mean().iloc[-1]
+            ema50 = df['close'].ewm(span=50).mean().iloc[-1]
+            return 1 if ema20 > ema50 else -1
             
-            # 1D is a 'Trend Booster' in Sovereign Mode
-            if latest_d['ema_20'] > latest_d['ema_50']:
-                score += 1.0
-            elif latest_d['ema_20'] < latest_d['ema_50']:
-                score -= 1.0
-                
-            # Calibration: Only return NEUTRAL if 4H and 1D are in direct conflict
-            ema_conflict = (latest['ema_20'] > latest['ema_50'] and latest_d['ema_20'] < latest_d['ema_50']) or \
-                           (latest['ema_20'] < latest['ema_50'] and latest_d['ema_20'] > latest_d['ema_50'])
+        bias_4h = get_tf_bias(df_4h)
+        bias_1h = get_tf_bias(df_1h)
+        bias_5m = get_tf_bias(df_5m)
+        
+        # STRICT ENFORCEMENT: 4H/1H/5M Alignment
+        if not (bias_4h == bias_1h == bias_5m):
+            logger.info(f"⚖️ {symbol} Bias Conflict: 4H({bias_4h}) 1H({bias_1h}) 5M({bias_5m})")
+            return "NEUTRAL (Conflict)"
 
-            # Sovereign Mode: Narrow Hurst Buffer
-            hurst = self.get_hurst_exponent(df['close'].values)
-            
-            if 0.495 <= hurst <= 0.505:
-                # In Chaos Zone, we require 4H alignment at minimum
-                if ema_conflict: return "NEUTRAL"
-                return "BULLISH" if latest['ema_20'] > latest['ema_50'] else "BEARISH" if latest['ema_20'] < latest['ema_50'] else "NEUTRAL"
-            
-            # Outside Chaos Zone: Follow Hurst + 4H
-            if hurst > 0.5: # Trending
-                if latest['ema_20'] > latest['ema_50']: return "BULLISH"
-                if latest['ema_20'] < latest['ema_50']: return "BEARISH"
-            elif hurst < 0.5: # Mean Reverting
-                # For SMC, we usually want trending, but we'll flag bias by 4H
-                return "BULLISH" if latest['ema_20'] > latest['ema_50'] else "BEARISH"
+        score = float(bias_4h) # Base score -1 or 1
 
-            return "NEUTRAL"
-
-        # --- Opinionated Bias: Macro Alignment Bonus ---
-        if Config.get('BIAS_PRIORITIZE_MACRO', True):
-            # Ensure we have both timeframes before attempting alignment check
-            try:
-                # 'latest' and 'latest_d' must exist and have the required columns
-                ema_bullish = latest['ema_20'] > latest['ema_50'] and latest_d['ema_20'] > latest_d['ema_50']
-                ema_bearish = latest['ema_20'] < latest['ema_50'] and latest_d['ema_20'] < latest_d['ema_50']
-                
-                if ema_bullish:
-                    score += 1.0  # Extra conviction for macro long alignment
-                    logger.info(f"🦁 Macro Narrative: BULLISH alignment detected for {symbol}")
-                elif ema_bearish:
-                    score -= 1.0  # Extra conviction for macro short alignment
-                    logger.info(f"🦁 Macro Narrative: BEARISH alignment detected for {symbol}")
-            except (NameError, KeyError, UnboundLocalError):
-                # Silently skip if data is missing for either timeframe
-                pass
-
-        # 3. Intermarket (DXY Trend)
+        # 2. Intermarket (DXY)
         if index_context and 'DXY' in index_context:
             dxy_trend = index_context['DXY']['trend']
-            if dxy_trend == 'DOWN': score += 1.0
-            elif dxy_trend == 'UP': score -= 1.0
+            if dxy_trend == 'DOWN' and score > 0: score += 1.0
+            elif dxy_trend == 'UP' and score < 0: score -= 1.0
 
-        # 5. HTF Gravity Points (Order Blocks / FVGs)
+        # 3. HTF Gravity Points
         try:
             htf_pois = self.detect_htf_pois(symbol)
+            latest = df_5m.iloc[-1]
             for poi in htf_pois:
-                # If we are BULLISH but trading into a BEARISH HTF POI, penalize
                 if score > 0 and 'BEARISH' in poi['type']:
-                    # Only penalize if price is very close to the POI (within 0.5%)
                     if abs(latest['close'] - poi['level']) / poi['level'] < 0.005:
-                        score -= 1.0
-                # If we are BEARISH but trading into a BULLISH HTF POI, penalize
+                        score -= 0.5 # Soften bias near resistance
                 if score < 0 and 'BULLISH' in poi['type']:
                     if abs(latest['close'] - poi['level']) / poi['level'] < 0.005:
-                        score += 1.0
-        except Exception as e:
-            logger.error(f"HTF POI Bias Integration Error: {e}")
+                        score += 0.5
+        except Exception: pass
 
-        self.last_bias_score = score
+        label = "STRONG BULLISH" if score >= 1.5 else "BULLISH" if score > 0 else \
+                "STRONG BEARISH" if score <= -1.5 else "BEARISH" if score < 0 else "NEUTRAL"
         
-        threshold_strong = 3.0 if visual_check else 2.5
-        threshold_weak = 0.5
-        
-        label = "NEUTRAL"
-        if score >= threshold_strong: label = f"STRONG BULLISH ({score})"
-        elif score >= threshold_weak: label = f"BULLISH ({score})"
-        elif score <= -threshold_strong: label = f"STRONG BEARISH ({score})"
-        elif score <= -threshold_weak: label = f"BEARISH ({score})"
+        label_with_score = f"{label} ({score})"
         
         self._bias_cache[symbol] = {
             'timestamp': now,
             'score': score,
-            'label': label
+            'label': label_with_score
         }
-        if visual_check: self._bias_cache[symbol]['visual'] = True
-        
-        return label
+        return label_with_score
 
     def get_4h_bias(self, symbol):
         # Legacy wrapper
@@ -671,20 +678,45 @@ class SMCScanner:
         
         return fresh_pois
 
+        return fresh_pois
+
+    def _calculate_synthetic_volume_profile(self, symbol, swept_level, direction):
+        """
+        Calculates a synthetic volume profile using historical 1m/5m tick-delta.
+        Used as a high-fidelity fallback when Level 2 Order Book is unavailable.
+        Absorption = Volume / abs(Price Change). High absorption near level = Institutional interest.
+        """
+        try:
+            df = self.fetch_data(symbol, '5m', limit=50, synchronized=False)
+            if df is None or df.empty: return False
+            
+            # Detect candles near the swept level
+            # Check last 10 candles for absorption near level
+            absorption_detected = False
+            for i in range(-5, 0):
+                row = df.iloc[i]
+                proximity = abs(row['close'] - swept_level) / swept_level
+                if proximity < 0.002: # Within 0.2%
+                    price_delta = abs(row['close'] - row['open'])
+                    if price_delta == 0: price_delta = 1e-9 # Avoid div by zero
+                    absorption_coef = row['volume'] / price_delta
+                    
+                    # Threshold: Absorption must be 2x the average of previous 20 bars
+                    avg_abs = (df['volume'] / abs(df['close'].diff().abs().replace(0, 1e-9))).iloc[-25:-5].mean()
+                    if absorption_coef > avg_abs * 2.0:
+                        absorption_detected = True
+                        break
+            
+            return absorption_detected
+        except Exception:
+            return False
+
     def validate_sweep_depth(self, symbol, swept_level, direction):
         """
-        Level 2 Depth Filter: Validates that liquidity sweep had actual institutional absorption.
-        
-        Args:
-            symbol: Trading pair
-            swept_level: Price level that was swept
-            direction: 'LONG' or 'SHORT'
-        
-        Returns:
-            True if whale absorption detected, False if retail dust
+        Refactored 98% Reliability Filter: Institutional Absorption Verification.
         """
         if not self.order_book_enabled:
-            return True  # Skip filter if not supported
+            return self._calculate_synthetic_volume_profile(symbol, swept_level, direction)
         
         try:
             # Fetch order book (Level 2 depth)
@@ -718,8 +750,8 @@ class SMCScanner:
                 return total_volume >= 5.0
         
         except Exception as e:
-            logger.warning(f"Order book fetch failed: {e}. Skipping depth filter.")
-            return True  # Don't reject trade if order book unavailable
+            logger.warning(f"Order book fetch failed for {symbol}: {e}. Falling back to synthetic volume profile.")
+            return self._calculate_synthetic_volume_profile(symbol, swept_level, direction)
     
     def calculate_atr(self, df, period=14):
         """

@@ -193,6 +193,10 @@ class RegimeFilter:
         atr_pct     = (current_atr / price * 100) if price > 0 else 0.0
         atr_pctile  = self._atr_percentile(symbol, current_atr)
 
+        # ── 98% Reliability: Hurst Chaos Zone & PO3 Logic ──
+        h_min, h_max = 0.495, 0.505
+        is_chaos_zone = h_min <= hurst <= h_max
+        
         # ── Classification Logic ──
         regime: Regime
         allowed = True
@@ -200,15 +204,33 @@ class RegimeFilter:
         size_mult = 1.0
         reason = ""
 
+        if is_chaos_zone:
+            # Task 2: Chaos Zone strict requirements
+            po3_detected = self._detect_po3_accumulation(df)
+            if not po3_detected:
+                return RegimeResult(
+                    regime=Regime.CHOPPY,
+                    allowed=False,
+                    confidence=0.9,
+                    reason=f"CHAOS ZONE DETECTED (H={hurst:.4f}). No PO3 Accumulation found. Blocking to prevent chop losses.",
+                    adx=adx, hurst=hurst, atr_pct=atr_pct, atr_percentile=atr_pctile, suggested_size_mult=0.0
+                )
+            else:
+                regime = Regime.RANGING
+                allowed = True
+                size_mult = 0.8
+                confidence = 0.7
+                reason = f"CHAOS ZONE PO3: Valid accumulation detected within random walk (H={hurst:.4f}). Standard EMA alignment bypassed."
+
         # HIGH VOLATILITY: ATR in top 90th percentile
-        if atr_pctile >= 90:
+        elif atr_pctile >= 90:
             regime     = Regime.HIGH_VOL
             allowed    = True   # Allow, but with reduced size
             size_mult  = 0.5
             confidence = 0.7
             reason     = (
                 f"HIGH VOLATILITY REGIME: ATR at {atr_pctile:.0f}th percentile. "
-                f"Signal allowed but position sized at 50% to accommodate expanded stops."
+                f"Sized at 50% for safety."
             )
 
         # TRENDING: ADX high + Hurst persistent + EMA aligned
@@ -220,46 +242,58 @@ class RegimeFilter:
             else:
                 regime = Regime.TRENDING_BULL if adx > 30 else Regime.RANGING
             allowed    = True
-            size_mult  = 1.0 if adx < 35 else 1.1  # Slightly larger in strong trend
+            size_mult  = 1.0 if adx < 35 else 1.1
             confidence = min(0.95, (adx - 25) / 25 + 0.5)
-            reason     = (
-                f"TRENDING REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}, EMA={ema_al:+d}. "
-                f"Full size. Order blocks have strong follow-through in this environment."
-            )
+            reason     = f"TRENDING REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}, EMA={ema_al:+d}."
 
         # RANGING / MEAN-REVERTING: Low ADX + low Hurst
         elif adx < 22 and hurst < 0.5:
             regime     = Regime.RANGING
-            allowed    = True   # Ranging = ideal for sweeps (turtle soup)
+            allowed    = True
             size_mult  = 0.85
             confidence = 0.65
-            reason     = (
-                f"RANGING REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}. "
-                f"Mean-reverting environment — prefer liquidity sweeps / turtle soups. "
-                f"Breakout setups may fail. Size at 85%."
-            )
+            reason     = f"RANGING REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}. Ideal for Sweeps."
 
-        # CHOPPY: Low ADX + random Hurst (≈0.5) + no EMA alignment
+        # CHOPPY: Low ADX + random Hurst (≈0.5 but outside chaos narrow band)
         elif adx < 18 and 0.45 <= hurst <= 0.55 and ema_al == 0:
             regime     = Regime.CHOPPY
             allowed    = False
             size_mult  = 0.0
             confidence = 0.75
-            reason     = (
-                f"CHOPPY REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}, EMA misaligned. "
-                f"No directional edge. Signal BLOCKED. Wait for structure to clarify."
-            )
+            reason     = f"CHOPPY REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}. No edge."
 
         # BORDERLINE: Allow with reduced size
         else:
             regime     = Regime.RANGING
             allowed    = True
-            size_mult  = 0.75
+            size_mult  = 0.65
             confidence = 0.4
-            reason     = (
-                f"BORDERLINE REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}. "
-                f"Regime not well-defined. Proceeding with 75% size."
-            )
+            reason     = f"BORDERLINE REGIME: ADX={adx:.1f}, Hurst={hurst:.2f}. Sized at 65%."
+
+    def _detect_po3_accumulation(self, df: pd.DataFrame, lookback: int = 20) -> bool:
+        """
+        PO3 (Power of 3) Filter: Identifies institutional accumulation (consolidation).
+        Institutional footprints: Price contraction + volume neutrality.
+        """
+        try:
+            recent = df.iloc[-lookback:]
+            # 1. Price Contraction (BB-style width)
+            std_dev = recent['close'].std()
+            price_avg = recent['close'].mean()
+            relative_std = std_dev / price_avg
+            
+            # 2. Volume Consistency (No massive spikes during accumulation)
+            vol_avg = recent['volume'].mean()
+            vol_std = recent['volume'].std()
+            vol_cv = vol_std / vol_avg if vol_avg > 0 else 0
+            
+            # Thresholds for 'Accumulation'
+            is_contracted = relative_std < 0.002 # 0.2% price variation
+            is_quiet_vol = vol_cv < 0.5          # Low volume variance
+            
+            return is_contracted and is_quiet_vol
+        except Exception:
+            return False
 
         result = RegimeResult(
             regime=regime,

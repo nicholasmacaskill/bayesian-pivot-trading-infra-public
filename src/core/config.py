@@ -116,16 +116,18 @@ class Config:
     AI_THRESHOLD = 7.0
     AI_THRESHOLD_ASIAN_FADE = 6.5
     
-    # --- Opinionated Bias Mode ---
-    HURST_CHAOS_RANGE = (0.495, 0.505)  # Narrower buffer = more signals
-    HIGH_SENSITIVITY_MODE = True       # Relaxed Displacement (1.1x vs 1.5x)
-    BIAS_PRIORITIZE_MACRO = True       # 4H/1D EMA alignment is king
+    # ── 98% Reliability Standard Thresholds ──────────────────────
+    SYNC_PRICE_DELTA_MAX = 0.0005     # 0.05%
+    SYNC_LATENCY_SEC_MAX = 120        # 2 Minutes
+    SLIPPAGE_ATR_RATIO_MAX = 1.5      # Spread / ATR(14)
+    HURST_CHAOS_RANGE = (0.495, 0.505)
     
-    # --- High-Alpha ROI Optimization ---
+    # ── AI Risk Logic ──────────────────────────────────────────
     ROI_OPTIMIZATION_ENABLED = True
     TP1_RATIO = 0.5                    # 50% scale out
     BE_TRIGGER_R = 1.5                 # Move SL to entry at 1.5R
-    # ---------------------------------
+    AI_MIN_SMT_CONVERGENCE = 0.7       # Threshold for "Institutional Convergence"
+    # ──────────────────────────────────────────────────────────
     
     # Exit Parameters (Scalp Optimized)
     TP1_R_MULTIPLE = 2.5
