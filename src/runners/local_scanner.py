@@ -7,7 +7,19 @@ import signal
 import sys
 import os
 import fcntl
+import multiprocessing
 from datetime import datetime, timezone, timedelta
+
+# Fix ModuleNotFoundError: No module named 'src' <!-- id: 16 -->
+sys.path.append(os.getcwd())
+
+# Fix macOS Multiprocessing Pickling Error (TypeError: cannot pickle 'weakref.ReferenceType')
+if sys.platform == 'darwin':
+    try:
+        multiprocessing.set_start_method('fork', force=True)
+    except RuntimeError:
+        pass
+
 from src.core.config import Config
 from src.engines.smc_scanner import SMCScanner
 from src.engines.sentiment_engine import SentimentEngine
@@ -871,9 +883,9 @@ class LocalScannerRunner:
                             logger.warning(f"⚠️ {symbol} lot size ({lots}) exceeds symbol cap. Capping to {max_allowed_size}.")
                             lots = max_allowed_size
 
-                        # 2. Notional USD Value Cap (Sovereign Safety)
+                        # 2. Notional USD Value Cap (Sovereign Safety) <!-- id: 12 -->
                         position_value = lots * setup['entry']
-                        max_notional = getattr(Config, 'MAX_NOTIONAL_VALUE_USD', 50000.0)
+                        max_notional = getattr(Config, 'MAX_NOTIONAL_VALUE_USD', 40000.0)
                         
                         if position_value > max_notional:
                             lots = round(max_notional / setup['entry'], 2)

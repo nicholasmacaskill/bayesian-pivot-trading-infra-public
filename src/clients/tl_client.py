@@ -189,6 +189,7 @@ class TradeLockerHelper:
                 logger.warning(f"401 Unauthorized for {self.email} on positions. Re-authenticating...")
                 if self.login():
                     return self.get_open_positions()
+                return []
             else:
                  return []
         except Exception as e:

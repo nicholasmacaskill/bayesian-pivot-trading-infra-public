@@ -13,7 +13,7 @@ class Config:
     # Risk Management
     RISK_PER_TRADE = 0.007  # 0.7% (Default)
     FIXED_RISK_USD = 500.0  # Defensive Mode: Hard cap at $500 per trade
-    MAX_NOTIONAL_VALUE_USD = 50000.0  # Safe cap for notional position size
+    MAX_NOTIONAL_VALUE_USD = 40000.0  # Safe cap for notional position size <!-- id: 12 -->
     MIN_STOP_LOSS_ATR = 1.5          # Minimum stop loss distance (ATR multiplier)
     MAX_POSITION_SIZES = {
         "BTC/USD": 2.0,
@@ -120,7 +120,7 @@ class Config:
     SYNC_PRICE_DELTA_MAX = 0.0005     # 0.05%
     SYNC_LATENCY_SEC_MAX = 120        # 2 Minutes
     SLIPPAGE_ATR_RATIO_MAX = 1.5      # Spread / ATR(14)
-    HURST_CHAOS_RANGE = (0.495, 0.505)
+    HURST_CHAOS_RANGE = (0.45, 0.55)  # Re-enforced: must be rejected as CHOP / RANDOM <!-- id: 6 -->
     
     # ── AI Risk Logic ──────────────────────────────────────────
     ROI_OPTIMIZATION_ENABLED = True

@@ -172,6 +172,11 @@ class IntermarketEngine:
             logger.error(f"Error in detect_true_smt: {e}")
             return None, 0.0
 
+    def get_smt_strength(self, symbol, btc_df):
+        """Wrapper for Pulse compatibility."""
+        _, strength = self.detect_true_smt(btc_df)
+        return strength
+
 if __name__ == "__main__":
     engine = IntermarketEngine()
     print("Market Context:", engine.get_market_context())
