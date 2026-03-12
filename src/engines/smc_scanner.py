@@ -368,7 +368,9 @@ class SMCScanner:
             entry = last['close']
             atr = self.calculate_atr(df).iloc[-1]
 
-            stop_loss = (asian_high + atr * 0.5) if direction == "SHORT" else (asian_low - atr * 0.5)
+            # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR)
+            sl_buffer = max(atr * 0.5, atr * Config.get('MIN_STOP_LOSS_ATR', 1.5))
+            stop_loss = (asian_high + sl_buffer) if direction == "SHORT" else (asian_low - sl_buffer)
             target = entry - (abs(entry - stop_loss) * 3.0) if direction == "SHORT" else entry + (abs(stop_loss - entry) * 3.0)
 
             setup = {
@@ -1229,7 +1231,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                 # Bulls want to buy a dip (lower limit price)
                 limit_entry = current['close'] - (atr * Config.ENTRY_OFFSET_ATR_MULTIPLIER)
                 
-                stop_buffer = atr * Config.STOP_LOSS_ATR_MULTIPLIER
+                # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR)
+                stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 1.5))
                 
                 direction = 'LONG'
                 stop_loss = limit_entry - stop_buffer
@@ -1326,7 +1329,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                 # Bears want to sell a pump (higher limit price)
                 limit_entry = current['close'] + (atr * Config.ENTRY_OFFSET_ATR_MULTIPLIER)
                 
-                stop_buffer = atr * Config.STOP_LOSS_ATR_MULTIPLIER
+                # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR)
+                stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 1.5))
                 
                 direction = 'SHORT'
                 stop_loss = limit_entry + stop_buffer

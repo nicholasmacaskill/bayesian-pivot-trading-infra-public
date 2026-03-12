@@ -847,16 +847,29 @@ class LocalScannerRunner:
                         risk_amt = base_risk * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
                         lots = round(risk_amt / abs(setup['entry'] - setup['stop_loss']), 2) if abs(setup['entry'] - setup['stop_loss']) > 0 else 0
                         
-                        # Asset-Specific Spread & Liquidity Caps
+                        # 1. Asset-Specific Symbol Caps (from config.py) 
                         max_allowed_size = getattr(Config, 'MAX_POSITION_SIZES', {}).get(symbol)
                         if max_allowed_size is not None and lots > max_allowed_size:
-                            logger.warning(f"⚠️ {symbol} position size ({lots}) exceeds hard cap. Capping to {max_allowed_size}.")
+                            logger.warning(f"⚠️ {symbol} lot size ({lots}) exceeds symbol cap. Capping to {max_allowed_size}.")
                             lots = max_allowed_size
 
+                        # 2. Notional USD Value Cap (Sovereign Safety)
+                        position_value = lots * setup['entry']
+                        max_notional = getattr(Config, 'MAX_NOTIONAL_VALUE_USD', 50000.0)
+                        
+                        if position_value > max_notional:
+                            lots = round(max_notional / setup['entry'], 2)
+                            position_value = lots * setup['entry']
+                            logger.warning(f"🛡️ {symbol} exceeds Notional Cap (${max_notional:,}). Capping to {lots} lots (${position_value:,.2f}).")
+
                         risk_calc = {
-                            "entry": setup['entry'], "stop_loss": setup['stop_loss'],
-                            "position_size": lots, "regime_mult": regime_result.suggested_size_mult,
-                            "psych_mult": psych_mult, "alpha_mult": self.alpha_mult
+                            "entry": setup['entry'], 
+                            "stop_loss": setup['stop_loss'],
+                            "position_size": lots, 
+                            "position_value": position_value,
+                            "regime_mult": regime_result.suggested_size_mult,
+                            "psych_mult": psych_mult, 
+                            "alpha_mult": self.alpha_mult
                         }
 
                         signal_id = self.ledger.sign_signal(setup, live_score) if self.ledger else "UNSIGNED"

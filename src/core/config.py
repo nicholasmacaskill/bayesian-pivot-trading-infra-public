@@ -12,9 +12,13 @@ class Config:
     
     # Risk Management
     RISK_PER_TRADE = 0.007  # 0.7% (Default)
-    FIXED_RISK_USD = 500    # Defensive Mode: Hard cap at $500 per trade
+    FIXED_RISK_USD = 500.0  # Defensive Mode: Hard cap at $500 per trade
+    MAX_NOTIONAL_VALUE_USD = 50000.0  # Safe cap for notional position size
+    MIN_STOP_LOSS_ATR = 1.5          # Minimum stop loss distance (ATR multiplier)
     MAX_POSITION_SIZES = {
-        "SOL/USD": 30.0  # User constraint: Spread too high for >30 SOL
+        "BTC/USD": 2.0,
+        "ETH/USD": 30.0,
+        "SOL/USD": 100.0
     }
     MAX_DRAWDOWN_LIMIT = 0.06  # 6% Total Account Drawdown
     DAILY_DRAWDOWN_LIMIT = 0.025 # 2.5% Daily Drawdown
