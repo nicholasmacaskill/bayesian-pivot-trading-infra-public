@@ -109,12 +109,16 @@ class TelegramNotifier:
             entry = risk_calc.get('entry', 0)
             sl    = risk_calc.get('stop_loss', 0)
             lots  = risk_calc.get('position_size', 0)
+            pos_val = risk_calc.get('position_value', 0)
             tp    = risk_calc.get('take_profit', 'OPEN')
             tp_str = f"${tp:,.4f}" if isinstance(tp, (int, float)) else str(tp)
+            
+            val_str = f" | Position Value: <code>${pos_val:,.2f}</code>" if pos_val > 0 else ""
+            
             exec_block = (
                 f"\n💷 <b>EXECUTION</b>\n"
                 f"• Entry: <code>${entry:,.4f}</code> | SL: <code>${sl:,.4f}</code> | TP: <code>{tp_str}</code>\n"
-                f"• Lots: <code>{lots}</code>"
+                f"• Position Size: <code>{lots}</code>{val_str}"
             )
 
         # ── 7. AGENT-READABLE JSON SPOILER ────────────────────────────────────
