@@ -398,7 +398,7 @@ class SMCScanner:
             logger.error(f"scan_asian_fade error for {symbol}: {e}")
             return None
 
-    def get_detailed_bias(self, symbol, index_context=None, visual_check=False):
+    def get_detailed_bias(self, symbol, index_context=None, visual_check=False, current_time=None):
         """
         MULTI-FACTOR BIAS SCORING (Institutional Only):
         1. 4H Trend (EMA 20 vs 50) - Weight 1
@@ -407,13 +407,15 @@ class SMCScanner:
         4. Visual (AI Vision) - Weight 1 (Optional)
         """
         cache_key = f"bias_{symbol}"
-        now = time.time()
+        now = current_time.timestamp() if current_time else time.time()
         
         # 0. Check Bias Cache
         if not hasattr(self, '_bias_cache'): self._bias_cache = {}
         if symbol in self._bias_cache:
             entry = self._bias_cache[symbol]
-            if (now - entry['timestamp']) < 900: # 15 minute cache
+            # Use backtest-aware time for caching
+            cache_duration = 900 if not current_time else 1800 # 15/30 min cache
+            if (now - entry['timestamp']) < cache_duration:
                 if not visual_check or 'visual' in entry:
                     self.last_bias_score = entry['score']
                     return entry['label']
@@ -424,8 +426,9 @@ class SMCScanner:
         # 1. 4H Trend (Using 1h as proxy if needed)
         df_4h = self.fetch_data(symbol, Config.HTF_TIMEFRAME, limit=100)
         if df_4h is not None and len(df_4h) > 50:
-            df_4h['ema_20'] = df_4h['close'].ewm(span=20).mean()
-            df_4h['ema_50'] = df_4h['close'].ewm(span=50).mean()
+            if 'ema_20' not in df_4h.columns:
+                df_4h['ema_20'] = df_4h['close'].ewm(span=20).mean()
+                df_4h['ema_50'] = df_4h['close'].ewm(span=50).mean()
             latest = df_4h.iloc[-1]
             
             if latest['ema_20'] > latest['ema_50']: score += 1.0
@@ -439,30 +442,56 @@ class SMCScanner:
         # 2. Daily Trend
         df_1d = self.fetch_data(symbol, '1d', limit=50)
         if df_1d is not None and len(df_1d) > 20:
-            df_1d['ema_20'] = df_1d['close'].ewm(span=20).mean()
-            df_1d['ema_50'] = df_1d['close'].ewm(span=50).mean()
+            if 'ema_20' not in df_1d.columns:
+                df_1d['ema_20'] = df_1d['close'].ewm(span=20).mean()
+                df_1d['ema_50'] = df_1d['close'].ewm(span=50).mean()
             latest_d = df_1d.iloc[-1]
             
-            is_strong_expansion = abs(price_dist_20) > 0.5
-            
+            # 1D is a 'Trend Booster' in Sovereign Mode
             if latest_d['ema_20'] > latest_d['ema_50']:
                 score += 1.0
             elif latest_d['ema_20'] < latest_d['ema_50']:
-                if not (is_strong_expansion and price_dist_20 > 0):
-                    score -= 1.0
+                score -= 1.0
+                
+            # Calibration: Only return NEUTRAL if 4H and 1D are in direct conflict
+            ema_conflict = (latest['ema_20'] > latest['ema_50'] and latest_d['ema_20'] < latest_d['ema_50']) or \
+                           (latest['ema_20'] < latest['ema_50'] and latest_d['ema_20'] > latest_d['ema_50'])
+
+            # Sovereign Mode: Narrow Hurst Buffer
+            hurst = self.get_hurst_exponent(df['close'].values)
+            
+            if 0.495 <= hurst <= 0.505:
+                # In Chaos Zone, we require 4H alignment at minimum
+                if ema_conflict: return "NEUTRAL"
+                return "BULLISH" if latest['ema_20'] > latest['ema_50'] else "BEARISH" if latest['ema_20'] < latest['ema_50'] else "NEUTRAL"
+            
+            # Outside Chaos Zone: Follow Hurst + 4H
+            if hurst > 0.5: # Trending
+                if latest['ema_20'] > latest['ema_50']: return "BULLISH"
+                if latest['ema_20'] < latest['ema_50']: return "BEARISH"
+            elif hurst < 0.5: # Mean Reverting
+                # For SMC, we usually want trending, but we'll flag bias by 4H
+                return "BULLISH" if latest['ema_20'] > latest['ema_50'] else "BEARISH"
+
+            return "NEUTRAL"
 
         # --- Opinionated Bias: Macro Alignment Bonus ---
         if Config.get('BIAS_PRIORITIZE_MACRO', True):
-            # If 4H and Daily EMAs are on the same page, we have a "Macro Narrative"
-            ema_bullish = latest['ema_20'] > latest['ema_50'] and latest_d['ema_20'] > latest_d['ema_50']
-            ema_bearish = latest['ema_20'] < latest['ema_50'] and latest_d['ema_20'] < latest_d['ema_50']
-            
-            if ema_bullish:
-                score += 1.0  # Extra conviction for macro long alignment
-                logger.info(f"🦁 Macro Narrative: BULLISH alignment detected for {symbol}")
-            elif ema_bearish:
-                score -= 1.0  # Extra conviction for macro short alignment
-                logger.info(f"🦁 Macro Narrative: BEARISH alignment detected for {symbol}")
+            # Ensure we have both timeframes before attempting alignment check
+            try:
+                # 'latest' and 'latest_d' must exist and have the required columns
+                ema_bullish = latest['ema_20'] > latest['ema_50'] and latest_d['ema_20'] > latest_d['ema_50']
+                ema_bearish = latest['ema_20'] < latest['ema_50'] and latest_d['ema_20'] < latest_d['ema_50']
+                
+                if ema_bullish:
+                    score += 1.0  # Extra conviction for macro long alignment
+                    logger.info(f"🦁 Macro Narrative: BULLISH alignment detected for {symbol}")
+                elif ema_bearish:
+                    score -= 1.0  # Extra conviction for macro short alignment
+                    logger.info(f"🦁 Macro Narrative: BEARISH alignment detected for {symbol}")
+            except (NameError, KeyError, UnboundLocalError):
+                # Silently skip if data is missing for either timeframe
+                pass
 
         # 3. Intermarket (DXY Trend)
         if index_context and 'DXY' in index_context:
@@ -741,17 +770,23 @@ class SMCScanner:
         if mss_bearish: return 'BEARISH'
         return None
 
-    def is_displaced_move(self, df, direction):
+    def is_displaced_move(self, df, direction, smt_strength=0.0):
         """
         Confirms institutional participation via high-momentum candle (Displacement).
         Body > 1.5 * ATR.
+        Alpha-Weighted: If SMT Strength > 0.7, allow 1.1x sensitivity.
         """
         last = df.iloc[-1]
         atr = self.calculate_atr(df).iloc[-1]
         body_size = abs(last['close'] - last['open'])
         
-        # Opinionated Bias: High Sensitivity Mode (1.1x ATR) or Standard (1.5x)
-        multiplier = 1.1 if Config.get('HIGH_SENSITIVITY_MODE', False) else 1.5
+        # Priority 1: Extreme SMT confluence allows sensitive entry
+        if smt_strength > 0.7:
+             multiplier = 1.1
+        else:
+             # Priority 2: Standard/High Sensitivity toggle
+             multiplier = 1.1 if Config.get('HIGH_SENSITIVITY_MODE', False) else 1.5
+             
         return body_size > (atr * multiplier)
 
     def get_displacement_metrics(self, df, direction):
@@ -1068,7 +1103,7 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             
         # 4. HARD GATE: Bias (HTF 4H + Daily + Intermarket + Visual)
         # We pass visual_check as per parameter (default True)
-        bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=visual_check)
+        bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=visual_check, current_time=current_time_override)
         if "STRONG" in bias_full:
             logger.info(f"💪 STRONG BIAS DETECTED: {bias_full}")
         
@@ -1107,13 +1142,16 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         utc_hour = (current_time_override or datetime.utcnow()).hour
         is_asian_london = (0 <= utc_hour < 10) or (20 <= utc_hour <= 23)
         
+        # Opinionated Bias Bonus: If we have strong macro narrative, bypass session/hurst mismatch filters
+        has_macro_conviction = "STRONG" in bias_full
+        
         # Asian/Late NY Mode: Prioritize Mean-Reversion (Fades)
-        if is_asian_london and hurst > 0.55:
+        if is_asian_london and hurst > 0.55 and not has_macro_conviction:
             logger.debug(f"Session Calibration: Skipping Expansion during Low-Vol Asian/London hours (Hurst: {hurst:.2f})")
             return None
             
         # London/NY Open Mode: Prioritize Expansion (Continuations)
-        if not is_asian_london and hurst < 0.45:
+        if not is_asian_london and hurst < 0.45 and not has_macro_conviction:
              logger.debug(f"Session Calibration: Skipping Mean-Reversion during Trending NY hours (Hurst: {hurst:.2f})")
              return None
 
@@ -1366,9 +1404,11 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         
         current = df.iloc[-1]
         
-        # 3. Detect Market Structure Shift (MSS)
-        # Look back 50 candles for a pivot break with displacement
-        mss_setup = self.detect_mss(df, lookback=50)
+        # 3. Detect SMT Strength Early (for Alpha-Weighted Displacement)
+        true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
+        
+        # 4. Detect Market Structure Shift (MSS) with SMT-weighted displacement
+        mss_setup = self.detect_mss(df, lookback=50, smt_strength=true_smt_strength)
         
         if not mss_setup:
             return None
@@ -1404,9 +1444,19 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         if risk == 0: return None
         
         # TIER 1: Sponsorship & SMT
-        true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
         cross_asset_div = self.intermarket.calculate_cross_asset_divergence(direction, index_context)
         
+        # Hurst-Adaptive RR Scaling
+        hurst = self.get_hurst_exponent(df['close'].values)
+        if hurst > 0.6:
+            rr = 5.0  # High Momentum Trend
+        elif hurst > 0.5:
+            rr = 3.5  # Standard Trend
+        elif hurst < 0.45:
+            rr = 2.0  # Mean Reversion Range (Take profits faster)
+        else:
+            rr = 3.0  # Default
+            
         setup = {
             "timestamp": current['timestamp'].isoformat() if hasattr(current['timestamp'], 'isoformat') else str(current['timestamp']),
             "symbol": symbol,
@@ -1414,8 +1464,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             "bias": bias_full,
             "entry": entry_price,
             "stop_loss": stop_loss,
-            "target": target,
-            'tp1': entry_price + (risk * 2) if direction == 'LONG' else entry_price - (risk * 2),
+            "target": entry_price + (risk * rr) if direction == 'LONG' else entry_price - (risk * rr),
+            'tp1': entry_price + (risk * 2.0) if direction == 'LONG' else entry_price - (risk * 2.0),
             'direction': direction,
             "time_quartile": self.get_session_quartile(),
             "price_quartiles": self.get_price_quartiles(symbol),
@@ -1424,9 +1474,10 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             "cross_asset_divergence": round(cross_asset_div, 2),
             "news_context": "Checked",
             "is_discount": True, # Assumed if retracing to OB
-            'risk_reward': 3.0,
+            'risk_reward': rr,
             'quality': 'HIGH',
-            'true_smt': true_smt_type
+            'true_smt': true_smt_type,
+            'hurst_regime': round(hurst, 3)
         }
         
         if setup:
@@ -1435,7 +1486,7 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             return setup, df
         return None
 
-    def detect_mss(self, df, lookback=50):
+    def detect_mss(self, df, lookback=50, smt_strength=0.0):
         """
         Detects if a Market Structure Shift has occurred recently.
         Returns dict with direction and origin index (start of displacement).
@@ -1458,14 +1509,16 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             break_idx = subset[subset['close'] > last_swing_high['high']].index
             if len(break_idx) > 0 and break_idx[-1] >= df.index[-5]:
                 # Check for Displacement (Large Candle or FVG)
-                # Simplified: Candle body > ATR * 1.5
-                return {'direction': 'LONG', 'origin_index': last_swing_low.name} # Origin is the low before the break
+                # Alpha-Weighted Displacement Check
+                if self.is_displaced_move(df, 'LONG', smt_strength):
+                    return {'direction': 'LONG', 'origin_index': last_swing_low.name}
                 
         # Check Bearish MSS: Break of Last Swing Low
         if last_swing_low is not None:
              break_idx = subset[subset['close'] < last_swing_low['low']].index
              if len(break_idx) > 0 and break_idx[-1] >= df.index[-5]:
-                 return {'direction': 'SHORT', 'origin_index': last_swing_high.name}
+                 if self.is_displaced_move(df, 'SHORT', smt_strength):
+                     return {'direction': 'SHORT', 'origin_index': last_swing_high.name}
 
         return None
 
