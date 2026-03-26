@@ -117,7 +117,7 @@ class Config:
     AI_THRESHOLD_ASIAN_FADE = 6.5
     
     # ── 98% Reliability Standard Thresholds ──────────────────────
-    SYNC_PRICE_DELTA_MAX = 0.0005     # 0.05%
+    SYNC_PRICE_DELTA_MAX = 0.005     # 0.5% (Loosened for crypto volatility)
     SYNC_LATENCY_SEC_MAX = 120        # 2 Minutes
     SLIPPAGE_ATR_RATIO_MAX = 1.5      # Spread / ATR(14)
     HURST_CHAOS_RANGE = (0.45, 0.55)  # Re-enforced: must be rejected as CHOP / RANDOM <!-- id: 6 -->

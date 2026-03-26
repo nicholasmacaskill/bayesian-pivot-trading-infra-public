@@ -187,6 +187,7 @@ class TradeLockerHelper:
                 return trades
             elif resp.status_code == 401:
                 logger.warning(f"401 Unauthorized for {self.email} on positions. Re-authenticating...")
+                self.access_token = None # Hard reset
                 if self.login():
                     return self.get_open_positions()
                 return []
@@ -338,7 +339,8 @@ class TradeLockerClient:
         all_trades = []
         for helper in self.helpers:
             trades = helper.get_open_positions()
-            all_trades.extend(trades)
+            if trades:
+                all_trades.extend(trades)
         return all_trades
 
     def get_total_equity(self):

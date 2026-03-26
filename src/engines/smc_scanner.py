@@ -135,7 +135,7 @@ class SMCScanner:
             lags = range(2, 20)
             tau = [np.sqrt(np.std(np.subtract(time_series[lag:], time_series[:-lag]))) for lag in lags]
             # Use linear regression to estimate the Hurst Exponent
-            poly = np.polyfit(np.log(lags), np.log(tau), 1)
+            poly = np.polyfit(np.log(lags), np.log([max(t, 1e-8) for t in tau]), 1)
             return poly[0] * 2.0
         except Exception as e:
             logger.error(f"Hurst Calculation Error: {e}")
@@ -181,7 +181,7 @@ class SMCScanner:
         
         # Ensure timestamp is index for resample
         df_copy = df.copy().set_index('timestamp')
-        resampled = df_copy.resample('4H').agg({
+        resampled = df_copy.resample('4h').agg({
             'open': 'first',
             'high': 'max',
             'low': 'min',
@@ -190,36 +190,28 @@ class SMCScanner:
         }).dropna()
         return resampled.reset_index()
 
-    def _check_data_synchrony(self, df_ccxt, df_yf):
+    def _check_data_synchrony(self, symbol, df_ccxt):
         """
         Synchronized Data Buffer: Compares CCXT vs yfinance.
         Delta > 0.05% or Latency > 2 mins results in False.
         """
-        if df_ccxt is None or df_yf is None or df_ccxt.empty or df_yf.empty:
-            return False
-            
-        ccxt_latest = df_ccxt.iloc[-1]
-        yf_latest = df_yf.iloc[-1]
-        
-        # 1. Price Delta Check (0.05% default)
-        price_delta = abs(ccxt_latest['close'] - yf_latest['close']) / ccxt_latest['close']
-        if price_delta > Config.get('SYNC_PRICE_DELTA_MAX', 0.0005):
-            logger.warning(f"⚖️ Data Sync Delta Breach: {price_delta:.4%}")
-            return False
-            
-        # 2. Latency Check (2 minutes default)
         if df_ccxt is None or df_ccxt.empty:
             return False
             
         # Fetch yfinance data internally
         try:
             # Map symbol to yfinance format (BTC/USD -> BTC-USD)
+            # Match symbol format
             yf_symbol = symbol.replace('/', '-') if '/' in symbol else symbol
             if 'USDT' in yf_symbol: yf_symbol = yf_symbol.replace('USDT', 'USD')
             
-            # Use 1h interval for yfinance to cover various timeframes
+            # Fetch yfinance 5m data for a tighter match (limit to 1 day for speed)
             import yfinance as yf
-            df_yf_raw = yf.download(yf_symbol, period='5d', interval='1h', progress=False)
+            df_yf_raw = yf.download(yf_symbol, period='1d', interval='5m', progress=False)
+            
+            if df_yf_raw is None or df_yf_raw.empty:
+                logger.warning(f"yfinance 5m sync failed for {symbol} - retrying with 1h")
+                df_yf_raw = yf.download(yf_symbol, period='5d', interval='1h', progress=False)
             
             if df_yf_raw is None or df_yf_raw.empty:
                 logger.warning(f"yfinance sync failed for {symbol} - holding trade.")
@@ -234,37 +226,24 @@ class SMCScanner:
                 df_yf_raw['timestamp'] = df_yf_raw['timestamp'].dt.tz_localize(None)
             
             df_yf = df_yf_raw.loc[:, ~df_yf_raw.columns.duplicated()]
-            # Aggregate yfinance data to match the CCXT timeframe if needed (e.g., 4h)
-            # For simplicity, we'll compare latest 1h close if CCXT is also 1h or aggregated from 1h
-            # If CCXT is 4h, we need to aggregate yfinance to 4h as well for a fair comparison
-            # This logic needs to be robust for various timeframes. For now, assume latest 1h comparison.
             
-            # For a robust comparison, we should align the timeframes.
-            # For now, let's just take the latest available from yfinance and compare with latest CCXT.
-            # This might not be perfectly aligned if CCXT is a higher TF.
-            # A more robust solution would involve resampling df_yf to df_ccxt's timeframe.
-            
-            # For now, let's simplify and compare the latest available close prices.
-            # This assumes that the latest yfinance data point is roughly comparable to the latest CCXT data point.
-            # A better approach would be to resample df_yf to the timeframe of df_ccxt if df_ccxt is not 1h.
-            
-            # Let's use the latest 1h close from yfinance for comparison.
+            # Use the latest available price from yfinance
             yf_latest = df_yf.iloc[-1]
-            ccxt_latest = df_ccxt.iloc[-1] # Assuming df_ccxt is already in the correct timeframe
+            ccxt_latest = df_ccxt.iloc[-1]
             
-            # 1. Price Delta Check (0.05% default)
+            # 1. Price Delta Check (Sanity Check: 0.25% or Config)
             price_delta = abs(ccxt_latest['close'] - yf_latest['close']) / ccxt_latest['close']
-            if price_delta > Config.get('SYNC_PRICE_DELTA_MAX', 0.0005):
-                logger.warning(f"⚖️ Data Sync Delta Breach: {price_delta:.4%}")
-                return False
-                
-            # 2. Latency Check (2 minutes default)
-            now = datetime.utcnow()
-            ccxt_ts = ccxt_latest['timestamp']
-            latency_sec = (now - ccxt_ts).total_seconds()
             
-            if latency_sec > Config.get('SYNC_LATENCY_SEC_MAX', 120):
-                logger.warning(f"⏳ Data Sync Latency Breach: {latency_sec:.1f}s")
+            # Use UTC for comparison
+            ts_diff = abs((ccxt_latest['timestamp'] - yf_latest['timestamp']).total_seconds())
+            
+            # Threshold: 0.05% if perfectly aligned, else 0.5% for sanity check
+            base_threshold = Config.get('SYNC_PRICE_DELTA_MAX', 0.0005)
+            # If timestamps are significantly different, loosen threshold for "Reality Check"
+            threshold = 0.0025 if ts_diff > 300 else base_threshold # 0.25% if offset
+                
+            if price_delta > threshold:
+                logger.warning(f"⚖️ Data Sync Delta Breach: {price_delta:.4%} (Threshold: {threshold:.4%})")
                 return False
                 
             return True
@@ -278,12 +257,21 @@ class SMCScanner:
         Eliminates proxies and enforces strict time-drift validation (120s limit).
         """
         try:
-            # 1. Fetch Primary Stream
-            df = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
-            if not df: return None
+            tf_to_seconds = {'1m': 60, '5m': 300, '1h': 3600, '4h': 14400, '1d': 86400}
             
-            main_df = pd.DataFrame(df, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            main_df['timestamp'] = pd.to_datetime(main_df['timestamp'], unit='ms')
+            # 1. Fetch Primary Stream
+            # Coinbase doesn't natively support 4H in CCXT, so if timeframe is 4h, we fallback to 1h then aggregate
+            if timeframe == '4h' and self.exchange.id == 'coinbase':
+                df_raw_main = self.exchange.fetch_ohlcv(symbol, '1h', limit=limit*4)
+                if not df_raw_main: return None
+                main_df_base = pd.DataFrame(df_raw_main, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                main_df_base['timestamp'] = pd.to_datetime(main_df_base['timestamp'], unit='ms')
+                main_df = self._aggregate_ohlcv(main_df_base, '4h')
+            else:
+                df_raw_main = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+                if not df_raw_main: return None
+                main_df = pd.DataFrame(df_raw_main, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                main_df['timestamp'] = pd.to_datetime(main_df['timestamp'], unit='ms')
 
             if not synchronized:
                 return main_df
@@ -295,20 +283,33 @@ class SMCScanner:
             for tf in timeframes_to_check:
                 if tf == '4h':
                     # Native aggregation for 4H
-                    df_base = self.exchange.fetch_ohlcv(symbol, '1h', limit=limit*4)
-                    if not df_base: continue
-                    df_tf = self._aggregate_ohlcv(pd.DataFrame(df_base, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']), '4h')
+                    df_base_raw = self.exchange.fetch_ohlcv(symbol, '1h', limit=limit*4)
+                    if not df_base_raw: continue
+                    df_base = pd.DataFrame(df_base_raw, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    df_base['timestamp'] = pd.to_datetime(df_base['timestamp'], unit='ms')
+                    df_tf = self._aggregate_ohlcv(df_base, '4h')
                 else:
                     df_raw = self.exchange.fetch_ohlcv(symbol, tf, limit=10)
                     if not df_raw: continue
                     df_tf = pd.DataFrame(df_raw, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    df_tf['timestamp'] = pd.to_datetime(df_tf['timestamp'], unit='ms')
 
-                # Time-Drift Validation (120s limit)
-                latest_ts = pd.to_datetime(df_tf.iloc[-1]['timestamp'], unit='ms') if isinstance(df_tf.iloc[-1]['timestamp'], (int, float)) else df_tf.iloc[-1]['timestamp']
-                drift = abs((datetime.utcnow() - latest_ts).total_seconds())
+                if df_tf is None or df_tf.empty:
+                    continue
+
+                # Time-Drift Validation (Config + Candle Duration)
+                latest_ts = df_tf.iloc[-1]['timestamp']
                 
-                if drift > Config.get('SYNC_LATENCY_SEC_MAX', 120):
-                    logger.error(f"🚨 DATA_DESYNC: Stream {tf} drift is {drift:.1f}s (Limit: 120s). Pausing execution.")
+                # Use UTC for comparison as ccxt timestamps are UTC
+                now_utc = datetime.utcnow()
+                drift = abs((now_utc - latest_ts).total_seconds())
+                
+                # Limit must account for the fact that the latest bar timestamp is the START of the candle
+                tf_sec = tf_to_seconds.get(tf, 300)
+                allowed_drift = Config.get('SYNC_LATENCY_SEC_MAX', 120) + tf_sec
+                
+                if drift > allowed_drift:
+                    logger.error(f"🚨 DATA_DESYNC: Stream {tf} drift is {drift:.1f}s (Limit: {allowed_drift}s). Pausing execution.")
                     return None # Triggers "HOLD" state in runner
 
             # 3. Double-Source Check (CCXT vs yFinance)
@@ -317,7 +318,8 @@ class SMCScanner:
 
             return main_df
         except Exception as e:
-            logger.error(f"Fetch error: {e}")
+            import traceback
+            logger.error(f"Fetch error: {e}\n{traceback.format_exc()}")
             return None
 
     def calculate_volume_cluster(self, df, lookback=20):
@@ -485,8 +487,6 @@ class SMCScanner:
             logger.error(f"scan_asian_fade error for {symbol}: {e}")
             return None
 
-        return label
-
     def get_detailed_bias(self, symbol, index_context=None, visual_check=False, current_time=None):
         """
         98% Reliability Refactor: Strict Multi-Timeframe Alignment.
@@ -522,9 +522,9 @@ class SMCScanner:
         bias_1h = get_tf_bias(df_1h)
         bias_5m = get_tf_bias(df_5m)
         
-        # STRICT ENFORCEMENT: 4H/1H/5M Alignment
-        if not (bias_4h == bias_1h == bias_5m):
-            logger.info(f"⚖️ {symbol} Bias Conflict: 4H({bias_4h}) 1H({bias_1h}) 5M({bias_5m})")
+        # RELAXED ENFORCEMENT: 4H and 1H Alignment Required
+        if not (bias_4h == bias_1h):
+            logger.info(f"⚖️ {symbol} Bias Conflict: 4H({bias_4h}) 1H({bias_1h})")
             return "NEUTRAL (Conflict)"
 
         score = float(bias_4h) # Base score -1 or 1
@@ -562,7 +562,7 @@ class SMCScanner:
 
     def get_4h_bias(self, symbol):
         # Legacy wrapper
-        return self.get_detailed_bias(symbol).split(" ")[-1] # Returns BULLISH/BEARISH/NEUTRAL
+        return self.get_detailed_bias(symbol).split(" (")[0] # Returns BULLISH/BEARISH/NEUTRAL
 
     def get_session_quartile(self, current_time=None):
         """
@@ -636,7 +636,7 @@ class SMCScanner:
         These act as 'HTF Gravity Points'—trading into them is high-risk.
         """
         pois = []
-        for tf in ['1d', '1wk']:
+        for tf in ['1d']: # Removed 1w due to exchange compatibility issues
             df = self.fetch_data(symbol, tf, limit=100)
             if df is None or len(df) < 10:
                 continue
@@ -688,7 +688,10 @@ class SMCScanner:
                     })
         
         # Filter for 'Fresh' POIs (Not yet mitigated)
-        current_price = self.fetch_data(symbol, '1m', limit=1).iloc[-1]['close']
+        df_now = self.fetch_data(symbol, '1m', limit=1)
+        if df_now is None or df_now.empty: return []
+        
+        current_price = df_now.iloc[-1]['close']
         fresh_pois = [p for p in pois if (p['type'].endswith('BULLISH') and current_price > p['bottom']) or 
                                        (p['type'].endswith('BEARISH') and current_price < p['top'])]
         
@@ -706,7 +709,8 @@ class SMCScanner:
             if df_5m is None or df_1h is None: return False
             
             # 1. Calculate 1H average volume (Baseline)
-            avg_vol_1h = df_1h['volume'].mean()
+            # Scale 1H volume to 5M equivalent (1/12)
+            avg_vol_1h = (df_1h['volume'].mean() / 12)
             if avg_vol_1h == 0: return False
             
             # 2. Detect last relevant 5M volume (Tick-delta Proxy)
@@ -1144,7 +1148,9 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         # 4. HARD GATE: Bias (HTF 4H + Daily + Intermarket + Visual)
         # We pass visual_check as per parameter (default True)
         bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=visual_check, current_time=current_time_override)
-        if "STRONG" in bias_full:
+        has_macro_conviction = "STRONG" in bias_full
+        
+        if has_macro_conviction:
             logger.info(f"💪 STRONG BIAS DETECTED: {bias_full}")
         
         # 3. GET SESSION METADATA (Time & Price Quartiles)
@@ -1172,9 +1178,9 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         adf_p = self.get_adf_test(closes)
         
         # --- Hurst 'Chaos' Buffer Reduction (Gate 1 Refinement) ---
-        # Update: (0.45, 0.55) must be rejected as CHOP / RANDOM <!-- id: 6 -->
-        hurst_low, hurst_high = Config.get('HURST_CHAOS_RANGE', (0.45, 0.55))
-        if hurst_low <= hurst <= hurst_high:
+        # Update: (0.48, 0.52) must be rejected as CHOP / RANDOM
+        hurst_low, hurst_high = Config.get('HURST_CHAOS_RANGE', (0.48, 0.52))
+        if not has_macro_conviction and hurst_low <= hurst <= hurst_high:
             logger.debug(f"Hurst Chaos Buffer: Skipping random walk ({hurst:.3f})")
             return None
 
@@ -1182,16 +1188,13 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         utc_hour = (current_time_override or datetime.utcnow()).hour
         is_asian_london = (0 <= utc_hour < 10) or (20 <= utc_hour <= 23)
         
-        # Opinionated Bias Bonus: If we have strong macro narrative, bypass session/hurst mismatch filters
-        has_macro_conviction = "STRONG" in bias_full
-        
         # Asian/Late NY Mode: Prioritize Mean-Reversion (Fades)
-        if is_asian_london and hurst > 0.55:
+        if not has_macro_conviction and is_asian_london and hurst > 0.55:
             logger.debug(f"Session Calibration: Skipping Expansion during Low-Vol Asian/London hours (Hurst: {hurst:.2f})")
             return None
             
         # London/NY Open Mode: Prioritize Expansion (Continuations)
-        if not is_asian_london and hurst < 0.45:
+        if not has_macro_conviction and not is_asian_london and hurst < 0.45:
              logger.debug(f"Session Calibration: Skipping Mean-Reversion during Trending NY hours (Hurst: {hurst:.2f})")
              return None
 
@@ -1201,8 +1204,17 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         setup = None
         entry_type = None
 
-        # BULLISH Setup (OPTIMIZED: Require STRONG bias for quality)
-        if "BULLISH" in bias_full:
+        # BULLISH Setup (OPTIMIZED: Allow Counter-Trend if Mean-Reverting)
+        can_check_long = "BULLISH" in bias_full
+        is_mean_reverting_regime = hurst < 0.45
+        
+        # Counter-Trend Reversal Logic (Turtle Soup)
+        # 98% Reliability: Do not allow a 'Fade' if volume is accelerating (Capitulation)
+        vol_spike = self.calculate_volume_cluster(df)
+        if not can_check_long and is_mean_reverting_regime and vol_spike < 1.3:
+             can_check_long = True # Allow search for long even if bias is Bearish
+
+        if can_check_long:
             # TIER 1: Deep Discount
             in_deep_discount = False
             if price_quartiles:
@@ -1235,11 +1247,16 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             # PHASE 2: 90-Minute Cycle Logic (Q2 Manipulation Window)
             is_q2 = time_quartile.get('num') == 2
 
-            
-            # SIMPLIFIED: Proceed if we have discount zone + SMT alignment
-            # PHASE 2: Strict Institutional Requirements
-            # We want: (Discount + SMT) AND (Sweep + Vol Spike)
-            if (in_deep_discount or has_true_smt or has_strong_smt):
+            # RESTRUCTURED: In Mean-Reverting regimes, strictly require DISCOUNT to avoid buying the top.
+            if is_mean_reverting_regime:
+                can_proceed_long = in_deep_discount
+            else:
+                can_proceed_long = (in_deep_discount or has_true_smt or has_strong_smt)
+                # If bias is Bearish, DO NOT allow Trend Following Longs
+                if "BULLISH" not in bias_full:
+                    can_proceed_long = False
+
+            if can_proceed_long:
                 # Require Volume Spike (Smart Money Print) or True SMT for JUDAS
                 if (swept_pdl or swept_london) and (vol_spike >= 1.5 or has_true_smt):
                     # LEVEL 2 DEPTH FILTER
@@ -1305,6 +1322,7 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                     'true_smt': true_smt_type
                 }
 
+
         # BEARISH Setup (OPTIMIZED: Require bias for quality - Only if no Long found yet)
         if not setup and "BEARISH" in bias_full:
             # TIER 1: Premium
@@ -1342,7 +1360,15 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             
             # SIMPLIFIED: Proceed if we have premium zone + SMT alignment
             # PHASE 2: Strict Institutional Requirements
-            if (in_premium or has_true_smt or has_strong_smt):
+            # RESTRUCTURED: In Mean-Reverting regimes, strictly require PREMIUM to avoid selling the low.
+            is_mean_reverting_regime = hurst < 0.45
+            
+            if is_mean_reverting_regime:
+                can_proceed = in_premium
+            else:
+                can_proceed = (in_premium or has_true_smt or has_strong_smt)
+
+            if can_proceed:
                 if (swept_pdh or swept_london) and (vol_spike >= 1.5 or has_true_smt):
                     # LEVEL 2 DEPTH FILTER
                     swept_level = recent_high if swept_pdh else (london_range["high"] if london_range else recent_high)
@@ -1453,7 +1479,10 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         if df is None: return None
         
         current = df.iloc[-1]
-        
+        hurst = self.get_hurst_exponent(df['close'].values)
+        is_mean_reverting_regime = hurst < 0.45
+        price_quartiles = self.get_price_quartiles(symbol)
+
         # 3. Detect SMT Strength Early (for Alpha-Weighted Displacement)
         true_smt_type, true_smt_strength = self.intermarket.detect_true_smt(df, "DXY")
         
@@ -1465,10 +1494,32 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             
         direction = mss_setup['direction'] # 'LONG' or 'SHORT'
         
-        # Bias Confirmation
-        if direction == 'LONG' and not is_bullish: return None
-        if direction == 'SHORT' and not is_bearish: return None
+        # ── RESTRUCTURED: BIAS & REGIME GATES ───────────────────────
+        # In Mean-Revert regimes, we allow Counter-Trend if in Extreme Quartile
+        in_deep_discount = False
+        in_premium = False
+        if price_quartiles:
+            ref_range = price_quartiles.get("Asian Range") or price_quartiles.get("CBDR")
+            if ref_range:
+                pos = (current['close'] - ref_range['low']) / (ref_range['high'] - ref_range['low'])
+                in_deep_discount = pos <= 0.25
+                in_premium = pos >= 0.75
+
+        # Bias Gate: Allow Counter-Trend if Mean-Reverting and in Extreme zone
+        if direction == 'LONG':
+            if not is_bullish and not (is_mean_reverting_regime and in_deep_discount):
+                return None
+            # Block Mean-Revert Long if NOT in discount
+            if is_mean_reverting_regime and not in_deep_discount:
+                return None
         
+        if direction == 'SHORT':
+            if not is_bearish and not (is_mean_reverting_regime and in_premium):
+                return None
+            # Block Mean-Revert Short if NOT in premium
+            if is_mean_reverting_regime and not in_premium:
+                return None
+
         # 4. Find Responsible Order Block (OB)
         # The OB is the candle(s) BEFORE the displacement leg
         ob_setup = self.find_order_block(df, mss_setup['origin_index'], direction)

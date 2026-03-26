@@ -28,7 +28,7 @@ def check_btc():
             print(f"   London Low: {quartiles['London Range']['low']:.2f}")
     
     # 3. Get Current Price
-    df = scanner.fetch_data(symbol, "5m", limit=10)
+    df = scanner.fetch_data(symbol, "5m", limit=100)
     current_price = df['close'].iloc[-1]
     print(f"\n💰 Current Price: {current_price:.2f}")
     

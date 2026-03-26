@@ -94,7 +94,8 @@ class ExecutionAuditEngine:
         """Matches a signal to an execution by symbol, side, and time proximity."""
         sig_time = datetime.fromisoformat(signal['timestamp'])
         for trade in executions:
-            if trade['symbol'] == signal['symbol'] and trade['side'].upper() == signal['direction'].upper():
+            signal_direction = signal.get('direction') or signal.get('bias') or 'N/A'
+            if trade['symbol'] == signal['symbol'] and trade['side'].upper() in signal_direction.upper():
                 # Allow 30 min window for entry execution
                 trade_time_str = trade.get('time') or trade.get('entry_time')
                 if not trade_time_str: continue
@@ -117,7 +118,8 @@ class ExecutionAuditEngine:
         except: return None
 
         for signal in signals:
-            if signal['symbol'] == trade['symbol'] and signal['direction'].upper() == trade['side'].upper():
+            signal_direction = signal.get('direction') or signal.get('bias') or 'N/A'
+            if signal['symbol'] == trade['symbol'] and trade['side'].upper() in signal_direction.upper():
                 sig_time = datetime.fromisoformat(signal['timestamp'])
                 diff = abs((trade_time - sig_time).total_seconds())
                 if diff < 1800:
@@ -161,7 +163,7 @@ class ExecutionAuditEngine:
             status=trade['status'],
             price=trade.get('price', 0.0),
             deviations=" | ".join(audit.get('deviations', [])),
-            notes=f"Signal Match: {signal['signal_id'] if 'signal_id' in signal else 'N/A'}"
+            notes=f"Signal Match: {signal.get('signal_id') or signal.get('id') or 'N/A'}"
         )
 
     def _mark_missed(self, signal):
