@@ -339,7 +339,7 @@ class AIValidator:
             }
         }
 
-    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, hurst_exponent=None):
+    def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, hurst_exponent=None, guard_trust_score=None):
         """
         Calls Gemini API to validate the setup with DUAL-TRACK analysis.
         
@@ -351,10 +351,15 @@ class AIValidator:
             df: Optional dataframe for regime detection
             exchange: Optional CCXT exchange for slippage estimation
             memory_context: Optional historical context from RAG
+            hurst_exponent: Optional Hurst exponent for market regime
+            guard_trust_score: Optional trust score from GuardEngine
         
         Returns:
             dict: Dual-track analysis with live_execution and shadow_optimizer sections
         """
+        if guard_trust_score is not None:
+            setup['guard_trust_score'] = guard_trust_score
+
         if not self.hub.has_ai:
             # Fallback to hard logic if AI unavailable
             return self.hard_logic_audit(setup, df)
@@ -519,7 +524,7 @@ class AIValidator:
             print(f"⚠️ Visual Bias Check Failed: {e}")
             return 0
 
-def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, hurst_exponent=None):
+def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, hurst_exponent=None, guard_trust_score=None):
     """
     Main entry point for trade validation with dual-track analysis.
     
@@ -532,9 +537,10 @@ def validate_setup(setup, sentiment, whales, image_path=None, df=None, exchange=
         exchange: Optional CCXT exchange for slippage estimation
         memory_context: Optional historical context from RAG
         hurst_exponent: Optional Hurst exponent for market regime
+        guard_trust_score: Optional trust score from GuardEngine
     
     Returns:
         dict: Dual-track analysis result
     """
     validator = AIValidator()
-    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context, hurst_exponent)
+    return validator.analyze_trade(setup, sentiment, whales, image_path, df, exchange, memory_context, hurst_exponent, guard_trust_score)

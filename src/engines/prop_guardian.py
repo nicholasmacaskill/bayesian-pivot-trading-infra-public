@@ -134,8 +134,8 @@ class PropGuardian:
             report['total_drawdown'] = total_dd
 
             # 2. Daily Drawdown Calculation
-            # 2a. Fetch Daily Start Equity <!-- id: 14 -->
-            c.execute("SELECT value FROM sync_state WHERE key = 'daily_start_equity'")
+            # 2a. Fetch Daily Start Equity
+            c.execute("SELECT value, last_updated FROM sync_state WHERE key = 'daily_start_equity'")
             day_start_row = c.fetchone()
             
             if not day_start_row or float(day_start_row['value']) <= 0:
@@ -147,10 +147,26 @@ class PropGuardian:
             
             day_start_equity = float(day_start_row['value'])
 
-            # 2b. Track Daily High Water Mark for Intra-Day Protection <!-- id: 15 -->
-            c.execute("SELECT value FROM sync_state WHERE key = 'daily_hwm'")
+            # 2b. Track Daily High Water Mark for Intra-Day Protection
+            c.execute("SELECT value, last_updated FROM sync_state WHERE key = 'daily_hwm'")
             daily_hwm_row = c.fetchone()
-            daily_hwm = float(daily_hwm_row['value']) if daily_hwm_row else day_start_equity
+            
+            needs_hwm_reset = False
+            if not daily_hwm_row:
+                needs_hwm_reset = True
+            else:
+                last_hwm_update = datetime.fromisoformat(daily_hwm_row['last_updated'])
+                if (datetime.now() - last_hwm_update).total_seconds() > 64800 or last_hwm_update.day != datetime.now().day:
+                    needs_hwm_reset = True
+            
+            if needs_hwm_reset:
+                daily_hwm = day_start_equity
+                c.execute("INSERT OR REPLACE INTO sync_state (key, value, last_updated) VALUES (?, ?, ?)", 
+                         ("daily_hwm", str(daily_hwm), datetime.now().isoformat()))
+                conn.commit()
+                logger.info(f"🔄 PropGuardian: Daily HWM reset to ${daily_hwm:,.2f} (Stale entry detected)")
+            else:
+                daily_hwm = float(daily_hwm_row['value'])
 
             if current_equity > daily_hwm:
                 daily_hwm = current_equity
@@ -214,7 +230,11 @@ class PropGuardian:
             c = conn.cursor()
             c.execute("INSERT OR REPLACE INTO sync_state (key, value, last_updated) VALUES (?, ?, ?)", 
                      ("daily_start_equity", str(equity), datetime.now().isoformat()))
+            # Also reset daily HWM to the starting equity to avoid stale peaks
+            c.execute("INSERT OR REPLACE INTO sync_state (key, value, last_updated) VALUES (?, ?, ?)", 
+                     ("daily_hwm", str(equity), datetime.now().isoformat()))
             conn.commit()
             conn.close()
+            logger.info(f"🛡️ PropGuardian: Daily anchors reset to ${equity:,.2f}")
         except Exception as e:
             print(f"Error updating daily start equity: {e}")

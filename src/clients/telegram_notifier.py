@@ -144,9 +144,9 @@ class TelegramNotifier:
         msg = (
             f"{emoji} <b>{grade}: {symbol}</b>\n"
             f"{header}\n\n"
+            f"{hunt}\n\n"
             f"{confluence}\n\n"
             f"{liquidity}\n\n"
-            f"{hunt}\n\n"
             f"{system_state}"
             f"{exec_block}\n\n"
             f"📊 <a href='{tv_link}'>View on TradingView</a>"

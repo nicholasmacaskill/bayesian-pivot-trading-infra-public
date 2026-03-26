@@ -15,7 +15,8 @@ def check_intermarket():
         if context:
             print("\n📈 Market Context:")
             for symbol, data in context.items():
-                print(f"   {symbol}: {data['price']} ({data['change_5m']}% | {data['trend']})")
+                change = data.get('change_ltf', 0.0)
+                print(f"   {symbol}: {data['price']:.2f} ({change:.3f}% | {data['trend']})")
             
             # Check for Bearish Sponsorship
             score = engine.calculate_cross_asset_divergence('SHORT', context)
