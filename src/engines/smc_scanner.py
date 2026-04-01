@@ -1444,6 +1444,105 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         return None
 
     @safe_scan("Scanner.scan_order_flow")
+    def scan_trend_expansion(self, symbol, timeframe=Config.TIMEFRAME, cached_context=None):
+        """
+        [NEW] TREND EXPANSION SCANNER:
+        Identifies 'Clean' trend moves that don't satisfy reversal criteria.
+        Logic: STRONG 4H/1H Bias Alignment + Retracement to 15m/1H/4H POI.
+        """
+        # 1. HARD GATE: Bias Conviction (Must be STRONG and aligned)
+        index_context = cached_context or self.intermarket.get_market_context()
+        bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=False)
+        
+        is_strong_bull = "STRONG BULLISH" in bias_full
+        is_strong_bear = "STRONG BEARISH" in bias_full
+        
+        if not is_strong_bull and not is_strong_bear:
+            return None
+
+        # 2. HEURISTIC GATE: Hurst (Must be EXPANSION)
+        df = self.fetch_data(symbol, timeframe)
+        if df is None or len(df) < 50: return None
+        
+        hurst = self.get_hurst_exponent(df['close'].values)
+        if hurst < 0.52: # Standard expansion threshold
+            return None
+            
+        # 3. POI DETECTION: Find 15m, 1H, 4H POIs
+        # We need to fetch higher timeframe data specifically for this
+        pois = []
+        for tf in ['15m', '1h', '4h']:
+            tf_df = self.fetch_data(symbol, tf, limit=100, synchronized=False)
+            if tf_df is None or len(tf_df) < 5: continue
+            
+            # Detect FVGs on this TF
+            for i in range(2, len(tf_df)):
+                # Bullish FVG
+                if tf_df['low'].iloc[i] > tf_df['high'].iloc[i-2]:
+                    pois.append({'type': 'FVG_BULLISH', 'top': tf_df['low'].iloc[i], 'bottom': tf_df['high'].iloc[i-2], 'tf': tf})
+                # Bearish FVG
+                if tf_df['high'].iloc[i] < tf_df['low'].iloc[i-2]:
+                    pois.append({'type': 'FVG_BEARISH', 'top': tf_df['low'].iloc[i-2], 'bottom': tf_df['high'].iloc[i], 'tf': tf})
+
+        if not pois:
+            return None
+
+        current_price = df['close'].iloc[-1]
+        direction = 'LONG' if is_strong_bull else 'SHORT'
+        
+        # 4. ENTRY TRIGGER: Price currently "sitting" in a POI aligned with the trend
+        active_poi = None
+        for p in pois:
+            if direction == 'LONG' and p['type'] == 'FVG_BULLISH':
+                if p['bottom'] <= current_price <= p['top']:
+                    active_poi = p
+                    break
+            if direction == 'SHORT' and p['type'] == 'FVG_BEARISH':
+                if p['bottom'] <= current_price <= p['top']:
+                    active_poi = p
+                    break
+        
+        if not active_poi:
+            return None
+
+        # 5. DEDUPLICATION GATE
+        now_ts = datetime.utcnow().timestamp()
+        cache_key = f"{symbol}_expansion"
+        last_fired = self._signal_cache.get(cache_key, 0)
+        if (now_ts - last_fired) < (self._signal_cooldown_mins * 60):
+            return None
+
+        # 6. Construct Setup
+        # TP/SL based on POI and ATR
+        atr = self.calculate_atr(df).iloc[-1]
+        if direction == 'LONG':
+            entry = current_price
+            stop_loss = active_poi['bottom'] - (atr * 0.5)
+            target = entry + (abs(entry - stop_loss) * 3.5) # Expanding trend RR
+        else:
+            entry = current_price
+            stop_loss = active_poi['top'] + (atr * 0.5)
+            target = entry - (abs(entry - stop_loss) * 3.5)
+
+        setup = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "symbol": symbol,
+            "pattern": f"Trend Expansion ({active_poi['tf']} {active_poi['type']})",
+            "bias": bias_full,
+            "entry": entry,
+            "stop_loss": stop_loss,
+            "target": target,
+            "direction": direction,
+            "time_quartile": self.get_session_quartile(),
+            "price_quartiles": self.get_price_quartiles(symbol),
+            "index_context": index_context,
+            "hurst_regime": round(hurst, 3),
+            "quality": "HIGH"
+        }
+        
+        self._signal_cache[cache_key] = now_ts
+        return setup, df
+
     def scan_order_flow(self, symbol, timeframe=Config.TIMEFRAME, cached_context=None):
         """
         STRATEGY 3: ICT ORDER FLOW (Order Blocks + MSS)

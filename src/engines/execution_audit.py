@@ -150,8 +150,22 @@ class ExecutionAuditEngine:
         }
         
         audit = self.ai.audit_trade(manual_trade, system_data)
-        
-        # Log to Journal
+
+        # Calculate execution latency
+        sig_time = datetime.fromisoformat(signal['timestamp'])
+        try:
+            trade_time_str = trade.get('time') or trade.get('entry_time')
+            trade_dt = datetime.fromisoformat(trade_time_str.replace('Z', '+00:00'))
+            latency_seconds = (trade_dt - sig_time.replace(tzinfo=trade_dt.tzinfo)).total_seconds()
+            latency_str = f"{int(abs(latency_seconds)//60)}m {int(abs(latency_seconds)%60)}s"
+            if latency_seconds > 0:
+                latency_note = f"Latency: {latency_str} delay"
+            else:
+                latency_note = f"Latency: {latency_str} early entry"
+        except Exception as e:
+            latency_note = "Latency: Unknown"
+            trade_time_str = trade.get('time', datetime.utcnow().isoformat())
+
         self.sb.log_journal_entry(
             trade_id=trade['id'],
             symbol=trade['symbol'],
@@ -162,16 +176,37 @@ class ExecutionAuditEngine:
             strategy="SYSTEM",
             status=trade['status'],
             price=trade.get('price', 0.0),
-            deviations=" | ".join(audit.get('deviations', [])),
+            timestamp=trade_time_str,
+            deviations=" | ".join([latency_note] + audit.get('deviations', [])),
             notes=f"Signal Match: {signal.get('signal_id') or signal.get('id') or 'N/A'}"
         )
 
+
+
     def _mark_missed(self, signal):
         """Logs a signal that was generated but never taken by the trader."""
+        signal_id = signal.get('id') or signal.get('signal_id') or "N/A"
+        missed_id = f"MISSED_{signal_id}"
+        
         # Check if already logged as missed
-        # We don't want to spam the journal with the same missed signal every audit.
-        # Use signal_id as a unique key in the journal's notes or as a separate check.
-        pass
+        existing = self.sb.client.table("journal").select("id").eq("trade_id", missed_id).execute()
+        if existing.data and len(existing.data) > 0:
+            return
+
+        logger.info(f"⭕ Marking Signal as MISSED: {signal['symbol']} {signal['pattern']}")
+        
+        self.sb.log_journal_entry(
+            trade_id=missed_id,
+            symbol=signal['symbol'],
+            side=signal.get('direction') or signal.get('bias') or "N/A",
+            pnl=0.0,
+            ai_grade=0.0,
+            mentor_feedback="Signal provided but no corresponding execution found within window.",
+            strategy="SYSTEM_MISSED",
+            status="MISSED",
+            timestamp=signal['timestamp'],
+            notes=f"System recommended {signal['pattern']} | Bias: {signal.get('bias')}"
+        )
 
     def _mark_rogue(self, trade):
         """Auto-contextualizes a discretionary trade. Zero input required from trader."""

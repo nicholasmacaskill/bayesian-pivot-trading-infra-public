@@ -84,10 +84,8 @@ def predict_btc_5m():
     # Bias Alignment
     if "BULLISH" in bias_label:
         projected_change += 0.0003 # Reduced for conservative local estimate
-        prediction = "BULLISH"
     elif "BEARISH" in bias_label:
         projected_change -= 0.0003
-        prediction = "BEARISH"
 
     # Hurst Regime
     if hurst > 0.55:
@@ -114,6 +112,13 @@ def predict_btc_5m():
             else: projected_change -= 0.0002
 
     # Final Synthesis
+    if projected_change > 0.0001:
+        prediction = "BULLISH"
+    elif projected_change < -0.0001:
+        prediction = "BEARISH"
+    else:
+        prediction = "NEUTRAL"
+
     projected_price = current_price * (1 + projected_change)
     
     # 5. Output Sovereign Briefing
