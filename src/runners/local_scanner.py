@@ -789,9 +789,9 @@ class LocalScannerRunner:
                 if is_prime_window:
                     result = self.scanner.scan_asian_fade(symbol)
                 if not result:
-                    result = self.scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
-                if not result:
                     result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
+                if not result:
+                    result = self.scanner.scan_trend_expansion(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
 
                 if result:
                     setup, df = result
@@ -975,6 +975,11 @@ class LocalScannerRunner:
                 c.execute("INSERT INTO journal (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0.0, 'Synced Active Trade', 'SYSTEM') ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'OPEN'", (t['entry_time'], t['id'], t['symbol'], t['side'], t['pnl'], t['price']))
             for t in history:
                 c.execute("INSERT INTO journal (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy) VALUES (?, ?, ?, ?, ?, ?, 'CLOSED', 0.0, 'Synced History', 'ROGUE') ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'CLOSED'", (t['close_time'], t['id'], t['symbol'], t['side'], t['pnl'], t.get('price', 0)))
+                # Release correlation slot if this was a system trade
+                if self.ledger:
+                    sig_id = self.ledger.get_signal_id_by_trade_id(t['id'])
+                    if sig_id:
+                        self.corr_gate.release(sig_id)
             conn.commit()
             conn.close()
         except Exception as e:

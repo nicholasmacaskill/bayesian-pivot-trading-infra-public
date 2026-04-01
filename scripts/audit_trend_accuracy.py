@@ -10,7 +10,7 @@ from scripts.sovereign_backtest_v2 import SovereignBacktestV2
 
 def main():
     print("📈 Auditing Trend Direction Accuracy...")
-    bt = SovereignBacktestV2(start_date="2024-01-01", end_date="2025-03-01", timeframe="5m")
+    bt = SovereignBacktestV2(symbol="BTC/USDT", start_date="2026-01-01", end_date="2026-03-27")
     df = bt.fetch_historical_data()
     
     if df.empty:

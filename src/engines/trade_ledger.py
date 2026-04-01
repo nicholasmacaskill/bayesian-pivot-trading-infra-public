@@ -418,6 +418,17 @@ class TradeLedger:
 
         return report
 
+    def get_signal_id_by_trade_id(self, trade_id: str) -> Optional[str]:
+        """Queries the ledger for a signal_id associated with a specific trade_id."""
+        conn = sqlite3.connect(LEDGER_DB_PATH)
+        try:
+            row = conn.execute(
+                "SELECT signal_id FROM signed_ledger WHERE trade_id = ?", (trade_id,)
+            ).fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+
     @property
     def public_key_fingerprint(self) -> str:
         return self._fingerprint
