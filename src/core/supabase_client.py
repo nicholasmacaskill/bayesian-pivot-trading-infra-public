@@ -64,15 +64,18 @@ class SupabaseBridge:
             shadow_multiplier = scan_data.get('shadow_multiplier', 1.0)
             verdict = scan_data.get('verdict', 'N/A')
             
+            # Map 'direction' to notes since the column doesn't exist in DB
+            direction = scan_data.get('direction', 'N/A')
+            
             data = {
                 "timestamp": scan_data.get('timestamp', datetime.utcnow().isoformat()),
                 "symbol": scan_data['symbol'],
                 "timeframe": scan_data.get('timeframe', "5m"),
                 "pattern": scan_data['pattern'],
                 "bias": scan_data['bias'],
-                "direction": scan_data.get('direction', 'N/A'),
+                # "direction": direction, # DOES NOT EXIST IN DB
                 "ai_score": float(ai_result.get('score', 0.0)),
-                "ai_reasoning": ai_result.get('reasoning', ""),
+                "ai_reasoning": ai_result.get('reasoning', f"Dir: {direction} | " + ai_result.get('reasoning', "")),
                 "status": scan_data.get('status', 'PENDING'),
                 "verdict": verdict,
                 "shadow_regime": shadow_regime,
@@ -87,10 +90,12 @@ class SupabaseBridge:
                 self.client.table("scans").insert(data).execute()
             except Exception as e:
                 err_str = str(e)
-                # PGRST204: column not in schema cache — retry without new columns
+                # PGRST204: column not in schema cache — retry without known missing columns
                 if 'PGRST204' in err_str or 'schema cache' in err_str:
-                    logger.warning(f"Supabase schema missing new columns — retrying with base fields: {e}")
-                    safe_data = {k: v for k, v in data.items() if k not in ('direction', 'entry', 'stop_loss', 'target', 'r_multiple', 'outcome')}
+                    logger.warning(f"Supabase schema cache stale for signal: {e}")
+                    # Only strip 'direction' if it was causing the error, keep the levels!
+                    # Based on project forensics, 'entry', 'stop_loss', 'target' DO exist.
+                    safe_data = {k: v for k, v in data.items() if k not in ('direction')}
                     self.client.table("scans").insert(safe_data).execute()
                 else:
                     raise
