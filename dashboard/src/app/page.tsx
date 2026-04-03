@@ -125,47 +125,38 @@ export default function Dashboard() {
         </div>
 
         {/* Primary Metrics Ribbon */}
-        <div className="flex flex-wrap items-end gap-x-12 gap-y-4">
-          {/* Equity & Growth Integrated */}
-          <div className="space-y-1">
-            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Digital Equity</div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-mono font-bold tracking-tighter">
-                {isZenMode ? "— — — —" : equityDisplay}
-              </span>
-              {!isZenMode && (
-                <span className={`text-xs font-bold ${totalPnL >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  {pnlSign}{totalReturnPercent}%
-                </span>
-              )}
-            </div>
-            <div className="w-32 h-[2px] bg-white/5 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPercent}%` }}
-                className="h-full bg-emerald-500"
-              />
-            </div>
-          </div>
+        <div className="flex flex-wrap items-end gap-x-16 gap-y-4">
+          <StatsCard
+            label="Digital Equity"
+            value={isZenMode ? "— — — —" : equityDisplay}
+            sub={equitySub}
+            icon={Target}
+            className={totalPnL >= 0 ? "text-emerald-500" : "text-rose-500"}
+          />
 
-          <div className="space-y-1">
-            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Market Bias</div>
-            <div className={`text-2xl font-black tracking-tighter ${biasColor}`}>{marketBias}</div>
-          </div>
+          <StatsCard
+            label="Market Bias"
+            value={marketBias}
+            sub="Structural Consensus"
+            icon={Activity}
+            highlight={marketBias === "BULLISH"}
+            alert={marketBias === "BEARISH"}
+          />
 
-          <div className="space-y-1">
-            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Daily Drawdown</div>
-            <div className={`text-2xl font-mono font-bold tracking-tighter ${parseFloat(drawdown) > 5 ? "text-rose-500" : "text-white/40"}`}>
-              {drawdownDisplay}
-            </div>
-          </div>
+          <StatsCard
+            label="Daily Drawdown"
+            value={drawdownDisplay}
+            sub="Prop Guard Active"
+            icon={ShieldAlert}
+            alert={parseFloat(drawdown) > 5}
+          />
 
-          <div className="space-y-1 text-right">
-            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Session</div>
-            <div className="text-xl font-bold text-white tracking-tighter">
-              {session.name} <span className="text-[10px] text-white/20 align-middle ml-1">{session.sub}</span>
-            </div>
-          </div>
+          <StatsCard
+            label="Session"
+            value={session.name}
+            sub={session.sub}
+            icon={Clock}
+          />
         </div>
 
         <div className="flex items-center gap-4">

@@ -113,14 +113,16 @@ class Config:
     
     # Strategy Mode
     STRATEGY_MODE = "VOLUME_OPERATOR"
-    AI_THRESHOLD = 7.0
-    AI_THRESHOLD_ASIAN_FADE = 6.5
+    AI_THRESHOLD = 8.5
+    AI_THRESHOLD_ASIAN_FADE = 7.5
     
     # ── 98% Reliability Standard Thresholds ──────────────────────
     SYNC_PRICE_DELTA_MAX = 0.005     # 0.5% (Loosened for crypto volatility)
     SYNC_LATENCY_SEC_MAX = 120        # 2 Minutes
     SLIPPAGE_ATR_RATIO_MAX = 1.5      # Spread / ATR(14)
-    HURST_CHAOS_RANGE = (0.45, 0.55)  # Re-enforced: must be rejected as CHOP / RANDOM <!-- id: 6 -->
+    HURST_CHAOS_RANGE = (0.45, 0.55)  # Must be rejected as CHOP / RANDOM
+    HURST_MIN_MEMORY = 0.55          # Trending threshold
+    HURST_MAX_RANDOM = 0.45          # Mean-reverting threshold
     
     # ── AI Risk Logic ──────────────────────────────────────────
     ROI_OPTIMIZATION_ENABLED = True

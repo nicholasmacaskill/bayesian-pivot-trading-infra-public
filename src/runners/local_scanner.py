@@ -735,7 +735,7 @@ class LocalScannerRunner:
                     'smt_score': f"{market_context.get('DXY', {}).get('change_ltf', 0):+.2f}%" if market_context else 'N/A',
                 }
 
-                # ── Hurst Exponent + Strategy Label ───────────────────────────
+                # ── Hurst Gate: The Sovereign Filter ───────────────────────────
                 hurst_val = 0.5
                 try:
                     df_tmp = self.scanner.fetch_data(symbol, Config.TIMEFRAME, limit=100)
@@ -743,12 +743,20 @@ class LocalScannerRunner:
                         hurst_val = self.scanner.get_hurst_exponent(df_tmp['close'].values)
                 except: pass
 
-                if hurst_val < 0.45:
+                # 🚫 THE MEAT GRINDER: Block symbols in the 0.45 - 0.55 randomness zone
+                if Config.HURST_CHAOS_RANGE[0] <= hurst_val <= Config.HURST_CHAOS_RANGE[1]:
+                    logger.debug(f"🚫 {symbol} in MEAT GRINDER (Hurst: {hurst_val:.2f}). Skipping.")
+                    continue
+
+                if hurst_val < Config.HURST_MAX_RANDOM:
                     hunt_label = "Turtle Soup / Fade Search"
-                elif hurst_val > 0.55:
+                    strategy_mode = "REVERSAL"
+                elif hurst_val > Config.HURST_MIN_MEMORY:
                     hunt_label = "Trend Alignment / Displacement Search"
+                    strategy_mode = "TREND"
                 else:
-                    hunt_label = "Neutral / Structure Search"
+                    # Fallback — should be caught by chaos range but for safety:
+                    continue
 
                 # ── HTF POI — Liquidity Gravity ───────────────────────────────
                 liquidity_targets = None
@@ -773,7 +781,7 @@ class LocalScannerRunner:
 
                 self.scan_results[symbol] = {
                     'bias':     bias_score,
-                    'regime':   'CHOP',
+                    'regime':   'TREND' if strategy_mode == "TREND" else 'REVERSAL',
                     'hurst':    hurst_val,
                     'smt':      market_context.get('DXY', {}).get('change_ltf', 0) if market_context else 0.0,
                     'quartile': f"Q{quartile_data['num']}: {quartile_data['phase'][:7]}",
@@ -783,14 +791,19 @@ class LocalScannerRunner:
                 cal_safe, cal_reason = self.cal_filter.is_safe_to_trade(symbol)
                 if not cal_safe: continue
 
-                # Scan
+                # ── Strategy-Aligned Scanning ────────────────────────────────
                 is_prime_window = self.scanner.is_asian_fade_window()
                 result = None
-                if is_prime_window:
-                    result = self.scanner.scan_asian_fade(symbol)
-                if not result:
-                    result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
-                if not result:
+                
+                # ONLY run Reversal scans in Reversal markets
+                if strategy_mode == "REVERSAL":
+                    if is_prime_window:
+                        result = self.scanner.scan_asian_fade(symbol)
+                    if not result:
+                        result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
+                
+                # ONLY run Trend scans in Trending markets
+                elif strategy_mode == "TREND":
                     result = self.scanner.scan_trend_expansion(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
 
                 if result:
@@ -856,7 +869,7 @@ class LocalScannerRunner:
                     base_pattern = setup.get('pattern', 'Unknown')
                     enriched_pattern = f"{hunt_label} — {base_pattern}"
 
-                    # Threshold
+                    # Threshold: Sovereign Sniper Standard (8.5)
                     is_asian_fade = setup.get('is_asian_fade', False)
                     threshold = Config.AI_THRESHOLD_ASIAN_FADE if is_asian_fade else Config.AI_THRESHOLD
 
