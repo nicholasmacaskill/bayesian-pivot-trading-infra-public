@@ -65,6 +65,16 @@ def fetch_binance_ohlcv(symbol, timeframe='5m', days_back=365):
     
     return df
 
+def calculate_hurst(prices):
+    """Calculates the Hurst Exponent to detect market memory."""
+    try:
+        lags = range(2, 20)
+        tau = [np.sqrt(np.std(np.subtract(prices[idx:], prices[:-idx]))) for idx in lags]
+        m = np.polyfit(np.log(lags), np.log(tau), 1)
+        return m[0] * 2.0
+    except:
+        return 0.5
+
 def calculate_atr(df, period=14):
     """Calculate ATR for stop loss sizing."""
     high = df['high']
@@ -183,7 +193,8 @@ def run_backtest():
     print(f"🔬 1-YEAR BINANCE HISTORICAL BACKTEST (OPTIMIZED)")
     print(f"=" * 60)
     print(f"📋 Scanner Config: MIN_SMT_STRENGTH = {Config.MIN_SMT_STRENGTH}")
-    print(f"📋 AI Threshold: {Config.AI_THRESHOLD}")
+    print(f"📋 Sovereign AI Threshold: 8.5")
+    print(f"📋 Chaos Range (Hurst Gate): {Config.HURST_CHAOS_RANGE}")
     print(f"=" * 60)
     
     symbols = ['BTC/USD', 'ETH/USD', 'SOL/USD']
@@ -231,6 +242,11 @@ def run_backtest():
             print(f"   ❌ Failed to fetch {symbol}: {e}")
             continue
         
+        # ── Hurst Pre-Calculation ──────────────────────────────────────────
+        print(f"🔬 Pre-calculating Hurst Exponent for {symbol}...")
+        df['hurst'] = df['close'].rolling(window=100).apply(lambda x: calculate_hurst(x.values))
+        df.fillna(0.5, inplace=True)
+        
         print(f"\n📊 Scanning {symbol} ({len(df)} candles)...")
         setups_found = 0
         
@@ -242,6 +258,11 @@ def run_backtest():
             if idx % 5000 == 0:
                 print(f"   Progress: {idx}/{len(df)} candles scanned... Signals: {signals_before_ai}")
                 
+            # 🚫 THE SNIPER GATE: Block 0.45 - 0.55
+            hurst_val = df['hurst'].iloc[idx]
+            if Config.HURST_CHAOS_RANGE[0] <= hurst_val <= Config.HURST_CHAOS_RANGE[1]:
+                continue
+
             setup = detect_order_block_setup(df, idx, intermarket)
             if setup:
                 last_signal_idx = idx
@@ -268,8 +289,8 @@ def run_backtest():
                 import time
                 time.sleep(1) # Rate limit protection for Gemini
                 
-                # Filter by AI threshold (Relaxed to 7.5 for backtest due to lack of visual/sentiment context)
-                BACKTEST_AI_THRESHOLD = 7.0
+                # Threshold: Sovereign Sniper Standard (8.5)
+                BACKTEST_AI_THRESHOLD = 8.5
                 if ai_score < BACKTEST_AI_THRESHOLD or ai_verdict not in ["FLOW_GO", "HARD_LOGIC_PASS"]:
                     print(f"   [AI REJECT] Score: {ai_score} | Verdict: {ai_verdict} | Reason: {ai_result['live_execution']['reasoning'][:100]}...")
                     continue
