@@ -75,17 +75,18 @@ class SovereignAIHub:
             from PIL import Image
             contents.append(Image.open(image_path))
         
-        # Try different Gemini models
-        for model in ['gemini-2.0-flash', 'gemini-1.5-flash']:
+        # Updated model priority: 2.5-flash (best quality), 2.0-flash (faster/cheaper)
+        for model in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']:
             try:
                 response = self.gemini_client.models.generate_content(
                     model=model,
                     contents=contents
                 )
-                return self._parse_json_response(response.text, provider="Gemini")
-            except Exception:
+                return self._parse_json_response(response.text, provider=f"Gemini/{model}")
+            except Exception as e:
+                logger.warning(f"Gemini model {model} failed: {e}")
                 continue
-        raise Exception("Gemini models failed")
+        raise Exception("All Gemini models failed")
 
     def _analyze_with_claude(self, prompt: str, image_path: Optional[str]) -> Dict[str, Any]:
         """Claude 3.5 Sonnet Implementation."""
@@ -153,7 +154,7 @@ class SovereignAIHub:
             try:
                 from PIL import Image
                 img = Image.open(image_path)
-                for model in ['gemini-2.0-flash', 'gemini-1.5-flash']:
+                for model in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']:
                     try:
                         response = self.gemini_client.models.generate_content(
                             model=model,
