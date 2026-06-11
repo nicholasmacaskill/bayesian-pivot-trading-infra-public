@@ -981,14 +981,21 @@ class SMCScanner:
         else:
             target = session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg')
         
-        # CRITICAL: Enforce minimum Config target for all institutional setups
-        if direction == 'LONG' and target < min_target_dynamic:
-            logger.warning(f"⚠️ Target {target:.2f} < {Config.TP1_R_MULTIPLE}R floor {min_target_dynamic:.2f}. Using Config minimum.")
-            return min_target_dynamic
-        elif direction == 'SHORT' and target > min_target_dynamic:
-            logger.warning(f"⚠️ Target {target:.2f} > {Config.TP1_R_MULTIPLE}R floor {min_target_dynamic:.2f}. Using Config minimum.")
-            return min_target_dynamic
+        # 98% Reliability: Target Guard Rails
+        # Ensure target is ALWAYS in the right direction
+        if direction == 'LONG':
+            target = max(target or 0, min_target_dynamic)
+        else: # SHORT
+            target = min(target or float('inf'), min_target_dynamic)
             
+        # CRITICAL: Final sanity check on absolute return direction
+        if direction == 'LONG' and target <= entry_price:
+            logger.warning(f"🛡️ Fix LONG Target: {target:.2f} <= {entry_price:.2f}. Forcing 2.5R.")
+            target = entry_price + (Config.TP1_R_MULTIPLE * stop_buffer)
+        elif direction == 'SHORT' and target >= entry_price:
+            logger.warning(f"🛡️ Fix SHORT Target: {target:.2f} >= {entry_price:.2f}. Forcing 2.5R.")
+            target = entry_price - (Config.TP1_R_MULTIPLE * stop_buffer)
+
         return target
             
     def get_next_institutional_target(self, df, direction, entry_price):
