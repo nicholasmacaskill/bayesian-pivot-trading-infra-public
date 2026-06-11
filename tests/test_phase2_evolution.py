@@ -46,8 +46,8 @@ def test_phase2_logic():
     with patch('yfinance.download', return_value=mock_dxy):
         smt = intermarket.detect_true_smt(btc_df, "DXY")
         print(f"Detected SMT: {smt}")
-        assert "BULLISH_SMT" in smt
-        assert "DXY Sweep" in smt
+        assert "BULLISH_SMT" in smt[0]
+        assert "DXY Sweep" in smt[0]
 
     print("✅ Phase 2 Logic Verification Passed!")
 
