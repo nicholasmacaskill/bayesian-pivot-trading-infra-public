@@ -354,6 +354,7 @@ def run_scanner_job():
                         "stop_loss": setup['stop_loss'],
                         "take_profit": setup['target'],
                         "position_size": round(lots, 2),
+                        "position_value": round(raw_units * setup['entry'], 2),
                         "raw_units": round(raw_units, 4),
                         "contract_size": c_size,
                         "firm": Config.ACTIVE_FIRM,
