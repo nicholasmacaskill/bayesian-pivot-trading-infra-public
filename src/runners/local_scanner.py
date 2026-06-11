@@ -644,7 +644,7 @@ class LocalScannerRunner:
             if self.awaiting_psych_response:
                 user_response = self.notifier.get_latest_message(since_timestamp=self.last_psych_prompt_time)
                 if user_response:
-                    physio_tilt = self.biometrics.calculate_physio_tilt()
+                    physio_tilt = 1.0 if getattr(Config, 'BYPASS_BIOMETRIC_GATE', False) else self.biometrics.calculate_physio_tilt()
                     psych_state = self.psychology.analyze_user_state(user_response['text'], physio_tilt=physio_tilt)
                     self.last_psych_state = psych_state
                     self.awaiting_psych_response = False
@@ -839,31 +839,40 @@ class LocalScannerRunner:
 
                     # ── AI Validation (Cloud → Llama3 fallback) ───────────────
                     session_info_for_llm = session_info
-                    try:
-                        ai_result = validate_setup(
-                            setup, self.sentiment_engine.get_market_sentiment(symbol),
-                            self.sentiment_engine.get_whale_confluence(),
-                            df=df, exchange=self.scanner.exchange, hurst_exponent=hurst_val,
-                            guard_trust_score=self.guard.get_trust_score()
-                        )
-                        live = ai_result.get('live_execution', ai_result)
-                        live_score = live.get('score', 0)
-                    except Exception as _cloud_err:
-                        logger.warning(f"☁️ Cloud AI failed for {symbol}: {_cloud_err} — trying Llama3...")
-                        if self.local_llm.is_available():
-                            try:
-                                local_result = self.local_llm.score_setup(
-                                    setup, market_context=market_context,
-                                    hurst=hurst_val, session_info=session_info_for_llm
-                                )
-                                live = local_result
-                                live_score = local_result.get('score', 0)
-                                logger.info(f"🦙 Llama3 fallback score for {symbol}: {live_score}")
-                            except Exception as _llm_err:
-                                logger.error(f"🦙 Llama3 also failed: {_llm_err}")
+                    if getattr(Config, 'BYPASS_AI_GATE', False):
+                        logger.info(f"⚡ AI Gate Bypassed (Sovereign Light) for {symbol}")
+                        ai_result = {
+                            "live_execution": {"score": 10.0, "reasoning": "AI Gate Bypassed (Sovereign Light)"},
+                            "shadow_optimizer": {"suggested_risk_multiplier": 1.0}
+                        }
+                        live = ai_result["live_execution"]
+                        live_score = 10.0
+                    else:
+                        try:
+                            ai_result = validate_setup(
+                                setup, self.sentiment_engine.get_market_sentiment(symbol),
+                                self.sentiment_engine.get_whale_confluence(),
+                                df=df, exchange=self.scanner.exchange, hurst_exponent=hurst_val,
+                                guard_trust_score=self.guard.get_trust_score()
+                            )
+                            live = ai_result.get('live_execution', ai_result)
+                            live_score = live.get('score', 0)
+                        except Exception as _cloud_err:
+                            logger.warning(f"☁️ Cloud AI failed for {symbol}: {_cloud_err} — trying Llama3...")
+                            if self.local_llm.is_available():
+                                try:
+                                    local_result = self.local_llm.score_setup(
+                                        setup, market_context=market_context,
+                                        hurst=hurst_val, session_info=session_info_for_llm
+                                    )
+                                    live = local_result
+                                    live_score = local_result.get('score', 0)
+                                    logger.info(f"🦙 Llama3 fallback score for {symbol}: {live_score}")
+                                except Exception as _llm_err:
+                                    logger.error(f"🦙 Llama3 also failed: {_llm_err}")
+                                    continue
+                            else:
                                 continue
-                        else:
-                            continue
 
                     # Hurst-aware pattern label
                     base_pattern = setup.get('pattern', 'Unknown')
@@ -884,11 +893,37 @@ class LocalScannerRunner:
                         shadow = ai_result.get('shadow_optimizer', {})
                         ai_multiplier = shadow.get('suggested_risk_multiplier', 1.0)
                         
-                        # Final Risk Calculation
-                        base_risk_pct = Config.RISK_PER_TRADE
-                        risk_amt = calc_equity * base_risk_pct * ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
+                        # Calculate true R:R from actual prices (not hardcoded config)
+                        _entry = setup['entry']
+                        _sl    = setup['stop_loss']
+                        _tp    = setup.get('target')
+                        _risk  = abs(_entry - _sl)
+                        _actual_rr = round(abs(_tp - _entry) / _risk, 2) if (_tp and _risk > 0) else 0
+
+                        # TP Sanity Check
+                        _tp_valid = False
+                        if _tp is not None:
+                            if direction == 'LONG' and _tp > _entry:
+                                _tp_valid = True
+                            elif direction == 'SHORT' and _tp < _entry:
+                                _tp_valid = True
+
+                        if not _tp_valid:
+                            logger.error(f"🚨 ALERT BLOCKED: {symbol} {direction} TP Sanity Fail | Entry={_entry:.2f} | TP={_tp} (Negative Return)")
+                            continue
+
+                        # Risk Calculation (Target Profit Mode vs Fixed USD Risk vs standard Risk Per Trade)
+                        if getattr(Config, 'TARGET_PROFIT_MODE', False) and _actual_rr > 0:
+                            risk_amt = Config.TARGET_PROFIT_USD / _actual_rr
+                            logger.info(f"🎯 TARGET PROFIT MODE: Risking ${risk_amt:.2f} to target ${Config.TARGET_PROFIT_USD:.2f} profit with R:R {_actual_rr:.2f}")
+                        elif getattr(Config, 'FIXED_RISK_USD', None) is not None:
+                            risk_amt = Config.FIXED_RISK_USD
+                            logger.info(f"🛡️ FIXED RISK MODE: Risking a hard limit of ${risk_amt:.2f} per trade")
+                        else:
+                            base_risk_pct = Config.RISK_PER_TRADE
+                            risk_amt = calc_equity * base_risk_pct * ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
                         
-                        lots = round(risk_amt / abs(setup['entry'] - setup['stop_loss']), 4) if abs(setup['entry'] - setup['stop_loss']) > 0 else 0
+                        lots = round(risk_amt / _risk, 4) if _risk > 0 else 0
                         
                         # 1. Asset-Specific Symbol Caps (from config.py) 
                         max_allowed_size = getattr(Config, 'MAX_POSITION_SIZES', {}).get(symbol)
