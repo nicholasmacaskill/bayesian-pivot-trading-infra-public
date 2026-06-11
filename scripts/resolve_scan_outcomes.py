@@ -12,7 +12,7 @@ Run daily via cron: 0 8 * * * cd /path/to/project && python3 scripts/resolve_sca
 import os
 import sys
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.append(os.getcwd())
 
@@ -99,11 +99,12 @@ def run_resolver(limit=200):
     resolved = 0
     for scan in scans:
         try:
-            ts_str = scan['timestamp'].replace('Z', '').split('+')[0]
-            ts = datetime.fromisoformat(ts_str)
+            # Parse as timezone-aware UTC datetime
+            ts = datetime.fromisoformat(scan['timestamp'].replace('Z', '+00:00'))
 
             # Skip scans less than 1 hour old (need time to play out)
-            if (datetime.utcnow() - ts).total_seconds() < 3600:
+            now_utc = datetime.now(ts.tzinfo)
+            if (now_utc - ts).total_seconds() < 3600:
                 continue
 
             symbol = scan['symbol']
@@ -117,14 +118,14 @@ def run_resolver(limit=200):
 
             if outcome == 'OPEN':
                 # Still in play — skip for now unless it's old
-                if (datetime.utcnow() - ts).total_seconds() > 86400 * 3:
+                if (now_utc - ts).total_seconds() > 86400 * 3:
                     outcome = 'EXPIRED'  # Too old to resolve = likely moved SL manually
             
             if outcome != 'OPEN':
                 supabase.client.table('scans').update({
                     'outcome': outcome,
                     'actual_r': actual_r,
-                    'resolved_at': datetime.utcnow().isoformat()
+                    'resolved_at': datetime.now(timezone.utc).isoformat()
                 }).eq('id', scan['id']).execute()
 
                 emoji = "✅" if outcome == 'WIN' else "❌" if outcome == 'LOSS' else "⏰"
