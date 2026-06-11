@@ -2,7 +2,7 @@ import os
 
 class Config:
     # Trading Parameters
-    SYMBOLS = ['BTC/USD', 'ETH/USD', 'SOL/USD']  # Tier 1: Institutional Majors (All Setups)
+    SYMBOLS = ['BTC/USD']  # Focus exclusively on BTC/USD (Proven System Edge)
     
     # Tier 2: High Alpha Altcoins (Judas Sweeps Only)
     ALT_SYMBOLS = []
@@ -12,13 +12,20 @@ class Config:
     
     # Risk Management
     RISK_PER_TRADE = 0.007  # 0.7% (Default)
-    FIXED_RISK_USD = 500.0  # Defensive Mode: Hard cap at $500 per trade
-    MAX_NOTIONAL_VALUE_USD = 40000.0  # Safe cap for notional position size <!-- id: 12 -->
-    MIN_STOP_LOSS_ATR = 1.5          # Minimum stop loss distance (ATR multiplier)
+    FIXED_RISK_USD = 100.0  # Defensive Mode: Hard cap at $100 per trade
+    MAX_NOTIONAL_VALUE_USD = 50000.0  # Hard cap: max position value per trade
+    MIN_STOP_LOSS_ATR = 1.5           # Minimum stop loss distance (ATR multiplier)
+    # Minimum stop distance per asset as % of price (prevents tiny-ATR runaway lots)
+    # e.g. BTC at $83k → min stop = $166; ATR must cause at least this distance
+    MIN_STOP_PCT = {
+        "BTC/USD": 0.002,   # 0.2% = ~$166 at $83k
+        "ETH/USD": 0.002,   # 0.2% = ~$3.60 at $1,800
+        "SOL/USD": 0.002,   # 0.2% = ~$0.24 at $120
+    }
     MAX_POSITION_SIZES = {
-        "BTC/USD": 2.0,
-        "ETH/USD": 30.0,
-        "SOL/USD": 100.0
+        "BTC/USD": 0.60,    # ~$50k notional at $83k
+        "ETH/USD": 27.0,    # ~$49k notional at $1,800
+        "SOL/USD": 416.0,   # ~$50k notional at $120
     }
     MAX_DRAWDOWN_LIMIT = 0.06  # 6% Total Account Drawdown
     DAILY_DRAWDOWN_LIMIT = 0.025 # 2.5% Daily Drawdown
@@ -88,9 +95,16 @@ class Config:
         "MENT_FUNDING": {"name": "Ment Funding", "url": "https://mentfunding.com/faq", "contract_size": 1.0, "commission_rate": 0.001}
     }
     
-    # Safety Toggles
     USE_TRADELOCKER_API = True
     SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "")
+
+    # Sovereign Light Simplification Toggles (Defaults to simplified mode)
+    BYPASS_AI_GATE = False        # Set to True to execute setups purely on Gates 1-5
+    BYPASS_BIOMETRIC_GATE = True  # Set to True to ignore biometric stress halts
+    
+    # Target Profit Mode (Direct $300-$400 Clocking)
+    TARGET_PROFIT_MODE = False     # Set to True to scale risk specifically for a target profit
+    TARGET_PROFIT_USD = 350.0      # Target profit per trade (e.g. $300 - $400)
 
     # Correlation & Calendar
     CORRELATION_MAX_PER_DIRECTION = 1
@@ -155,8 +169,8 @@ class Config:
     MIN_PRICE_QUARTILE_SHORT = 0.25
     MAX_PRICE_QUARTILE_SHORT = 1.0
     
-    # Database Path (Local)
-    DB_PATH = os.path.join(os.getcwd(), "data", "smc_alpha.db")
+    # Database Path (Local vs Modal Volume)
+    DB_PATH = "/data/smc_alpha.db" if os.path.isdir("/data") else os.path.join(os.getcwd(), "data", "smc_alpha.db")
 
     # Local Runner Parameters
     RUN_INTERVAL_MINS = 3

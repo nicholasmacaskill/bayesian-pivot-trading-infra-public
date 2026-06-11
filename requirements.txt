@@ -18,3 +18,5 @@ psutil
 plyer
 cryptography
 yfinance
+anthropic
+openai
