@@ -30,11 +30,14 @@ class TradeLockerHelper:
             "208": "SOL/USD",
             "221": "SOL/USD",
             "1": "EUR/USD",
-            "2": "GBP/USD"
+            "2": "GBP/USD",
+            "19965": "BTC/USD",
+            "19967": "ETH/USD",
+            "19968": "SOL/USD",
         }
         symbol = mapping.get(str(instrument_id))
         if not symbol:
-            logger.warning(f"Unknown instrument ID: {instrument_id}")
+            logger.debug(f"Unmapped instrument ID: {instrument_id}")
             return str(instrument_id)
         return symbol
 
@@ -169,6 +172,7 @@ class TradeLockerHelper:
                                 'pnl': float(p[9] or 0.0),
                                 'entry_time': str(p[8]),
                                 'price': float(p[5] or 0.0),
+                                'qty': float(p[4] or 0.0),
                                 'status': 'OPEN'
                             })
                         except Exception as e:
@@ -182,6 +186,7 @@ class TradeLockerHelper:
                             'pnl': float(p.get('floatingProfit') or p.get('profit') or 0.0), 
                             'entry_time': p.get('openDate') or p.get('created'),
                             'price': float(p.get('avgOpenPrice') or p.get('openPrice') or 0.0),
+                            'qty': float(p.get('qty') or p.get('lotSize') or 0.0),
                             'status': 'OPEN'
                         })
                 return trades
@@ -282,7 +287,11 @@ class TradeLockerHelper:
                 total_qty = min(sum(o['qty'] for o in buys), sum(o['qty'] for o in sells))
 
                 pnl = (avg_sell - avg_buy) * total_qty
-                side = 'BUY'  # Net side (opened as a BUY, closed as a SELL)
+                
+                # Sort orders by time_ms to identify the opening trade side (BUY for Long, SELL for Short)
+                orders_sorted = sorted(orders, key=lambda x: x['time_ms'])
+                side = orders_sorted[0]['side'] if orders_sorted else 'BUY'
+                
                 close_time_ms = max(o['time_ms'] for o in orders)
                 close_time = datetime.utcfromtimestamp(close_time_ms / 1000).isoformat()
 
@@ -305,6 +314,37 @@ class TradeLockerHelper:
             logger.error(f"History Fetch Error: {e}")
             return []
 
+    def place_order(self, instrument_id, side, qty, stop_loss=None, take_profit=None, order_type="market", price=0.0):
+        """Stealth Order Execution Module"""
+        if not self.access_token and not self.login(): return False
+        try:
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/orders"
+            payload = {
+                "tradableInstrumentId": int(instrument_id),
+                "qty": float(qty),
+                "side": side.lower(),
+                "type": order_type.lower(),
+                "routeId": 2025730,
+                "validity": "IOC"
+            }
+            if order_type.lower() == "limit":
+                payload["price"] = float(price)
+            else:
+                payload["price"] = 0.0
+                
+            if stop_loss: payload["stopLoss"] = float(stop_loss)
+            if take_profit: payload["takeProfit"] = float(take_profit)
+            
+            resp = requests.post(url, json=payload, headers=self._get_headers(auth=True), timeout=10)
+            if resp.status_code in [200, 201]:
+                logger.info(f"✅ Order Executed: {side} {qty} on {instrument_id}")
+                return resp.json()
+            else:
+                logger.error(f"❌ Order Failed: {resp.status_code} - {resp.text}")
+                return False
+        except Exception as e:
+            logger.error(f"Order Exception: {e}")
+            return False
 
     def get_todays_trades_count(self):
         """Simplified trade count for verification."""
@@ -408,3 +448,20 @@ class TradeLockerClient:
 
     def get_trade_history(self, limit=5):
         return [] # Placeholder
+
+    def execute_trade(self, symbol="BTC/USD", side="buy", qty=0.15, stop_loss=None, take_profit=None):
+        """Executes a trade across the primary account. Uses Upcomers BTC ID 19965."""
+        instrument_id = "19965" if symbol == "BTC/USD" else "206"
+        
+        # We execute on the primary account (Account A)
+        if not self.helpers: return False
+        primary_account = self.helpers[0]
+        
+        return primary_account.place_order(
+            instrument_id=instrument_id,
+            side=side,
+            qty=qty,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            order_type="market"
+        )
