@@ -1,0 +1,24 @@
+[package]
+name = "quant-auditor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# GUI Framework
+slint = "1.7.0"
+
+# Database client (with bundled SQLite to avoid external dev dependencies)
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+
+# Cryptography & Hashing
+rsa = "0.9.6"
+sha2 = { version = "0.10.8", features = ["oid"] }
+hex = "0.4.3"
+
+# Date and Serialization
+chrono = { version = "0.4.38", features = ["serde"] }
+serde = { version = "1.0.204", features = ["derive"] }
+serde_json = "1.0.120"
+
+[build-dependencies]
+slint-build = "1.7.0"
