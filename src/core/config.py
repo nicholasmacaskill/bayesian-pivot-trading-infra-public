@@ -22,6 +22,12 @@ class Config:
         "ETH/USD": 0.002,   # 0.2% = ~$3.60 at $1,800
         "SOL/USD": 0.002,   # 0.2% = ~$0.24 at $120
     }
+    # Minimum target distance per asset as % of price (prevents noise-level weekend ATR targets)
+    MIN_TARGET_PCT = {
+        "BTC/USD": 0.010,   # 1.0% = ~$640 at $64k
+        "ETH/USD": 0.010,   # 1.0% = ~$35 at $3,500
+        "SOL/USD": 0.015,   # 1.5% = ~$2.25 at $150
+    }
     MAX_POSITION_SIZES = {
         "BTC/USD": 0.60,    # ~$50k notional at $83k
         "ETH/USD": 27.0,    # ~$49k notional at $1,800
@@ -97,6 +103,7 @@ class Config:
     
     USE_TRADELOCKER_API = True
     SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "")
+    LIVE_AUTO_EXECUTION = os.environ.get("LIVE_AUTO_EXECUTION", "False").lower() == "true"
 
     # Sovereign Light Simplification Toggles (Defaults to simplified mode)
     BYPASS_AI_GATE = False        # Set to True to execute setups purely on Gates 1-5
@@ -127,6 +134,9 @@ class Config:
     
     # Strategy Mode
     STRATEGY_MODE = "VOLUME_OPERATOR"
+    AI_THRESHOLD_LONG = 9.0
+    AI_THRESHOLD_SHORT = 8.0
+    LONG_RISK_MULTIPLIER = 0.5
     AI_THRESHOLD = 8.5
     AI_THRESHOLD_ASIAN_FADE = 7.5
     

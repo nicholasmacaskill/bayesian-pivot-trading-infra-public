@@ -880,7 +880,10 @@ class LocalScannerRunner:
 
                     # Threshold: Sovereign Sniper Standard (8.5)
                     is_asian_fade = setup.get('is_asian_fade', False)
-                    threshold = Config.AI_THRESHOLD_ASIAN_FADE if is_asian_fade else Config.AI_THRESHOLD
+                    if is_asian_fade:
+                        threshold = Config.AI_THRESHOLD_ASIAN_FADE
+                    else:
+                        threshold = Config.AI_THRESHOLD_LONG if direction == 'LONG' else Config.AI_THRESHOLD_SHORT
 
                     if live_score >= threshold:
                         setups_found += 1
@@ -915,13 +918,20 @@ class LocalScannerRunner:
                         # Risk Calculation (Target Profit Mode vs Fixed USD Risk vs standard Risk Per Trade)
                         if getattr(Config, 'TARGET_PROFIT_MODE', False) and _actual_rr > 0:
                             risk_amt = Config.TARGET_PROFIT_USD / _actual_rr
+                            if direction == 'LONG':
+                                risk_amt = risk_amt * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
                             logger.info(f"🎯 TARGET PROFIT MODE: Risking ${risk_amt:.2f} to target ${Config.TARGET_PROFIT_USD:.2f} profit with R:R {_actual_rr:.2f}")
                         elif getattr(Config, 'FIXED_RISK_USD', None) is not None:
                             risk_amt = Config.FIXED_RISK_USD
+                            if direction == 'LONG':
+                                risk_amt = risk_amt * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
                             logger.info(f"🛡️ FIXED RISK MODE: Risking a hard limit of ${risk_amt:.2f} per trade")
                         else:
                             base_risk_pct = Config.RISK_PER_TRADE
-                            risk_amt = calc_equity * base_risk_pct * ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
+                            risk_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
+                            if direction == 'LONG':
+                                risk_mult = risk_mult * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
+                            risk_amt = calc_equity * base_risk_pct * risk_mult
                         
                         lots = round(risk_amt / _risk, 4) if _risk > 0 else 0
                         
@@ -968,7 +978,29 @@ class LocalScannerRunner:
                             security_status=self.guard.get_security_context(),
                             psych_data={'mood': self.last_psych_state.get('sentiment', 'Unknown')}
                         )
-                        
+
+                        # ── LIVE AUTO-EXECUTION ──
+                        if Config.LIVE_AUTO_EXECUTION:
+                            logger.info(f"⚡ LIVE AUTO-EXECUTION: Submitting order to TradeLocker: {direction} {lots} {symbol} SL={_sl} TP={_tp}")
+                            try:
+                                exec_side = "buy" if direction.upper() == "LONG" else "sell"
+                                trade_success = self.tl.execute_trade(
+                                    symbol=symbol,
+                                    side=exec_side,
+                                    qty=lots,
+                                    stop_loss=_sl,
+                                    take_profit=_tp
+                                )
+                                if trade_success:
+                                    logger.info(f"✅ Trade executed successfully on TradeLocker.")
+                                    self.notifier._send_message(f"⚡ <b>AUTO-EXECUTION SUCCESS:</b> Placed <code>{exec_side.upper()} {lots} lots</code> of {symbol} (SL: <code>{_sl:,.2f}</code>, TP: <code>{_tp:,.2f}</code>)")
+                                else:
+                                    logger.error(f"❌ Trade execution rejected by TradeLocker broker client.")
+                                    self.notifier._send_message(f"⚠️ <b>AUTO-EXECUTION FAILURE:</b> Broker rejected order request for {symbol}.")
+                            except Exception as exec_err:
+                                logger.error(f"❌ Error executing live TradeLocker trade: {exec_err}", exc_info=True)
+                                self.notifier._send_message(f"🚨 <b>AUTO-EXECUTION EXCEPTION:</b> {str(exec_err)}")
+
                         # ── V3 Persistence ──
                         try:
                             scan_data = {
