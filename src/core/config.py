@@ -13,6 +13,7 @@ class Config:
     # Risk Management
     RISK_PER_TRADE = 0.007  # 0.7% (Default)
     FIXED_RISK_USD = 100.0  # Defensive Mode: Hard cap at $100 per trade
+    MAX_RISK_USD = 150.0    # Strict absolute risk cap per trade
     MAX_NOTIONAL_VALUE_USD = 50000.0  # Hard cap: max position value per trade
     MIN_STOP_LOSS_ATR = 1.5           # Minimum stop loss distance (ATR multiplier)
     # Minimum stop distance per asset as % of price (prevents tiny-ATR runaway lots)
@@ -29,7 +30,7 @@ class Config:
         "SOL/USD": 0.015,   # 1.5% = ~$2.25 at $150
     }
     MAX_POSITION_SIZES = {
-        "BTC/USD": 0.60,    # ~$50k notional at $83k
+        "BTC/USD": 0.25,    # Capped at 0.25 BTC
         "ETH/USD": 27.0,    # ~$49k notional at $1,800
         "SOL/USD": 416.0,   # ~$50k notional at $120
     }

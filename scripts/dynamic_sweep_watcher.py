@@ -94,9 +94,9 @@ def run_dynamic_daemon():
                     target_hit = lower
                 
                 if trigger_type:
-                    # Optimized Risk Management for $300 Profit with Wide Stop
-                    # Using 0.30 BTC: 1000 point move = $300. 300 point SL = $90 Risk.
-                    qty = 0.30
+                    # Optimized Risk Management for $250 Profit with Wide Stop
+                    # Using 0.25 BTC: 1000 point move = $250. 300 point SL = $75 Risk.
+                    qty = 0.25
                     if trigger_type == "UPPER":
                         side = "sell"
                         sl = current_price + 300
