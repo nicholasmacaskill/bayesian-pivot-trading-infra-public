@@ -136,9 +136,9 @@ class Config:
     
     # Strategy Mode
     STRATEGY_MODE = "VOLUME_OPERATOR"
-    AI_THRESHOLD_LONG = 9.0
+    AI_THRESHOLD_LONG = 8.0   # Leveled to match shorts (data shows longs avg $360 win vs $221)
     AI_THRESHOLD_SHORT = 8.0
-    LONG_RISK_MULTIPLIER = 0.5
+    LONG_RISK_MULTIPLIER = 1.0  # Full size — longs earn it (55.1% win rate, +$5,849 net)
     AI_THRESHOLD = 8.5
     AI_THRESHOLD_ASIAN_FADE = 7.5
     
