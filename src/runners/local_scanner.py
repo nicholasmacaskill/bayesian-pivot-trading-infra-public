@@ -931,7 +931,11 @@ class LocalScannerRunner:
                             risk_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
                             if direction == 'LONG':
                                 risk_mult = risk_mult * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
-                            risk_amt = calc_equity * base_risk_pct * risk_mult
+                        # Strict Risk Cap (Sovereign Guard Cap)
+                        max_risk = getattr(Config, 'MAX_RISK_USD', 150.0)
+                        if risk_amt > max_risk:
+                            logger.warning(f"🛡️ Risk calculated as ${risk_amt:.2f} exceeds MAX_RISK_USD (${max_risk:.2f}). Capping to ${max_risk:.2f}.")
+                            risk_amt = max_risk
                         
                         lots = round(risk_amt / _risk, 4) if _risk > 0 else 0
                         
