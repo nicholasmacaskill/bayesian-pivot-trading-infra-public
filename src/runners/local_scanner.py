@@ -984,8 +984,8 @@ class LocalScannerRunner:
                         )
 
                         # ── LIVE AUTO-EXECUTION ──
-                        if Config.LIVE_AUTO_EXECUTION:
-                            logger.info(f"⚡ LIVE AUTO-EXECUTION: Submitting order to TradeLocker: {direction} {lots} {symbol} SL={_sl} TP={_tp}")
+                        if Config.LIVE_AUTO_EXECUTION and live_score >= 10.0:
+                            logger.info(f"⚡ LIVE AUTO-EXECUTION (10/10 Setup): Submitting order to TradeLocker: {direction} {lots} {symbol} SL={_sl} TP={_tp}")
                             try:
                                 exec_side = "buy" if direction.upper() == "LONG" else "sell"
                                 trade_success = self.tl.execute_trade(
@@ -1004,6 +1004,8 @@ class LocalScannerRunner:
                             except Exception as exec_err:
                                 logger.error(f"❌ Error executing live TradeLocker trade: {exec_err}", exc_info=True)
                                 self.notifier._send_message(f"🚨 <b>AUTO-EXECUTION EXCEPTION:</b> {str(exec_err)}")
+                        elif Config.LIVE_AUTO_EXECUTION:
+                            logger.info(f"ℹ️ Skipping auto-execution: setup score is {live_score}/10 (Only 10/10 setups are automated).")
 
                         # ── V3 Persistence ──
                         try:
