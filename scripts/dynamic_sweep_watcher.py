@@ -10,6 +10,7 @@ sys.path.append(os.getcwd())
 from src.engines.smc_scanner import SMCScanner
 from src.clients.telegram_notifier import TelegramNotifier
 from src.clients.tl_client import TradeLockerClient
+from src.core.config import Config
 
 def get_dynamic_targets(scanner, symbol="BTC/USD"):
     """
@@ -109,25 +110,47 @@ def run_dynamic_daemon():
                         
                     print(f"\n🔔 [{trigger_type} TRIGGERED] BTC at ${current_price:,.2f}", flush=True)
                     
-                    # --- CYBORG MODE: AUTO-EXECUTION DISABLED ---
-                    print(f"🤖 [CYBORG MODE] Alerting {qty} BTC {side.upper()} opportunity (Execution Disabled)...", flush=True)
-                    # trade_result = tl_client.execute_trade(symbol=symbol, side=side, qty=qty, stop_loss=sl, take_profit=tp)
-                    status_text = "⚠️ CYBORG MODE: AUTO-EXECUTION DISABLED. MANUAL CONFIRMATION REQUIRED."
-                    
-                    # 5-Message Alert Sequence
-                    for i in range(5):
+                    # Check Auto-Execution
+                    if Config.LIVE_AUTO_EXECUTION:
+                        print(f"⚡ [AUTO-EXECUTION] Placing live order on TradeLocker: {side.upper()} {qty} BTC...", flush=True)
+                        try:
+                            trade_result = tl_client.execute_trade(symbol=symbol, side=side, qty=qty, stop_loss=sl, take_profit=tp)
+                            if trade_result:
+                                status_text = "✅ [AUTONOMOUS] Trade successfully executed on TradeLocker."
+                            else:
+                                status_text = "❌ [AUTONOMOUS] Broker rejected the execution request."
+                        except Exception as e:
+                            status_text = f"🚨 [AUTONOMOUS] Execution failed with exception: {str(e)}"
+                        
+                        # Send single execution alert
                         msg = (
-                            f"🚨 <b>BAYESIAN PIVOT ALERT ({i+1}/5)</b> 🚨\n\n"
-                            f"BTC hit <b>${current_price:,.2f}</b>, sweeping the {direction}.\n\n"
+                            f"🤖 <b>BAYESIAN PIVOT AUTO-EXECUTION REPORT</b> 🤖\n\n"
+                            f"BTC swept the {direction} at <b>${current_price:,.2f}</b>.\n\n"
                             f"<b>{status_text}</b>\n\n"
-                            f"Suggested Action: {side.upper()} {qty} BTC\n"
-                            f"Suggested Stop Loss: ${sl:,.2f}\n"
-                            f"Suggested Take Profit: ${tp:,.2f}"
+                            f"Action: {side.upper()} {qty} BTC\n"
+                            f"Stop Loss: ${sl:,.2f}\n"
+                            f"Take Profit: ${tp:,.2f}"
                         )
                         notifier._send_message(msg)
-                        print(f"   Sent Alert {i+1}/5", flush=True)
-                        if i < 4:
-                            time.sleep(60)
+                    else:
+                        # --- CYBORG MODE: AUTO-EXECUTION DISABLED ---
+                        print(f"🤖 [CYBORG MODE] Alerting {qty} BTC {side.upper()} opportunity (Execution Disabled)...", flush=True)
+                        status_text = "⚠️ CYBORG MODE: AUTO-EXECUTION DISABLED. MANUAL CONFIRMATION REQUIRED."
+                        
+                        # 5-Message Alert Sequence
+                        for i in range(5):
+                            msg = (
+                                f"🚨 <b>BAYESIAN PIVOT ALERT ({i+1}/5)</b> 🚨\n\n"
+                                f"BTC hit <b>${current_price:,.2f}</b>, sweeping the {direction}.\n\n"
+                                f"<b>{status_text}</b>\n\n"
+                                f"Suggested Action: {side.upper()} {qty} BTC\n"
+                                f"Suggested Stop Loss: ${sl:,.2f}\n"
+                                f"Suggested Take Profit: ${tp:,.2f}"
+                            )
+                            notifier._send_message(msg)
+                            print(f"   Sent Alert {i+1}/5", flush=True)
+                            if i < 4:
+                                time.sleep(60)
                             
                     targets_hit = True # Break inner loop, trigger full rescan
                     print("💤 Cooling down for 60 minutes before resetting traps...", flush=True)
