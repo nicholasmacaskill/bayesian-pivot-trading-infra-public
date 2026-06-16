@@ -954,9 +954,22 @@ class LocalScannerRunner:
                             position_value = lots * setup['entry']
                             logger.warning(f"🛡️ {symbol} exceeds Notional Cap (${max_notional:,}). Capping to {lots} lots (${position_value:,.2f}).")
 
+                        # 3. Take Profit Cap (Strict $400 Profit Cap)
+                        _max_profit = getattr(Config, 'MAX_PROFIT_USD', 400.0)
+                        if _tp is not None and lots > 0:
+                            _potential_profit = lots * abs(_tp - _entry)
+                            if _potential_profit > _max_profit:
+                                logger.warning(f"🛡️ Potential profit ${_potential_profit:.2f} exceeds MAX_PROFIT_USD (${_max_profit:.2f}). Clamping Take Profit.")
+                                if direction == 'LONG':
+                                    _tp = _entry + (_max_profit / lots)
+                                else:
+                                    _tp = _entry - (_max_profit / lots)
+                                setup['target'] = _tp
+
                         risk_calc = {
-                            "entry": setup['entry'], 
-                            "stop_loss": setup['stop_loss'],
+                            "entry": _entry, 
+                            "stop_loss": _sl,
+                            "take_profit": _tp,
                             "position_size": lots, 
                             "position_value": position_value,
                             "regime_mult": regime_result.suggested_size_mult,

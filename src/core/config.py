@@ -14,6 +14,7 @@ class Config:
     RISK_PER_TRADE = 0.007  # 0.7% (Default)
     FIXED_RISK_USD = 100.0  # Defensive Mode: Hard cap at $100 per trade
     MAX_RISK_USD = 150.0    # Strict absolute risk cap per trade
+    MAX_PROFIT_USD = 400.0  # Strict absolute profit cap per trade
     MAX_NOTIONAL_VALUE_USD = 50000.0  # Hard cap: max position value per trade
     MIN_STOP_LOSS_ATR = 1.5           # Minimum stop loss distance (ATR multiplier)
     # Minimum stop distance per asset as % of price (prevents tiny-ATR runaway lots)
