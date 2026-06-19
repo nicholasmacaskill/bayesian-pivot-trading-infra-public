@@ -30,51 +30,54 @@ class ExecutionAuditEngine:
         3. Match & Grade
         4. Update Journal
         """
-        logger.info(f"👮‍♂️ Starting Execution Audit (Last {hours_back}h)...")
-        
-        # 1. Fetch Signals
-        signals = self._fetch_recent_signals(hours_back)
-        if not signals:
-            logger.info("No high-quality signals found to audit.")
-            return
+        try:
+            logger.info(f"👮‍♂️ Starting Execution Audit (Last {hours_back}h)...")
             
-        # 2. Fetch Executions (Closed History + Open Positions)
-        # We need both because a signal might be currently active (Open) or already closed.
-        history_trades = self.tl.get_recent_history(hours=hours_back)
-        open_positions = self.tl.get_open_positions()
-        
-        # Normalize TL trades
-        executions = []
-        for t in history_trades:
-            executions.append({
-                "id": t['id'],
-                "symbol": t['symbol'],
-                "side": t['side'],
-                "price": t['price'],
-                "time": t['close_time'],
-                "status": "CLOSED",
-                "pnl": t['pnl']
-            })
-            
-        executions.extend(open_positions)
-        logger.info(f"Found {len(signals)} Signals vs {len(executions)} Executions.")
-        
-        # 3. Match & Grade
-        for signal in signals:
-            match = self._find_match(signal, executions)
-            if match:
-                self._grade_adherence(signal, match)
-                # Rate-limit protection for Gemini
-                time.sleep(2)
-            else:
-                self._mark_missed(signal)
+            # 1. Fetch Signals
+            signals = self._fetch_recent_signals(hours_back)
+            if not signals:
+                logger.info("No high-quality signals found to audit.")
+                return
                 
-        # 4. Check for Rogue Trades (Trades with NO Signal)
-        for trade in executions:
-            if not self._find_signal_for_trade(trade, signals):
-                self._mark_rogue(trade)
-                # Rate-limit protection for Gemini
-                time.sleep(2)
+            # 2. Fetch Executions (Closed History + Open Positions)
+            # We need both because a signal might be currently active (Open) or already closed.
+            history_trades = self.tl.get_recent_history(hours=hours_back)
+            open_positions = self.tl.get_open_positions()
+            
+            # Normalize TL trades
+            executions = []
+            for t in history_trades:
+                executions.append({
+                    "id": t['id'],
+                    "symbol": t['symbol'],
+                    "side": t['side'],
+                    "price": t['price'],
+                    "time": t['close_time'],
+                    "status": "CLOSED",
+                    "pnl": t['pnl']
+                })
+                
+            executions.extend(open_positions)
+            logger.info(f"Found {len(signals)} Signals vs {len(executions)} Executions.")
+            
+            # 3. Match & Grade
+            for signal in signals:
+                match = self._find_match(signal, executions)
+                if match:
+                    self._grade_adherence(signal, match)
+                    # Rate-limit protection for Gemini
+                    time.sleep(2)
+                else:
+                    self._mark_missed(signal)
+                    
+            # 4. Check for Rogue Trades (Trades with NO Signal)
+            for trade in executions:
+                if not self._find_signal_for_trade(trade, signals):
+                    self._mark_rogue(trade)
+                    # Rate-limit protection for Gemini
+                    time.sleep(2)
+        except Exception as e:
+            logger.error(f"Error in execution audit loop: {e}", exc_info=True)
 
     def _fetch_recent_signals(self, hours):
         """Fetches 'HIGH QUALITY' signals from Supabase scans table."""
@@ -87,7 +90,7 @@ class ExecutionAuditEngine:
                 .execute()
             return resp.data if resp.data else []
         except Exception as e:
-            logger.error(f"Failed to fetch signals: {e}")
+            logger.error(f"Failed to fetch signals from Supabase: {e}")
             return []
 
     def _find_match(self, signal, executions):
@@ -128,12 +131,20 @@ class ExecutionAuditEngine:
 
     def _grade_adherence(self, signal, trade):
         """Uses AI Audit Engine to grade how well the trader followed the system signal."""
+        if not self.sb.client:
+            logger.info("Supabase client offline. Skipping adherence grade.")
+            return
+
         logger.info(f"⚖️  Grading Adherence: {trade['symbol']} {trade['side']}")
         
-        # Check if already graded
-        existing = self.sb.client.table("journal").select("id").eq("trade_id", trade['id']).execute()
-        if existing.data and len(existing.data) > 0:
-            logger.info(f"   Trade {trade['id']} already graded. Skipping.")
+        try:
+            # Check if already graded
+            existing = self.sb.client.table("journal").select("id").eq("trade_id", trade['id']).execute()
+            if existing.data and len(existing.data) > 0:
+                logger.info(f"   Trade {trade['id']} already graded. Skipping.")
+                return
+        except Exception as e:
+            logger.error(f"Supabase check failed during adherence grade for trade {trade['id']}: {e}")
             return
 
         # Prepare parameters for AI
@@ -181,16 +192,21 @@ class ExecutionAuditEngine:
             notes=f"Signal Match: {signal.get('signal_id') or signal.get('id') or 'N/A'}"
         )
 
-
-
     def _mark_missed(self, signal):
         """Logs a signal that was generated but never taken by the trader."""
+        if not self.sb.client:
+            return
+
         signal_id = signal.get('id') or signal.get('signal_id') or "N/A"
         missed_id = f"MISSED_{signal_id}"
         
-        # Check if already logged as missed
-        existing = self.sb.client.table("journal").select("id").eq("trade_id", missed_id).execute()
-        if existing.data and len(existing.data) > 0:
+        try:
+            # Check if already logged as missed
+            existing = self.sb.client.table("journal").select("id").eq("trade_id", missed_id).execute()
+            if existing.data and len(existing.data) > 0:
+                return
+        except Exception as e:
+            logger.error(f"Supabase check failed during missed signal mark for {missed_id}: {e}")
             return
 
         logger.info(f"⭕ Marking Signal as MISSED: {signal['symbol']} {signal['pattern']}")
@@ -210,11 +226,18 @@ class ExecutionAuditEngine:
 
     def _mark_rogue(self, trade):
         """Auto-contextualizes a discretionary trade. Zero input required from trader."""
+        if not self.sb.client:
+            return
+
         logger.info(f"🕵️  Auto-Contextualizing Rogue Trade: {trade['symbol']} {trade['side']}")
         
-        # Check if already logged
-        existing = self.sb.client.table("journal").select("id").eq("trade_id", trade['id']).execute()
-        if existing.data and len(existing.data) > 0:
+        try:
+            # Check if already logged
+            existing = self.sb.client.table("journal").select("id").eq("trade_id", trade['id']).execute()
+            if existing.data and len(existing.data) > 0:
+                return
+        except Exception as e:
+            logger.error(f"Supabase check failed during rogue trade mark for {trade['id']}: {e}")
             return
 
         ctx = self._reconstruct_market_context(trade)
