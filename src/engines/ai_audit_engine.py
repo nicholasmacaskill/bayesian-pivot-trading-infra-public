@@ -95,7 +95,7 @@ class AIAuditEngine:
         try:
             # Multi-model fallback for robustness
             models_to_try = [
-                'gemini-2.0-flash', 
+                'gemini-2.5-flash', 
                 'gemini-1.5-flash', 
                 'gemini-1.5-pro'
             ]
@@ -107,8 +107,13 @@ class AIAuditEngine:
                     response = self.client.models.generate_content(
                         model=m,
                         contents=prompt,
-                        config={'response_mime_type': 'application/json'}
+                        config={
+                            'response_mime_type': 'application/json',
+                            'max_output_tokens': 500
+                        }
                     )
+                    from src.core.token_tracker import track_response_tokens
+                    track_response_tokens(response, model_name=m)
                     if response and response.text:
                         break
                 except Exception as ex:
@@ -166,7 +171,7 @@ class AIAuditEngine:
 
         try:
             # Multi-model fallback
-            models_to_try = ['gemini-2.0-flash', 'gemini-1.5-flash']
+            models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
             response = None
             last_err = None
             for m in models_to_try:
@@ -174,8 +179,13 @@ class AIAuditEngine:
                     response = self.client.models.generate_content(
                         model=m,
                         contents=prompt,
-                        config={'response_mime_type': 'application/json'}
+                        config={
+                            'response_mime_type': 'application/json',
+                            'max_output_tokens': 500
+                        }
                     )
+                    from src.core.token_tracker import track_response_tokens
+                    track_response_tokens(response, model_name=m)
                     if response and response.text:
                         break
                 except Exception as ex:
