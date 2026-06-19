@@ -80,8 +80,13 @@ class SovereignAIHub:
             try:
                 response = self.gemini_client.models.generate_content(
                     model=model,
-                    contents=contents
+                    contents=contents,
+                    config={
+                        'max_output_tokens': 800
+                    }
                 )
+                from src.core.token_tracker import track_response_tokens
+                track_response_tokens(response, model_name=model)
                 return self._parse_json_response(response.text, provider=f"Gemini/{model}")
             except Exception as e:
                 logger.warning(f"Gemini model {model} failed: {e}")
@@ -158,8 +163,13 @@ class SovereignAIHub:
                     try:
                         response = self.gemini_client.models.generate_content(
                             model=model,
-                            contents=[prompt, img]
+                            contents=[prompt, img],
+                            config={
+                                'max_output_tokens': 10
+                            }
                         )
+                        from src.core.token_tracker import track_response_tokens
+                        track_response_tokens(response, model_name=model)
                         text = response.text.upper()
                         if "BULLISH" in text: return 1
                         if "BEARISH" in text: return -1

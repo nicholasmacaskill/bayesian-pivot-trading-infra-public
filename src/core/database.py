@@ -389,3 +389,58 @@ def get_latest_prop_audits(limit=5):
         return []
     finally:
         conn.close()
+
+def log_token_usage(prompt_tokens, candidate_tokens, model_name="gemini-2.5-flash"):
+    """
+    Increments token usage statistics for the current day.
+    """
+    input_rate = 0.075 / 1000000.0
+    output_rate = 0.30 / 1000000.0
+    cost = (prompt_tokens * input_rate) + (candidate_tokens * output_rate)
+    
+    total_tokens = prompt_tokens + candidate_tokens
+    today = date.today().isoformat()
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT UNIQUE,
+                prompt_tokens INTEGER DEFAULT 0,
+                candidate_tokens INTEGER DEFAULT 0,
+                total_tokens INTEGER DEFAULT 0,
+                cost REAL DEFAULT 0.0
+            )
+        ''')
+        c.execute('''
+            INSERT INTO token_usage (date, prompt_tokens, candidate_tokens, total_tokens, cost)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(date) DO UPDATE SET
+                prompt_tokens = prompt_tokens + excluded.prompt_tokens,
+                candidate_tokens = candidate_tokens + excluded.candidate_tokens,
+                total_tokens = total_tokens + excluded.total_tokens,
+                cost = cost + excluded.cost
+        ''', (today, prompt_tokens, candidate_tokens, total_tokens, cost))
+        conn.commit()
+    except Exception as e:
+        print(f"Error logging token usage: {e}")
+    finally:
+        conn.close()
+
+def get_daily_token_usage():
+    """Retrieves the current day's token usage details."""
+    today = date.today().isoformat()
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT * FROM token_usage WHERE date = ?", (today,))
+        row = c.fetchone()
+        if row:
+            return dict(row)
+    except Exception as e:
+        print(f"Error fetching token usage: {e}")
+    finally:
+        conn.close()
+    return {"date": today, "prompt_tokens": 0, "candidate_tokens": 0, "total_tokens": 0, "cost": 0.0}

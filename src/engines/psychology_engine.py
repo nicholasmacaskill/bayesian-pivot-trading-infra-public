@@ -71,10 +71,15 @@ class PsychologyEngine:
 
         try:
             response = self.client.models.generate_content(
-                model='gemini-2.0-flash',
+                model='gemini-2.5-flash',
                 contents=contents,
-                config={'response_mime_type': 'application/json'}
+                config={
+                    'response_mime_type': 'application/json',
+                    'max_output_tokens': 300
+                }
             )
+            from src.core.token_tracker import track_response_tokens
+            track_response_tokens(response, model_name="gemini-2.5-flash")
             result = json.loads(response.text)
             
             # Incorporate Physiological Tilt if provided
