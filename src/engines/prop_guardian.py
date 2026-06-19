@@ -51,14 +51,24 @@ class PropGuardian:
             clean = re.sub(r'<script.*?>.*?</script>', '', html, flags=re.DOTALL)
             clean = re.sub(r'<style.*?>.*?</style>', '', clean, flags=re.DOTALL)
             
-            # Simple text extraction
+            # Simple text extraction with keyword-based token optimization
+            keywords = ["drawdown", "draw down", "limit", "loss", "profit", "max", "daily", "total", "%", "percent", "target", "payout", "consistency"]
             text_content = []
             for tag in ['p', 'h1', 'h2', 'h3', 'li']:
                 matches = re.findall(f'<{tag}[^>]*>(.*?)</{tag}>', clean, flags=re.DOTALL)
                 for m in matches:
-                    text_content.append(re.sub(r'<[^>]+>', ' ', m))
+                    text_line = re.sub(r'<[^>]+>', ' ', m).strip()
+                    # Keep only lines containing relevant keywords to save tokens
+                    if any(kw in text_line.lower() for kw in keywords):
+                        text_content.append(text_line)
             
             clean_text = re.sub(r'\s+', ' ', " ".join(text_content)).strip()
+            if not clean_text:
+                # Safe fallback if filter was too aggressive
+                raw_text = re.sub(r'<[^>]+>', ' ', clean)
+                clean_text = re.sub(r'\s+', ' ', raw_text).strip()[:3000]
+            else:
+                clean_text = clean_text[:4000] # Caps at ~1000 tokens
             
             prompt = f"""
             Analyze the following text scraped from a prop firm website. 
@@ -68,7 +78,7 @@ class PropGuardian:
             If multiple phases exist, return the strictest (lowest) drawdown.
             
             TEXT:
-            {clean_text[:15000]}
+            {clean_text}
             
             Return EXACTLY a JSON format like this, nothing else:
             {{"daily_drawdown": 0.04, "total_drawdown": 0.06}}
@@ -79,6 +89,9 @@ class PropGuardian:
                 contents=prompt,
                 config={'response_mime_type': 'application/json'}
             )
+            
+            from src.core.token_tracker import track_response_tokens
+            track_response_tokens(response, model_name="gemini-2.5-flash")
             
             data = json.loads(response.text)
             
