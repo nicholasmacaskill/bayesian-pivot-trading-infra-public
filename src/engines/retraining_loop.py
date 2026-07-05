@@ -105,7 +105,7 @@ class RetrainingLoop:
         elapsed = datetime.utcnow() - self._last_run
         return elapsed.total_seconds() >= 7 * 24 * 3600
 
-    def _fetch_recent_outcomes(self, days_back: int = 7) -> list[dict]:
+    def _fetch_recent_outcomes(self, days_back: int = 120) -> list[dict]:
         """
         Queries signed_ledger for closed bot trades AND journal for discretionary ALPHA trades.
         """
@@ -200,7 +200,10 @@ class RetrainingLoop:
             'prompt':           prompt,
             'label':            label,
             'score_adjustment': score_adjustment,
-            'is_discretionary': is_disc
+            'is_discretionary': is_disc,
+            'regime':           record.get('shadow_regime', 'Unknown'),
+            'vol_spike':        record.get('volume_spike', 1.0),
+            'true_smt':         record.get('true_smt', 'N/A')
         }
 
     def _export_jsonl(self, examples: list[dict]) -> Path:
@@ -238,7 +241,37 @@ class RetrainingLoop:
                 }
                 f.write(json.dumps(record) + '\n')
 
+        # Export OpenAI/Together AI compatible format (using assistant role instead of model)
+        together_path = TRAINING_DATA_DIR / f"training_{date_str}_together.jsonl"
+        with open(together_path, 'w') as f:
+            for ex in examples:
+                if not ex:
+                    continue
+                record = {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Evaluate this institutional setup:\n{ex['prompt']}\n\n"
+                                f"Outcome: This setup resulted in a {ex['outcome']} ({ex['label']}).\n\n"
+                                f"Instruction: Calibrate your weighting of Vol Spike and SMT for the '{ex['regime']}' regime."
+                            )
+                        },
+                        {
+                            "role": "assistant",
+                            "content": (
+                                f"Live Audit: {ex['label']} "
+                                f"Adjustment: {ex['score_adjustment']:+.1f}. "
+                                f"In {ex['regime']} regimes, the {ex['pattern']} requires "
+                                f"strict adherence to institutional prints (Vol: {ex['vol_spike']}x, SMT: {ex['true_smt']})."
+                            )
+                        }
+                    ]
+                }
+                f.write(json.dumps(record) + '\n')
+
         logger.info(f"[Retraining] 📁 JSONL exported: {out_path} ({len(examples)} examples)")
+        logger.info(f"[Retraining] 📁 Together AI SFT dataset exported: {together_path}")
         return out_path
 
     def _update_few_shot_cache(self, examples: list[dict]):
@@ -320,8 +353,8 @@ class RetrainingLoop:
         start = datetime.utcnow()
 
         # 1. Fetch recent outcomes from signed ledger
-        records = self._fetch_recent_outcomes(days_back=7)
-        logger.info(f"[Retraining] Found {len(records)} closed trades from past 7 days.")
+        records = self._fetch_recent_outcomes(days_back=120)
+        logger.info(f"[Retraining] Found {len(records)} closed trades from past 120 days.")
 
         if len(records) < MIN_SAMPLES_FOR_RETRAIN:
             msg = f"Only {len(records)} outcomes — minimum {MIN_SAMPLES_FOR_RETRAIN} required. Skipping."
@@ -397,7 +430,7 @@ class RetrainingLoop:
             rows = conn.execute("""
                 SELECT outcome, pnl 
                 FROM signed_ledger 
-                WHERE outcome NOT IN ('PENDING', 'UNKNOWN')
+                WHERE outcome NOT IN ('PENDING', 'UNKNOWN', 'ROGUE')
                 ORDER BY timestamp DESC 
                 LIMIT ?
             """, (window,)).fetchall()

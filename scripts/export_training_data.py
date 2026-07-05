@@ -162,12 +162,29 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
         examples.append(example)
         win_count += 1
 
-    # Write JSONL
+    # Write Vertex AI JSONL
     with open(OUTPUT_FILE, 'w') as f:
         for ex in examples:
             f.write(json.dumps(ex) + '\n')
+            
+    # Write OpenAI-compatible JSONL (translating Gemini parts to OpenAI messages)
+    openai_file = os.path.join(OUTPUT_DIR, "sovereign_trades_openai.jsonl")
+    with open(openai_file, 'w') as f:
+        for ex in examples:
+            system_txt = ex['system_instruction']['parts'][0]['text']
+            user_txt = ex['contents'][0]['parts'][0]['text']
+            assistant_txt = ex['contents'][1]['parts'][0]['text']
+            openai_ex = {
+                "messages": [
+                    {"role": "system", "content": system_txt},
+                    {"role": "user", "content": user_txt},
+                    {"role": "assistant", "content": assistant_txt}
+                ]
+            }
+            f.write(json.dumps(openai_ex) + '\n')
 
     logger.info(f"✅ Exported {len(examples)} training examples → {OUTPUT_FILE}")
+    logger.info(f"✅ Exported {len(examples)} OpenAI examples → {openai_file}")
     logger.info(f"   WIN: {win_count} | LOSS: {loss_count}")
     logger.info(f"   Improved Win Rate in training data: {win_count/len(examples)*100:.1f}%")
     
@@ -178,12 +195,15 @@ def export_training_data(min_score=5.0, outcomes=('WIN', 'LOSS')):
         "wins": win_count,
         "losses": loss_count,
         "win_rate_pct": round(win_count / len(examples) * 100, 1) if examples else 0,
-        "output_file": OUTPUT_FILE
+        "output_file_vertex": OUTPUT_FILE,
+        "output_file_openai": openai_file
     }
     with open(os.path.join(OUTPUT_DIR, "training_stats.json"), 'w') as f:
         json.dump(stats, f, indent=2)
 
-    print(f"\n🎯 Ready for Vertex AI. Next step:\n   python3 scripts/vertex_finetune.py")
+    print(f"\n🎯 Dataset Generation Complete!")
+    print(f"   - Vertex AI Format: {OUTPUT_FILE}")
+    print(f"   - OpenAI Format: {openai_file}")
 
 if __name__ == "__main__":
     export_training_data()
