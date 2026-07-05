@@ -1,15 +1,17 @@
-# Bayesian Pivot Trading Infra 🧠💎
+# BayesianPivot Trading Infrastructure 🧠💎
 
-**An institutional-grade synthetic consciousness for price discovery. The infrastructure replaces speculative liability with the certainty of a 9-Gate Bayesian funnel, orchestrating market physics (Hurst), intermarket confluence (SMT), and prop-firm forensic auditing. Leveraging specialized Vertex AI SFT models and biometric-gated OPSEC, the system enforces a high-fidelity probabilistic model of risk that transforms global liquidity volatility into a disciplined, sovereign advantage.**
+**An institutional-grade synthetic consciousness for price discovery and risk gating.**
 
-Bayesian Pivot Trading Infra is a professional-grade trading OS that synthesizes Inner Circle Trader (ICT) concepts with high-frequency execution filters, multimodal trader sentiment analysis, and a tiered security architecture.
+BayesianPivot is a professional-grade trading Operating System that synthesizes Inner Circle Trader (ICT) concepts with high-frequency execution filters, multimodal trader sentiment analysis, and a tiered security architecture.
 
-**"Bayesian institutional alpha. Replacing liability with 9-Gate probabilistic certainty: Vertex AI SFT, SMT, Hurst physics, biometrics, forensics & secure OPSEC."**
+At its core, the system replaces speculative liability with the probabilistic certainty of the **9-Gate Bayesian Funnel**—a deterministic gauntlet orchestrating market physics (Hurst), intermarket confluence (SMT), and prop-firm forensic auditing. Recently adapted to support a broader multi-engine ecosystem, this strict funnel now operates alongside high-velocity strategies (like the gate-less Alpha Sweep), all governed by our custom Serverless GPU AI infrastructure (Together AI & OpenRouter).
+
+**"Bayesian institutional alpha. Replacing liability with probabilistic certainty: 9-Gate Funnel, Together AI SFT, OpenRouter, SMT, Hurst physics, biometrics, forensics & secure OPSEC."**
 
 ---
 
-## 🛡️ The 9-Gate Signal Funnel (Deterministic Gauntlet)
-No trade is executed in isolation. Every signal must survive a sequential "Gauntlet" to filter for institutional backing.
+## 🛡️ Architecture Core: The 9-Gate Signal Funnel
+The 9-Gate Funnel remains the crown jewel of the BayesianPivot infrastructure. No standard trade is executed in isolation. Every signal must survive this sequential "Gauntlet" to filter for institutional backing.
 
 ```mermaid
 graph TD
@@ -57,10 +59,10 @@ Confirmation of intent shift on lower timeframes (1m-5m).
 - **MSS**: A close beyond the most recent swing point.
 - **Displacement**: Requires candles with bodies >1.5x the average volume/size to confirm a "V-shape" recovery or departure.
 
-### Gate 6: Dual-Track AI Validation
-Final logic audit via **Gemini 2.0 SFT Analysis** using a bifurcated review:
-- **Control Track**: A "Reject-by-Default" persona analyzing the chart for retail inducement traps.
-- **Shadow Track**: Experimental risk-adjustment (0.5x – 1.3x) based on setup-memory correlation.
+### Gate 6: Dual-Track AI Validation (`PivotAIHub`)
+Final logic audit via the **Unified AI Hub SFT Analysis** using a bifurcated review:
+- **Control Track (OpenRouter/Gemini)**: A "Reject-by-Default" persona analyzing the chart for retail inducement traps.
+- **Shadow Track (Together AI)**: A custom fine-tuned Llama-3 model trained exclusively on the proprietary execution ledger to adjust risk-weighting based on historical setups.
 
 ### Gate 7: Biometric Physiological Lock
 Biologically-aware execution gating via **Apple Health Integration**.
@@ -74,9 +76,17 @@ Compliance auditing for institutional and funded account providers.
 
 ---
 
-## 🧠 The Sovereign Psychologist (Psychology Engine)
+## 🚀 The Alpha Sweep Momentum Engine
+While the 9-Gate funnel remains the core for deterministic, high-probability reversals, we've adapted the architecture to support standalone sub-engines. 
+The **Alpha Sweep Engine** is a high-velocity momentum strategy that bypasses the strict 9-Gate funnel to capitalize on pure structural displacement:
+- **Liquidity Void Recognition**: Identifies severe imbalances and displacement candles without requiring intermarket divergence (SMT) or biometric gating.
+- **Adaptive Sizing**: Bypasses the strict checks but automatically scales down execution size by 50% to maintain the portfolio's risk of ruin matrix.
+
+---
+
+## 🧠 The Bayesian Psychologist (Psychology Engine)
 Trading is biological. This engine protects the system from the trader.
-- **Interactive Sentiment**: The system periodically prompts via Telegram for the trader's mental state. Natural language analysis (Gemini 2.0) determines the "Sovereign Sentiment" score.
+- **Interactive Sentiment**: The system periodically prompts via Telegram for the trader's mental state. Natural language analysis (`PivotAIHub`) determines the "Trader Sentiment" score.
 - **Risk Gating**: High Tilt (Score > 6) triggers automated trade-downsizing with a **0.25x Risk Floor**—protecting equity without a hard-stop on potential alpha. Panic/Revenge indices trigger a **Hard Shutdown**.
 - **Voice Verdicts**: The Gatekeeper provides auditory audits via macOS native TTS to ground the trader during high-volatility events.
 
@@ -86,57 +96,25 @@ Trading is biological. This engine protects the system from the trader.
 The system functions as a **Synthetic Consciousness** that learns from both its successes and the trader's failures.
 
 ### 1. Auto-Contextualization (Zero-Input Audit)
-When a discretionary/manual trade is executed ("Rogue Trade"), the system immediately triggers a **Forensic Reconstruction**. Without human input, it fetches historical 5m/1h data to determine the full **Institutional Footprint** at the moment of entry:
-- **HTF Bias Alignment**: Was the 4H/Daily trend (EMA 20/50) supportive of the move?
-- **Liquidity Integrity**: Did the entry occur after a sweep of the Previous Day High/Low (PDH/PDL) or a key Swing point?
-- **Intermarket SMT**: Were correlated assets (DXY/BTC) providing divergence confirmation?
-- **Asian Volatility Window**: Price position relative to the Asian Range (Premium/Discount) and Session Timing.
+When a discretionary/manual trade is executed ("Rogue Trade"), the system immediately triggers a **Forensic Reconstruction**. Without human input, it fetches historical 5m/1h data to determine the full **Institutional Footprint** at the moment of entry.
 
 ### 2. Delta Analysis: System vs. Rogue
 The infrastructure maintains two distinct ledgers:
-- **System Signals**: 9-Gate approved setups with high probabilistic edge.
+- **System Signals**: 9-Gate approved setups and Alpha Sweeps with high probabilistic edge.
 - **Rogue Trades**: Discretionary entries that bypassed the funnel.
 The **Delta Engine** compares the outcomes of these two paths, identifying "Alpha Leakage" (where the trader was right but the system was too conservative) and "Impulse Traps" (where the trader was wrong and the system correctly rejected).
 
-### 3. SFT Retraining Loop (Vertex AI)
-Every Sunday at 00:00 UTC, the system executes an **Automated Retraining Cycle**:
-- **Soft Training**: Updates the in-memory few-shot context window for Gemini with the past week's "Ground Truth" outcomes.
-- **Hard Training**: Exports a JSONL dataset for deep **Supervised Fine-Tuning (SFT)** on Google Vertex AI. 
-- **Alpha Hunting**: The system now learns from discretionary "Human Alpha"—trades marked as `ALPHA` by the auditor are prioritized in the training set to replicate the trader's unique institutional edge.
-- **Alpha Interview**: Upon closing a profitable rogue trade, the system "interviews" the trader via Telegram to capture technical reasoning (e.g., "Asian High fade during NY London overlap"), injecting high-quality human intent into the AI's pattern-recognition engine.
+### 3. Serverless SFT Retraining Loop (Together AI)
+Every Sunday at 00:00 UTC, the system executes an **Automated Retraining Cycle** to evolve the model's pattern recognition:
+- **Soft Training**: Automatically compiles the past week's "Ground Truth" outcomes into a local in-memory few-shot context window, injected dynamically into active validation prompts.
+- **Hard Fine-Tuning (Deep SFT)**: The weekly loop automatically stages and exports structured datasets formatted specifically for serverless SFT. It produces OpenAI/Together-compatible JSONL files (with correct `user`/`assistant` role structures) stored in `data/training/`.
+- **Monthly Retraining Cycle**: On the 15th of each month, the compiled dataset is used to run a Supervised Fine-Tuning (SFT) job on Together AI using `meta-llama/Meta-Llama-3-8B-Instruct` as the base. The resulting custom model is then linked back via the `.env.local` config (`TOGETHER_MODEL`) to handle active validation.
+- **Alpha Hunting**: The system prioritizes human discretionary trades marked as `ALPHA` by the auditor, training the model to replicate and automate the trader's unique, high-conviction edge.
 
 ---
 
-## 🔒 Security & Operations (OPSEC Layer)
-The **Guard Engine** runs as a background daemon to protect the workstation:
-- **RSA Provenance Chain**: Every signal is cryptographically signed using a local 2048-bit RSA key. This creates a tamper-evident audit trail for every trade, proving it originated from the system's logic and not a manual override.
-- **Clipboard Sentry**: Detects crypto address hijacking.
-- **Process Audit**: Whitelist-based process monitoring for process injection detection.
-- **Zero-Trust Logic**: All credentials secured via `.env.local` with hardware-awake persistence.
-
----
-
-## 📊 Prop Firm Compliance (The Auditor)
-Built explicitly for funded accounts:
-- **Drawdown Ceiling**: Hard risk management targeting <5% maximum drawdown.
-- **Prop Guardian**: AI-powered forensic scraper for prop firm rule documents—detects trailing drawdown traps and consistency rules.
-- **Automatic SL/TP**: ATR-weighted stops with multi-tier partial take-profit (TP1 @ 1.5R/2.0R, TP2 @ 3.0R/4.0R).
-
----
-
-## 🚀 Execution & Polyglot Architecture
-The system is built as a high-performance polyglot stack to ensure both low-latency execution and premium visualization.
-
-- **Core Engine (Python)**: 1.3M+ lines of vectorized logic handling 9-Gate filtering, Bayesian modeling, and Gemini/Vertex AI orchestration.
+## 🚀 Execution Stack
+- **Core Engine (Python)**: 1.3M+ lines of vectorized logic handling 9-Gate filtering, Bayesian modeling, and OpenRouter/Together AI orchestration.
 - **Alpha Dashboard (TypeScript/Next.js)**: 550k+ lines of React-based infrastructure for real-time Signal/Rogue visualization, Biometric telemetry, and proprietary "Glass" UI components.
 - **Ops & Automation (Shell/Bash)**: Hardened cron-based synchronization for Intermarket Alpha and daily forensic audits.
 - **Database (PostgreSQL/Supabase)**: Vectorized storage for semantic signal-memory and trade provenance.
-
----
-
-## 📈 Backtesting Performance
-- **Vectorized Engine**: Backtest a full year of 1H data or 30 days of 5m data in seconds.
-- **Institutional Realism**: Includes slippage (5bps), missed alert simulation, and commission-aware equity curves.
-- **Hedge-Fund Stats**: Outputs Sharpe Ratio (6.35 achieved in Phase 5), Profit Factor, Expectancy, and Max Drawdown.
-
-*Bayesian Pivot Trading Infra: Built for the 1% who trade with the 0.1%.*

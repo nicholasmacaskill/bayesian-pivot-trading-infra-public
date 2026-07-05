@@ -53,10 +53,22 @@ REMOVE_FILES=(
 
   # Internal docs
   "docs/SOVEREIGN_SYSTEM_MANIFESTO.md"
+  "docs/BAYESIAN_PIVOT_MANIFESTO.md"
+  "docs/BAYESIAN_PIVOT_CASE_STUDY.md"
+  "docs/BAYESIAN_PIVOT_TECH_CASE_STUDY.md"
+  "docs/BAYESIAN_PIVOT_ALPHA_SPECIFICATION.md"
+  "docs/BAYESIAN_PIVOT_ALPHA_SCANNER.md"
+  "docs/SOVEREIGN_EXECUTION_PLAN.md"
+  "docs/ALL_TIME_PERFORMANCE_REPORT.md"
+  "docs/PROP_FIRM_SCALING_PLAN.md"
+  "docs/edge_discovery_results.json"
+  "docs/ict_oracle_kb.json"
+  "agent.md"
+  ".agents/"
 
   # Data & charts (large binary blobs)
   "data/"
-  "backtesting/monte_carlo_results.json"
+  "backtesting/"
 )
 
 for f in "${REMOVE_FILES[@]}"; do
@@ -88,6 +100,17 @@ data/
 .env*
 __pycache__/
 EOF
+
+git add .gitignore.public
+
+# Swap in the public redacted README
+if [ -f "README.public.md" ]; then
+  mv README.public.md README.md
+  git add README.md
+  git rm --cached README.public.md 2>/dev/null || true
+fi
+
+git commit -m "chore: prepare public mirror by stripping proprietary engines and strategies"
 
 echo "🚀 Pushing to $REMOTE/$BRANCH..."
 git push "$REMOTE" "$TMP_BRANCH:$BRANCH" --force
