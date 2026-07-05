@@ -116,7 +116,7 @@ echo "🚀 Pushing to $REMOTE/$BRANCH..."
 git push "$REMOTE" "$TMP_BRANCH:$BRANCH" --force
 
 echo "🧹 Cleaning up staging branch..."
-git checkout main
+git checkout main --force
 git branch -D "$TMP_BRANCH"
 
 echo "✅ Public mirror updated successfully."
