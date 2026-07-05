@@ -170,7 +170,7 @@ class TradeLockerHelper:
                                 'symbol': self.resolve_symbol(p[1]), 
                                 'side': 'BUY' if str(p[3]).lower() == 'buy' else 'SELL',
                                 'pnl': float(p[9] or 0.0),
-                                'entry_time': str(p[8]),
+                                'entry_time': datetime.utcfromtimestamp(float(p[8]) / 1000).isoformat() + 'Z' if p[8] else None,
                                 'price': float(p[5] or 0.0),
                                 'qty': float(p[4] or 0.0),
                                 'status': 'OPEN'

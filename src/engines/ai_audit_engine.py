@@ -24,7 +24,7 @@ class AIAuditEngine:
     def get_text_embedding(self, text):
         """Generates a 768-dimensional vector for the given text."""
         if not self.client: 
-            return []
+            return None
         try:
             result = self.client.models.embed_content(
                 model="text-embedding-004",
@@ -39,7 +39,7 @@ class AIAuditEngine:
             return emb
         except Exception as e:
             logger.error(f"DEBUG EMBED ERROR: {e}")
-            return []
+            return None
 
     def audit_trade(self, manual_trade, system_data, zen_mode=False):
         """

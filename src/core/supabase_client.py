@@ -45,7 +45,7 @@ class SupabaseBridge:
                 "notes": notes or "",
                 "notes": notes or "",
                 "timestamp": timestamp or datetime.utcnow().isoformat(),
-                "embedding": embedding
+                "embedding": embedding if (embedding and len(embedding) > 0) else None
             }
             
             # Upsert by trade_id
