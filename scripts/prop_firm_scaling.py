@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 class PropFirmScaler:
     def __init__(
@@ -133,7 +134,7 @@ class PropFirmScaler:
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig('/Users/nicholasmacaskill/sovereignSMC/sovereignSMC/scaling_trajectory.png', dpi=150)
+        plt.savefig(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'docs', 'scaling_trajectory.png'), dpi=150)
         print("\n✅ Chart saved: scaling_trajectory.png")
 
 if __name__ == "__main__":

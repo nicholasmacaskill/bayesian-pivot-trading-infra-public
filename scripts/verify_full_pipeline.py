@@ -44,7 +44,7 @@ def verify_full_pipeline():
 
     # 2. Step 1: Chart Generation (Vision)
     print("\n[STEP 1] Generating Vision Chart...")
-    chart_path = "/Users/nicholasmacaskill/sovereignSMC/sovereignSMC/data/charts/verify_memory_vision.png"
+    chart_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'charts', 'verify_memory_vision.png')
     os.makedirs(os.path.dirname(chart_path), exist_ok=True)
     generated_chart = generate_ict_chart(df, mock_setup, output_path=chart_path)
     print(f"✅ Chart Generated: {generated_chart}")
