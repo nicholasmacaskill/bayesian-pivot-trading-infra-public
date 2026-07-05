@@ -1,5 +1,22 @@
 import os
 
+# Configure yfinance to use a local writable directory inside the workspace for its cache
+try:
+    import yfinance.cache as yf_cache
+    workspace_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    workspace_cache = os.path.join(workspace_dir, "data", "yfinance_cache")
+    os.makedirs(workspace_cache, exist_ok=True)
+    yf_cache.set_cache_location(workspace_cache)
+    yf_cache.set_tz_cache_location(workspace_cache)
+    
+    # Fallback to dummy caches to completely disable disk activity
+    yf_cache._CookieCacheManager._Cookie_cache = yf_cache._CookieCacheDummy()
+    yf_cache._ISINCacheManager._isin_cache = yf_cache._ISINCacheDummy()
+    yf_cache._TzCacheManager._tz_cache = yf_cache._TzCacheDummy()
+except Exception:
+    pass
+
+
 class Config:
     # Trading Parameters
     SYMBOLS = ['BTC/USD']  # Focus exclusively on BTC/USD (Proven System Edge)
