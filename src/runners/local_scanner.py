@@ -169,6 +169,7 @@ class LocalScannerRunner:
         self.processed_interviews = set() # Track IDs in-memory to avoid re-prompting
         self.last_command_time = int(time.time()) - 300 # Look back 5 mins on startup
         self.session_start_time = int(time.time())
+        self.last_session_name = None
         # ───────────────────────────────────────────────────────────
         # ───────────────────────────────────────────────────────────
 
@@ -689,12 +690,21 @@ class LocalScannerRunner:
             health_report['equity_buffer_usd'] = equity_buffer_usd
             self.current_perf = health_report
             
-            # 3. Biometric & Psychology Audit
-            if self._cycle_count % 20 == 0 and not self.awaiting_psych_response:
-                logger.info("🧠 Prompting User for Psychology Update...")
-                self.notifier._send_message("🧠 *BAYESIAN PIVOT SENTIMENT:* How are you feeling right now? (Reply to update your risk profile)")
+            # Get current session for psychology check
+            utc_now = datetime.now(timezone.utc)
+            current_kz = _get_active_killzone(utc_now.hour)
+            current_session_name = current_kz['name'] if current_kz else 'OFF-HOURS'
+
+            # 3. Biometric & Psychology Audit (Non-blocking Session-gated)
+            # Only trigger on new premium session start (exclude off-hours to avoid spamming)
+            if current_session_name != 'OFF-HOURS' and current_session_name != self.last_session_name and not self.awaiting_psych_response:
+                logger.info(f"🧠 Prompting User for Psychology Update for {current_session_name}...")
+                self.notifier._send_message(f"🧠 *BAYESIAN PIVOT SENTIMENT:* {current_session_name} started. How are you feeling right now? (Reply within 3 mins or we default to safe risk)")
                 self.awaiting_psych_response = True
                 self.last_psych_prompt_time = int(time.time())
+                self.last_session_name = current_session_name
+            elif current_session_name == 'OFF-HOURS':
+                self.last_session_name = 'OFF-HOURS'
                 
             if self.awaiting_psych_response:
                 user_response = self.notifier.get_latest_message(since_timestamp=self.last_psych_prompt_time)
@@ -707,21 +717,17 @@ class LocalScannerRunner:
                     score = psych_state.get('tilt_score', 0)
                     mult = self.psychology.get_risk_multiplier(score)
                     self.notifier._send_message(f"✅ *SENTIMENT CAPTURED*\n• Mood: `{mood}`\n• Tilt Score: `{score}/10`\n• Risk Multiplier: `{mult}x`")
-                elif time.time() - self.last_psych_prompt_time > 900:
+                elif time.time() - self.last_psych_prompt_time > 180: # 3-minute timeout
+                    logger.info("🕒 Psychology prompt timeout. Defaulting to baseline risk.")
                     self.awaiting_psych_response = False
 
-            self.current_tilt_score = self.last_psych_state.get('tilt_score', 1)
-            
-            # 3b. Alpha Persistence Audit
-            self.alpha_mult = 1.0
-            self.alpha_reasoning = "N/A"
-            if self.retrain_loop:
-                alpha_data = self.retrain_loop.get_alpha_persistence()
-                self.alpha_mult = alpha_data['multiplier']
-                self.alpha_reasoning = alpha_data['reasoning']
-
-            # Combine Psychology and Prop Health
-            psych_mult = self.psychology.get_risk_multiplier(self.current_tilt_score)
+            # Calculate risk multiplier (default to 0.5x while awaiting response)
+            if self.awaiting_psych_response:
+                psych_mult = 0.5
+            else:
+                self.current_tilt_score = self.last_psych_state.get('tilt_score', 1)
+                psych_mult = self.psychology.get_risk_multiplier(self.current_tilt_score)
+                
             self.risk_multiplier = min(psych_mult, health_report['risk_multiplier'])
             
             if health_report['status'] != "HEALTHY":
