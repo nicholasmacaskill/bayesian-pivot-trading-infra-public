@@ -13,6 +13,13 @@ import os
 import functools
 from src.core.database import log_system_event
 
+# Prevent yfinance filesystem/locking/FD leak issues by forcing it to use the dummy cache
+try:
+    from yfinance import cache
+    cache._TzCacheManager._tz_cache = cache._TzCacheDummy()
+except Exception:
+    pass
+
 logger = logging.getLogger(__name__)
 
 def ensure_data(default_return=None):
@@ -100,16 +107,69 @@ class SMCScanner:
             # 3. Get Macro Bias
             bias_full = self.get_detailed_bias(symbol)
             
+            # 3b. Calculate detailed timeframe bias breakdown (1D, 4H, 1H)
+            bias_breakdown = ""
+            try:
+                df_1d = self.fetch_data(symbol, '1d', limit=100, synchronized=False)
+                df_4h = self.fetch_data(symbol, '4h', limit=100, synchronized=False)
+                df_1h = self.fetch_data(symbol, '1h', limit=100, synchronized=False)
+                
+                def get_tf_bias_str(df):
+                    if df is None or df.empty: return "N/A"
+                    ema20 = df['close'].ewm(span=20).mean().iloc[-1]
+                    ema50 = df['close'].ewm(span=50).mean().iloc[-1]
+                    return "BULL" if ema20 > ema50 else "BEAR"
+                
+                bias_1d_str = get_tf_bias_str(df_1d)
+                bias_4h_str = get_tf_bias_str(df_4h)
+                bias_1h_str = get_tf_bias_str(df_1h)
+                
+                bias_breakdown = f" (1D: {bias_1d_str} | 4H: {bias_4h_str} | 1H: {bias_1h_str})"
+            except Exception as e:
+                logger.error(f"Failed to calculate detailed biases: {e}")
+
             # 4. SMT Context
             smt_strength = self.intermarket.get_smt_strength(symbol, df)
             
+            # 4b. Dynamic Strategic Playbook
+            interpretation_lines = []
+            
+            # Bias interpretation
+            if "Conflict" in bias_full or "NEUTRAL" in bias_full.upper():
+                interpretation_lines.append("• *Bias:* Trend direction is mixed. Breakout/momentum trades are risky; prefer range sweep fades.")
+            elif "BULLISH" in bias_full.upper():
+                interpretation_lines.append("• *Bias:* Macro trend aligned upward. Long setups (discount sweeps/reclaims) have higher probability.")
+            elif "BEARISH" in bias_full.upper():
+                interpretation_lines.append("• *Bias:* Macro trend aligned downward. Short setups (premium sweeps/rejections) have higher probability.")
+            else:
+                interpretation_lines.append("• *Bias:* Neutral/consolidation. Enforce strict range-bound rules.")
+
+            # Hurst regime interpretation
+            if hurst < h_low:
+                interpretation_lines.append("• *Regime:* Mean Reversion active. Breakouts are highly likely to fake out. We focus on range sweeps (Turtle Soup) at session extremes.")
+            elif hurst > h_high:
+                interpretation_lines.append("• *Regime:* Expansion active. Price is trending. Look for structure shifts (MSS) and ride displacement momentum.")
+            else:
+                interpretation_lines.append("• *Regime:* Choppy / Random. High noise level; the funnel is in defensive mode.")
+
+            # SMT interpretation
+            if smt_strength >= 0.5:
+                interpretation_lines.append(f"• *Sponsorship:* SMT is strong ({smt_strength:.2f}), confirming quiet institutional accumulation/distribution at range boundaries.")
+            else:
+                interpretation_lines.append("• *Sponsorship:* SMT is weak. Current move lacks divergence-backed institutional validation.")
+
+            interpretation_block = "\n".join(interpretation_lines)
+            
             # 5. Format Message
             pulse_msg = (
-                f"🧠 *Sovereign System Sentiment* | `{symbol}`\n"
+                f"🧠 *Bayesian Pivot Sentiment* | `{symbol}`\n"
                 f"───────────────────\n"
-                f"🏛️ **Macro Bias:** {bias_full}\n"
+                f"🏛️ **Macro Bias:** {bias_full}{bias_breakdown}\n"
                 f"🌀 **Hurst Regime:** {regime} ({hurst:.3f})\n"
                 f"⚡ **SMT Divergence:** {smt_strength:.2f}/1.0\n"
+                f"───────────────────\n"
+                f"💡 **Strategic Playbook:**\n"
+                f"{interpretation_block}\n"
                 f"───────────────────\n"
                 f"🛡️ *9-Gate Funnel: ARMED & SCANNING*"
             )
@@ -365,16 +425,16 @@ class SMCScanner:
         # In Global Liquidity Mode, we still flag it but don't hard-gate unless specified.
         lunch_start, lunch_end = Config.get('NY_LUNCH_BLACKOUT', (17, 18))
         if hour >= lunch_start and hour < lunch_end:
-            logger.debug("Sovereign Context: NY_LUNCH_BLACKOUT (Reduced Liquidity)")
+            logger.debug("Bayesian Pivot Context: NY_LUNCH_BLACKOUT (Reduced Liquidity)")
             return True # Always True in Global Mode
 
         # Labeling for internal context
         if 7 <= hour < 10:
-             logger.debug("Sovereign Context: LONDON")
+             logger.debug("Bayesian Pivot Context: LONDON")
         elif 0 <= hour < 4:
-             logger.debug("Sovereign Context: ASIA")
+             logger.debug("Bayesian Pivot Context: ASIA")
         elif 12 <= hour < 20:
-             logger.debug("Sovereign Context: NY_CONTINUOUS")
+             logger.debug("Bayesian Pivot Context: NY_CONTINUOUS")
 
         return True
 
@@ -503,14 +563,18 @@ class SMCScanner:
             if (now - entry['timestamp']) < cache_duration:
                 if not visual_check or 'visual' in entry:
                     self.last_bias_score = entry['score']
+                    if not hasattr(self, '_last_bias_1d'):
+                        self._last_bias_1d = {}
+                    self._last_bias_1d[symbol] = entry.get('bias_1d', 0)
                     return entry['label']
 
         # 1. Fetch Aligned Data
+        df_1d = self.fetch_data(symbol, '1d', limit=100)
         df_4h = self.fetch_data(symbol, '4h', limit=100)
         df_1h = self.fetch_data(symbol, '1h', limit=100)
         df_5m = self.fetch_data(symbol, '5m', limit=100)
         
-        if any(d is None or d.empty for d in [df_4h, df_1h, df_5m]):
+        if any(d is None or d.empty for d in [df_1d, df_4h, df_1h, df_5m]):
             return "NEUTRAL (Data Gap)"
 
         def get_tf_bias(df):
@@ -518,16 +582,22 @@ class SMCScanner:
             ema50 = df['close'].ewm(span=50).mean().iloc[-1]
             return 1 if ema20 > ema50 else -1
             
+        bias_1d = get_tf_bias(df_1d)
         bias_4h = get_tf_bias(df_4h)
         bias_1h = get_tf_bias(df_1h)
         bias_5m = get_tf_bias(df_5m)
         
-        # RELAXED ENFORCEMENT: 4H and 1H Alignment Required
-        if not (bias_4h == bias_1h):
-            logger.info(f"⚖️ {symbol} Bias Conflict: 4H({bias_4h}) 1H({bias_1h})")
+        # Cache the Daily Bias direction for direct use in scanning gates
+        if not hasattr(self, '_last_bias_1d'):
+            self._last_bias_1d = {}
+        self._last_bias_1d[symbol] = bias_1d
+        
+        # STRICT ENFORCEMENT: 1D, 4H, and 1H Alignment Required
+        if not (bias_1d == bias_4h == bias_1h):
+            logger.info(f"⚖️ {symbol} Bias Conflict: 1D({bias_1d}) 4H({bias_4h}) 1H({bias_1h})")
             return "NEUTRAL (Conflict)"
 
-        score = float(bias_4h) # Base score -1 or 1
+        score = float(bias_1d) # Base score -1 or 1
 
         # 2. Intermarket (DXY)
         if index_context and 'DXY' in index_context:
@@ -556,7 +626,8 @@ class SMCScanner:
         self._bias_cache[symbol] = {
             'timestamp': now,
             'score': score,
-            'label': label_with_score
+            'label': label_with_score,
+            'bias_1d': bias_1d
         }
         return label_with_score
 
@@ -929,7 +1000,7 @@ class SMCScanner:
             minor_high = recent['high'].iloc[:-1].max()
             return last['high'] > minor_high and last['close'] < minor_high
 
-    def get_volatility_adjusted_target(self, df, direction, entry_price, session_range):
+    def get_volatility_adjusted_target(self, df, direction, entry_price, session_range, symbol="BTC/USD"):
         """
         ATR-Dynamic Targeting: Adjusts targets based on current volatility.
         
@@ -942,51 +1013,68 @@ class SMCScanner:
             direction: 'LONG' or 'SHORT'
             entry_price: Entry price
             session_range: Price quartiles dict
+            symbol: Symbol string for configuration mapping
         
         Returns:
-            Target price (guaranteed minimum 3R from entry)
+            Target price (guaranteed minimum 3R from entry and respecting MIN_TARGET_PCT floor)
         """
         atr = self.calculate_atr(df)
         if atr is None or len(atr) < 14:
             # Fallback to SD 1.0 if ATR unavailable
-            return session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg')
-        
-        mean_atr = atr.iloc[-50:].mean()  # 50-period mean
-        current_atr = atr.iloc[-1]
-        
-        # Calculate stop loss to determine dynamic minimum target
-        stop_buffer = current_atr * Config.STOP_LOSS_ATR_MULTIPLIER
-        if direction == 'LONG':
-            stop_loss = entry_price - stop_buffer
-            risk = entry_price - stop_loss
-            min_target_dynamic = entry_price + (Config.TP1_R_MULTIPLE * risk)
-        else:  # SHORT
-            stop_loss = entry_price + stop_buffer
-            risk = stop_loss - entry_price
-            min_target_dynamic = entry_price - (Config.TP1_R_MULTIPLE * risk)
-        
-        # High Volatility: Expanded Targets
-        if current_atr > mean_atr * 1.5:
-            logger.info(f"📈 High Volatility Detected (ATR: {current_atr:.2f} > {mean_atr*1.5:.2f}). Targeting SD 2.0")
-            target = session_range.get('sd_2_pos' if direction == 'LONG' else 'sd_2_neg', 
-                                    session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg'))
-        
-        # Low Volatility: Use institutional draw, NOT session midpoint
-        elif current_atr < mean_atr:
-            logger.info(f"📉 Low Volatility Detected (ATR: {current_atr:.2f} < {mean_atr:.2f}). Targeting Institutional Draw (min 3R)")
-            # Use get_next_institutional_target instead of session midpoint
-            target = self.get_next_institutional_target(df, direction, entry_price)
-        
-        # Normal Volatility: SD 1.0 (current strategy)
-        else:
             target = session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg')
+            stop_buffer = entry_price * getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.002)
+        else:
+            mean_atr = atr.iloc[-50:].mean()  # 50-period mean
+            current_atr = atr.iloc[-1]
+            
+            # Calculate stop loss to determine dynamic minimum target
+            stop_buffer = current_atr * Config.STOP_LOSS_ATR_MULTIPLIER
+            
+            # Apply MIN_STOP_PCT floor to stop buffer (prevents tiny stop losses)
+            min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.002)
+            min_stop_distance = entry_price * min_stop_pct
+            stop_buffer = max(stop_buffer, min_stop_distance)
+            
+            if direction == 'LONG':
+                stop_loss = entry_price - stop_buffer
+                risk = entry_price - stop_loss
+                min_target_dynamic = entry_price + (Config.TP1_R_MULTIPLE * risk)
+            else:  # SHORT
+                stop_loss = entry_price + stop_buffer
+                risk = stop_loss - entry_price
+                min_target_dynamic = entry_price - (Config.TP1_R_MULTIPLE * risk)
+            
+            # High Volatility: Expanded Targets
+            if current_atr > mean_atr * 1.5:
+                logger.info(f"📈 High Volatility Detected (ATR: {current_atr:.2f} > {mean_atr*1.5:.2f}). Targeting SD 2.0")
+                target = session_range.get('sd_2_pos' if direction == 'LONG' else 'sd_2_neg', 
+                                        session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg'))
+            
+            # Low Volatility: Use institutional draw, NOT session midpoint
+            elif current_atr < mean_atr:
+                logger.info(f"📉 Low Volatility Detected (ATR: {current_atr:.2f} < {mean_atr:.2f}). Targeting Institutional Draw (min 3R)")
+                # Use get_next_institutional_target instead of session midpoint
+                target = self.get_next_institutional_target(df, direction, entry_price)
+            
+            # Normal Volatility: SD 1.0 (current strategy)
+            else:
+                target = session_range.get('sd_1_pos' if direction == 'LONG' else 'sd_1_neg')
+            
+            # 98% Reliability: Target Guard Rails
+            # Ensure target is ALWAYS in the right direction
+            if direction == 'LONG':
+                target = max(target or 0, min_target_dynamic)
+            else: # SHORT
+                target = min(target or float('inf'), min_target_dynamic)
+
+        # Apply MIN_TARGET_PCT floor to target (prevents noise-level weekend ATR targets)
+        min_target_pct = getattr(Config, 'MIN_TARGET_PCT', {}).get(symbol, 0.010)
+        min_target_distance = entry_price * min_target_pct
         
-        # 98% Reliability: Target Guard Rails
-        # Ensure target is ALWAYS in the right direction
         if direction == 'LONG':
-            target = max(target or 0, min_target_dynamic)
-        else: # SHORT
-            target = min(target or float('inf'), min_target_dynamic)
+            target = max(target or 0, entry_price + min_target_distance)
+        else:
+            target = min(target or float('inf'), entry_price - min_target_distance)
             
         # CRITICAL: Final sanity check on absolute return direction
         if direction == 'LONG' and target <= entry_price:
@@ -1218,8 +1306,14 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         # Counter-Trend Reversal Logic (Turtle Soup)
         # 98% Reliability: Do not allow a 'Fade' if volume is accelerating (Capitulation)
         vol_spike = self.calculate_volume_cluster(df)
-        if not can_check_long and is_mean_reverting_regime and vol_spike < 1.3:
-             can_check_long = True # Allow search for long even if bias is Bearish
+        
+        # STRICT DAILY TREND FILTER: Block counter-trend setups
+        last_bias_1d = getattr(self, '_last_bias_1d', {}).get(symbol, 0)
+        if last_bias_1d == -1:
+            # Daily trend is BEARISH: Hard-block all LONG setups
+            can_check_long = False
+        elif not can_check_long and is_mean_reverting_regime and vol_spike < 1.3:
+            can_check_long = True # Allow search for long even if bias is Bearish
 
         if can_check_long:
             # TIER 1: Deep Discount
@@ -1280,7 +1374,7 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             if entry_type:
                 # ATR-DYNAMIC TARGETING
                 ref_range_target = london_range or price_quartiles.get("Asian Range")
-                target = self.get_volatility_adjusted_target(df, 'LONG', current['close'], ref_range_target)
+                target = self.get_volatility_adjusted_target(df, 'LONG', current['close'], ref_range_target, symbol=symbol)
                 
                 if not target:
                     target = self.get_next_institutional_target(df, "LONG", current['close'])
@@ -1295,6 +1389,9 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                 
                 # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR)
                 stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 1.5))
+                min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.002)
+                min_stop_distance = limit_entry * min_stop_pct
+                stop_buffer = max(stop_buffer, min_stop_distance)
                 
                 direction = 'LONG'
                 stop_loss = limit_entry - stop_buffer
@@ -1331,7 +1428,14 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
 
 
         # BEARISH Setup (OPTIMIZED: Require bias for quality - Only if no Long found yet)
-        if not setup and "BEARISH" in bias_full:
+        last_bias_1d = getattr(self, '_last_bias_1d', {}).get(symbol, 0)
+        if last_bias_1d == 1:
+            # Daily trend is BULLISH: Hard-block all SHORT setups
+            can_check_short = False
+        else:
+            can_check_short = "BEARISH" in bias_full
+
+        if not setup and can_check_short:
             # TIER 1: Premium
             in_premium = False
             if price_quartiles:
@@ -1389,7 +1493,7 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
 
             if entry_type:
                 ref_range_target = london_range or price_quartiles.get("Asian Range")
-                target = self.get_volatility_adjusted_target(df, 'SHORT', current['close'], ref_range_target)
+                target = self.get_volatility_adjusted_target(df, 'SHORT', current['close'], ref_range_target, symbol=symbol)
                 
                 if not target:
                     target = self.get_next_institutional_target(df, "SHORT", current['close'])
@@ -1402,6 +1506,9 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                 
                 # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR)
                 stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 1.5))
+                min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.002)
+                min_stop_distance = limit_entry * min_stop_pct
+                stop_buffer = max(stop_buffer, min_stop_distance)
                 
                 direction = 'SHORT'
                 stop_loss = limit_entry + stop_buffer

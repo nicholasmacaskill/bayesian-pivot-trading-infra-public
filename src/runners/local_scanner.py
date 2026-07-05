@@ -68,13 +68,34 @@ def _is_presession_window(utc_hour: int, utc_minute: int) -> dict | None:
             return kz
     return None
 
-# Configure Logging
+# ── Logging Setup ────────────────────────────────────────────────────────────
+# SafeStreamHandler: swallows [Errno 5] Input/output error that occurs when
+# the controlling terminal is detached (broken pipe on sys.stdout).
+class SafeStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except (OSError, IOError):
+            # Silently ignore broken-pipe / EIO from a disconnected terminal
+            pass
+
+from logging.handlers import RotatingFileHandler as _RotatingFileHandler
+_file_handler = _RotatingFileHandler(
+    "logs/local_runner.log",
+    maxBytes=10 * 1024 * 1024,   # 10 MB per file
+    backupCount=3,
+    encoding="utf-8",
+)
+_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+_stream_handler = SafeStreamHandler(sys.stdout)
+_stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("logs/local_runner.log"),
-        logging.StreamHandler(sys.stdout)
+        _file_handler,
+        _stream_handler,
     ]
 )
 # Silence Noisy Third-Party Loggers
@@ -86,7 +107,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger("LocalRunner")
 
 # Lock file to prevent duplicate processes
-LOCK_FILE = f"/tmp/smc_scanner.lock"
+LOCK_FILE = os.path.join(os.getcwd(), "data", "smc_scanner.lock")
 
 def check_single_instance():
     """Ensure only one instance of the scanner is running."""
@@ -151,10 +172,10 @@ class LocalScannerRunner:
         # ───────────────────────────────────────────────────────────
         # ───────────────────────────────────────────────────────────
 
-        # ── Sovereign Guard (Security Layer) ────────────────────────────────
+        # ── Bayesian Pivot Guard (Security Layer) ───────────────────────────
         self.guard = GuardEngine(notifier=self.notifier)
         self.guard.start()
-        logger.info("🛡️  Sovereign Guard active — securing your edge.")
+        logger.info("🛡️  Bayesian Pivot Guard active — securing your edge.")
         # ────────────────────────────────────────────────────────────────────
 
         # ── Llama3 Local Fallback Validator ───────────────────────────────────
@@ -179,7 +200,7 @@ class LocalScannerRunner:
         logger.info("🛑 Shutdown signal received. Cleaning up...")
         self.running = False
         self.guard.stop()
-        logger.info("🛡️  Sovereign Guard stopped.")
+        logger.info("🛡️  Bayesian Pivot Guard stopped.")
 
     def _handle_commands(self):
         """Listens for and executes Telegram commands (/status, /scan)."""
@@ -255,7 +276,7 @@ class LocalScannerRunner:
         return "\n".join(lines)
 
     def _send_latest_scan_report(self):
-        """Sends the V3 Sovereign Briefing via Telegram on /scan, followed by reasoning and regime stats."""
+        """Sends the V3 Bayesian Pivot Briefing via Telegram on /scan, followed by reasoning and regime stats."""
         try:
             utc_now    = datetime.now(timezone.utc)
             active_kz  = _get_active_killzone(utc_now.hour)
@@ -350,16 +371,16 @@ class LocalScannerRunner:
             try:
                 conn = get_db_connection()
                 
-                # 1. Fetch Latest Setup (Any Valid Setup that isn't a Heartbeat)
+                # 1. Fetch Latest Accepted Setup (verdict='ACCEPTED')
                 row_acc = conn.execute(
-                    "SELECT * FROM scans "
-                    "WHERE symbol != 'HEARTBEAT' AND verdict != 'SCAN_HEARTBEAT' "
+                    "SELECT * FROM scans WHERE verdict='ACCEPTED' "
                     "ORDER BY timestamp DESC LIMIT 1"
                 ).fetchone()
                 
-                # 2. Fetch Latest Accepted (The "Live" setup if any)
-                row_live = conn.execute(
-                    "SELECT * FROM scans WHERE verdict='ACCEPTED' "
+                # 2. Fetch Latest Rejected Setup (verdict != 'ACCEPTED' and not a heartbeat)
+                row_rej = conn.execute(
+                    "SELECT * FROM scans "
+                    "WHERE verdict != 'ACCEPTED' AND symbol != 'HEARTBEAT' AND verdict != 'SCAN_HEARTBEAT' "
                     "ORDER BY timestamp DESC LIMIT 1"
                 ).fetchone()
                 
@@ -388,9 +409,42 @@ class LocalScannerRunner:
                     }
 
                 latest_accepted = _map_row(row_acc)
-                latest_rejected = _map_row(row_live) if row_live and (not row_acc or row_live['id'] != row_acc['id']) else None
+                latest_rejected = _map_row(row_rej)
             except Exception as db_err:
                 logger.error(f"Failed to fetch dual setups: {db_err}")
+
+            # Calculate Strategic Directive (Dynamic)
+            directive = "Waiting for clean session sweep and structure shift."
+            try:
+                primary_symbol = "BTC/USD"
+                df_1h = self.scanner.fetch_data(primary_symbol, "1h", limit=100, synchronized=False)
+                df_4h = self.scanner._aggregate_ohlcv(self.scanner.fetch_data(primary_symbol, "1h", limit=400, synchronized=False), "4h")
+                df_1m = self.scanner.fetch_data(primary_symbol, "1m", limit=5, synchronized=False)
+                
+                if df_1h is not None and df_4h is not None and df_1m is not None:
+                    current_price = df_1m['close'].iloc[-1]
+                    price_ranges = self.scanner.get_price_quartiles(primary_symbol) or {}
+                    
+                    def get_tf_bias(df):
+                        if df is None or len(df) < 5: return 0
+                        ema20 = df['close'].ewm(span=20).mean().iloc[-1]
+                        ema50 = df['close'].ewm(span=50).mean().iloc[-1]
+                        return 1 if ema20 > ema50 else -1
+
+                    bias_4h = get_tf_bias(df_4h)
+                    bias_1h = get_tf_bias(df_1h)
+                    
+                    if bias_4h == 1 and bias_1h == 1:
+                        if current_price < price_ranges.get("Asian Range", {}).get("mid", 0):
+                            directive = "🟢 <b>LOOK FOR:</b> Bullish MSS at Asian/London Low (Discount Buy opportunity)."
+                        else:
+                            directive = "⚠️ <b>LOOK FOR:</b> Expansion continuation above Asian High (breakout watch)."
+                    elif bias_4h == -1 and bias_1h == -1:
+                        directive = "🔴 <b>LOOK FOR:</b> Bearish rejection at Asian Range Premium/High (short opportunity)."
+                    else:
+                        directive = "⏳ <b>LOOK FOR:</b> Consolidation sweep. Session phase suggests waiting for Q2/Q3 shift."
+            except Exception as e:
+                logger.error(f"Failed to calculate strategic directive: {e}")
 
             # ── 1. SEND MAIN BRIEFING ──────────────────────────
             self.notifier.send_scan_briefing(
@@ -400,7 +454,8 @@ class LocalScannerRunner:
                 confluence_data  = confluence_data,
                 market_rows      = market_rows,
                 latest_setup     = latest_accepted,
-                latest_rejected  = latest_rejected
+                latest_rejected  = latest_rejected,
+                strategic_directive = directive
             )
 
             # ── 2. SEND STRATEGIC REASONING (Follow-up) ────────
@@ -637,7 +692,7 @@ class LocalScannerRunner:
             # 3. Biometric & Psychology Audit
             if self._cycle_count % 20 == 0 and not self.awaiting_psych_response:
                 logger.info("🧠 Prompting User for Psychology Update...")
-                self.notifier._send_message("🧠 *SOVEREIGN SENTIMENT:* How are you feeling right now? (Reply to update your risk profile)")
+                self.notifier._send_message("🧠 *BAYESIAN PIVOT SENTIMENT:* How are you feeling right now? (Reply to update your risk profile)")
                 self.awaiting_psych_response = True
                 self.last_psych_prompt_time = int(time.time())
                 
@@ -735,7 +790,7 @@ class LocalScannerRunner:
                     'smt_score': f"{market_context.get('DXY', {}).get('change_ltf', 0):+.2f}%" if market_context else 'N/A',
                 }
 
-                # ── Hurst Gate: The Sovereign Filter ───────────────────────────
+                # ── Hurst Gate: The Bayesian Pivot Filter ───────────────────────
                 hurst_val = 0.5
                 try:
                     df_tmp = self.scanner.fetch_data(symbol, Config.TIMEFRAME, limit=100)
@@ -840,9 +895,9 @@ class LocalScannerRunner:
                     # ── AI Validation (Cloud → Llama3 fallback) ───────────────
                     session_info_for_llm = session_info
                     if getattr(Config, 'BYPASS_AI_GATE', False):
-                        logger.info(f"⚡ AI Gate Bypassed (Sovereign Light) for {symbol}")
+                        logger.info(f"⚡ AI Gate Bypassed (Bayesian Pivot Light) for {symbol}")
                         ai_result = {
-                            "live_execution": {"score": 10.0, "reasoning": "AI Gate Bypassed (Sovereign Light)"},
+                            "live_execution": {"score": 10.0, "reasoning": "AI Gate Bypassed (Bayesian Pivot Light)"},
                             "shadow_optimizer": {"suggested_risk_multiplier": 1.0}
                         }
                         live = ai_result["live_execution"]
@@ -878,7 +933,7 @@ class LocalScannerRunner:
                     base_pattern = setup.get('pattern', 'Unknown')
                     enriched_pattern = f"{hunt_label} — {base_pattern}"
 
-                    # Threshold: Sovereign Sniper Standard (8.5)
+                    # Threshold: Bayesian Pivot Standard (8.5)
                     is_asian_fade = setup.get('is_asian_fade', False)
                     if is_asian_fade:
                         threshold = Config.AI_THRESHOLD_ASIAN_FADE
@@ -931,7 +986,7 @@ class LocalScannerRunner:
                             risk_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
                             if direction == 'LONG':
                                 risk_mult = risk_mult * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
-                        # Strict Risk Cap (Sovereign Guard Cap)
+                        # Strict Risk Cap (Bayesian Pivot Guard Cap)
                         max_risk = getattr(Config, 'MAX_RISK_USD', 150.0)
                         if risk_amt > max_risk:
                             logger.warning(f"🛡️ Risk calculated as ${risk_amt:.2f} exceeds MAX_RISK_USD (${max_risk:.2f}). Capping to ${max_risk:.2f}.")
@@ -945,7 +1000,7 @@ class LocalScannerRunner:
                             logger.warning(f"⚠️ {symbol} lot size ({lots}) exceeds symbol cap. Capping to {max_allowed_size}.")
                             lots = max_allowed_size
 
-                        # 2. Notional USD Value Cap (Sovereign Safety) <!-- id: 12 -->
+                        # 2. Notional USD Value Cap (Bayesian Pivot Safety) <!-- id: 12 -->
                         position_value = lots * setup['entry']
                         max_notional = getattr(Config, 'MAX_NOTIONAL_VALUE_USD', 40000.0)
                         
@@ -1113,7 +1168,7 @@ class LocalScannerRunner:
                 path = f"data/charts/pulse_{int(time.time())}.png"
                 from src.engines.visualizer import generate_bias_chart
                 generate_bias_chart(df_4h, symbol, timeframe="4h", output_path=path)
-                self.notifier.send_photo(path, caption=f"📊 *SOVEREIGN MARKET PULSE*\n`{symbol}` Bias: `{bias_str}`")
+                self.notifier.send_photo(path, caption=f"📊 *BAYESIAN PIVOT MARKET PULSE*\n`{symbol}` Bias: `{bias_str}`")
         except: pass
 
     def main_loop(self):
