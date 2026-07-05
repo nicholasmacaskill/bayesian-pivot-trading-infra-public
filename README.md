@@ -59,6 +59,18 @@ flowchart TD
 
 ---
 
+## 🏗️ Polyglot Architecture & Tech Stack
+The system is built to ensure ultra-low latency execution while providing premium visualization and institutional auditing.
+
+- **Core Engine (Python)**: 1.3M+ lines of highly optimized, vectorized logic handling dynamic market parsing, intermarket confluence validation, and AI orchestration.
+- **Quant Auditor (Rust)**: Standalone high-performance desktop tool built on the Slint GUI framework, executing RSA signature verification on logged trades/signals for cryptographic tamper-proofing.
+- **Alpha Dashboard (TypeScript / Next.js)**: 550k+ lines of React-based infrastructure for real-time Signal visualization, execution auditing, and proprietary "Glass" UI components.
+- **NexusAIHub (Model Orchestration)**: A unified AI gateway dynamically routing natural language reasoning tasks across Together AI (Serverless Llama-3 SFT) and OpenRouter (Gemini 2.5).
+- **Data & Telemetry (PostgreSQL / Supabase)**: Vectorized storage for semantic signal-memory, execution ledgers, and trade provenance.
+- **Ops & Automation (Shell / Bash)**: Hardened cron-based synchronization for continuous execution and public/private repository segregation.
+
+---
+
 ## 🧬 Architectural Evolution
 The infrastructure has undergone three major evolutionary phases to optimize latency, reduce cloud overhead, and maintain complete IP control:
 
@@ -213,6 +225,21 @@ To maintain cost efficiency and stay within API rate limits during high-frequenc
 To maintain 24/7 uptime in a live trading environment:
 - **Localized Database Caching (`data/yfinance_cache/`)**: Direct local yfinance caching prevents macOS process-forking issues and SQLite write-lock errors that arise from multiple concurrent background scan workers.
 - **Vitals Preloading**: System startup logic is reordered to import core config parameters and resolve dependency caching before establishing server connections, neutralizing race conditions on startup.
+
+---
+
+## 📊 Post-Trade Auditing & Transaction Cost Analysis (TCA)
+To maintain strict execution quality and continuous system evolution:
+- **Auto-Contextualization**: The system automatically captures and reconstructs the exact market state (session volatility, SMT divergence strength, relative range placement) at the millisecond of entry for all trades.
+- **Latency & Slippage Tracking**: Measures execution latency between validation confirmation and broker fill timestamps to log slippage performance.
+- **Semantic Journal Sync**: Outputs structured trade audits (AI-grade score, psychological context, execution metrics) and embeds them into Supabase for semantic search retrieval, allowing natural language queries on historical performance.
+
+---
+
+## 🔐 Cryptographic Provenance & AI Security
+To protect data integrity and model alignment in live execution environments:
+- **Rust Quant Auditor**: A native compiled verification module that parses local SQLite logs and mathematically validates signal authenticity. Using SHA-256 digests and PKCS#1 v1.5 RSA-2048 public key signatures, the auditor ensures that no trade records or signal alerts have been modified or backdated.
+- **Adversarial Injection Defense**: Active protection filters check raw natural language inputs (Telegram updates, chat responses) for prompt-injection attacks or model override directives, neutralizing jailbreak attempts before they reach the NexusAIHub router.
 
 ---
 
