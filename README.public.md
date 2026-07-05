@@ -1,10 +1,89 @@
-# Bayesian Pivot Trading Infrastructure 🧠💎
+# BayesianPivot Trading Infrastructure 🧠💎
 
 **An institutional-grade, multi-engine synthetic consciousness for price discovery and execution.**
 
-The infrastructure is a professional-grade trading Operating System built on a high-performance polyglot stack. It replaces traditional speculative liability with a deterministic, multi-strategy architecture—orchestrating market physics, real-time biometric telemetry, and a custom multi-modal AI validation layer. 
+BayesianPivot is a professional-grade trading Operating System built on a high-performance polyglot stack. It replaces traditional speculative liability with a deterministic, multi-strategy architecture—orchestrating market physics, real-time biometric telemetry, and a custom multi-modal AI validation layer.
 
-Designed for scalability and operational security, the infrastructure leverages serverless GPU fine-tuning and a proprietary Bayesian orchestrator to transform global liquidity volatility into a disciplined, sovereign advantage.
+Designed for scalability and operational security, the infrastructure leverages serverless GPU fine-tuning and a proprietary Bayesian orchestrator to transform global liquidity volatility into a disciplined, probabilistic advantage.
+
+---
+
+## 🏛️ System Pipeline & Flow Architecture
+The diagram below maps the complete data ingestion, processing, validation, and execution pipeline of the BayesianPivot trading OS:
+
+```mermaid
+flowchart TD
+    %% Ingestion Layer
+    subgraph Ingestion [Ingestion Layer]
+        A1[yfinance Feed] --> B1[Data Processing Engine]
+        A2[TradeLocker Account API] --> B1
+        A3[Apple Health Biometrics] --> B1
+    end
+
+    %% Quantitative Gating Layer
+    subgraph QG [Quantitative Gating Layer]
+        B1 --> C1{Gate 1: Hurst Exponent}
+        C1 -->|< Threshold| D1[Mean Reversion Engine]
+        C1 -->|> Threshold| D2[Expansion Engine]
+        C1 -->|Chaos Band| D3[Random Walk / SKIP]
+        
+        B1 --> C2[Gate 2: Vector SMT Divergence]
+        B1 --> C3[Gate 7: Biometric HRV Lock]
+        
+        D1 & D2 & C2 & C3 --> E1[Setup Candidates]
+    end
+
+    %% AI Validation Layer
+    subgraph AIV [AI Validation Layer: PivotAIHub]
+        E1 --> F1{Model Router}
+        F1 -->|Live Inference| G1[OpenRouter: Gemini 2.5]
+        F1 -->|Custom Models| G2[Together AI: Llama-3 SFT]
+        G1 & G2 --> H1[AI Validation Score]
+    end
+
+    %% Execution & Evolution Layer
+    subgraph EE [Execution & Evolution Layer]
+        H1 -->|Target Score| I1[TradeLocker Execution]
+        I1 --> J1[Supabase DB / Event Ledger]
+        
+        J1 --> K1[Weekly Dataset Parser]
+        K1 -->|Export JSONL| L1[data/training/ folder]
+        L1 -->|Monthly Cycle| M1[Together SFT Job]
+        M1 -->|Compile Weights| G2
+        
+        J1 --> N1[Telegram Bot / Voice Audits]
+    end
+```
+
+---
+
+## 🧠 The Multi-Strategy Philosophy: Why Dual Engines?
+Originally, the infrastructure operated solely on a single strict gating funnel. While highly profitable, this approach presented a trade-frequency bottleneck during fast-moving, high-momentum market phases.
+
+To solve this, we migrated to a **dual-engine, multi-strategy approach**:
+- **Capital Anchor (SMC Engine):** Preserves capital by waiting for rare, high-confluence institutional reversals. It trades with full risk parameters because the probability of success is mathematically maximized by the 9-Gate gauntlet.
+- **Velocity Driver (Alpha Sweep Engine):** Captures high-frequency intraday momentum. By stripping away slow validation gates, it acts on immediate structural displacement, scaling down position sizing to maintain a steady equity curve and keep capital active.
+- **The Synergy:** Together, they smooth the portfolio's drawdown cycles, keeping yield consistent while ensuring institutional risk standards are never violated.
+
+---
+
+## ⚡ The Two Active Strategy Engines
+
+### 1. The SMC Reversal Engine (The 9-Gate Funnel)
+- **Primary Objective:** Captures major market turning points (Institutional accumulation/distribution).
+- **Core Signal:** Sweeps of high-timeframe (1H/Daily) swing levels, requiring displacement and structural shifts on the 5m chart.
+- **Validation Rigor:** Full 9-Gate execution. Requires SMT divergence, trend alignment, real-time AI validation, Apple Health biometric verification, and Prop Firm compliance audits.
+- **Risk Profile:** Full risk sizing with institutional target reward-to-risk (RR) ratios.
+
+### 2. The Alpha Sweep Engine (Streamlined 4-Gate Execution)
+- **Primary Objective:** Captures quick, high-velocity displacement sweeps (imbalance reclaims and momentum continuations).
+- **Core Signal:** Reclaims of recent swing levels with strong wick rejection during active sessions.
+- **Validation Rigor:** Streamlined 4-Gate execution. Bypasses SMT, Order Book, AI validation, Biometrics, and Prop Audit. It runs only:
+  - *Gate 0 (Killzones):* Execution restricted strictly to high-liquidity session windows.
+  - *Gate 1 (Hurst Exponent):* Rejects random walk chop.
+  - *Gate 4 (Wick & Depth):* Verifies wick rejection and relative sweep depth.
+  - *Gate 5 (Trend Alignment):* Forces direction to align with the trend during trending states.
+- **Risk Profile:** Automatically downsized to a fraction of the base risk parameter to maintain strict risk guardrails.
 
 ---
 
@@ -19,31 +98,22 @@ The system is built to ensure ultra-low latency execution while providing premiu
 
 ---
 
-## ⚡ Key Infrastructure Features
+## 🛠️ LLM Ops & Token Optimization
+To maintain cost efficiency and stay within API rate limits during high-frequency scans, the codebase implements specialized LLM Ops layers:
+- **Rule Compression**: Prop firm rules can be tens of thousands of tokens. The system uses regex-based extraction to compress raw rules (over 70% payload reduction) while preserving full validation accuracy.
+- **Real-Time Token Tracking**: Every API call routes through a local tracker that logs prompt/completion token usage and cost metrics to local SQLite databases, generating daily alerts to ensure inference costs remain nominal.
 
-### 1. Multi-Strategy Execution Engines
-Rather than relying on a single static funnel, the system deploys isolated, specialized engines:
-- **SMC Gating Engine**: A strict multi-stage deterministic gauntlet evaluating market state, structural displacements, and liquidity voids.
-- **Alpha Sweep Momentum**: A standalone high-velocity engine designed to capitalize on pure structural displacement and imbalance cascades without waiting for deep confirmations.
+---
 
-### 2. Dual-Track AI Validation (`NexusAIHub`)
-All critical logic flows through a centralized model wrapper designed for zero-latency failovers:
-- **Live Validation (OpenRouter/Gemini)**: Acts as a real-time "Reject-by-Default" persona, actively hunting for retail inducement traps in the chart context.
-- **Serverless SFT (Together AI)**: A custom fine-tuned Llama-3 model trained exclusively on the proprietary execution ledger. The system runs automated weekly data-collection loops to self-correct and compound its trading edge.
-
-### 3. Biometric Physiological Lock (Apple Health)
-Trading is biological. The system protects the capital from the trader's nervous system.
-- By integrating real-time telemetry from Apple Health, the system measures BPM and HRV.
-- If the practitioner enters a state of "Tilt" (high BPM / low HRV), the orchestrator triggers an automatic execution lock or downsizes risk parameters, ensuring trading only occurs during analytical coherence.
-
-### 4. Interactive "Gatekeeper" Telegram Interface
-- **Prop Guardian**: Conducts real-time compliance auditing for institutional constraints (drawdown limits, consistency rules).
-- **Psychology Audits**: Periodically prompts the trader via Telegram. Natural language analysis of the trader's responses determines a "Trader Sentiment" score, adjusting risk dynamically.
+## 💾 System Stability & Concurrency Engineering
+To maintain 24/7 uptime in a live trading environment:
+- **Localized Database Caching**: Direct local data caching prevents process-forking issues and write-lock errors that arise from multiple concurrent background scan workers.
+- **Vitals Preloading**: System startup logic is reordered to import core config parameters and resolve dependency caching before establishing server connections, neutralizing race conditions on startup.
 
 ---
 
 ## 🔒 Operational Security (OPSEC)
-This repository represents the **Public Mirror** of the Bayesian Pivot infrastructure. 
+This repository represents the **Public Mirror** of the BayesianPivot infrastructure. 
 To protect proprietary Intellectual Property and active Alpha logic, this mirror exposes only the architectural harness, UI scaffolding, and non-proprietary stubs. 
 
 - Core Bayesian algorithms, metric thresholds, and SFT datasets remain strictly partitioned in the internal private cluster.
