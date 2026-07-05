@@ -16,6 +16,28 @@ class SovereignAIHub:
     Provides automatic failover to ensure analysis uptime.
     """
     def __init__(self):
+        # Together AI (Direct Integration)
+        self.together_key = os.environ.get("TOGETHER_API_KEY")
+        self.together_model = os.environ.get("TOGETHER_MODEL", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
+        if self.together_key:
+            self.together_client = openai.OpenAI(
+                api_key=self.together_key,
+                base_url="https://api.together.xyz/v1"
+            )
+        else:
+            self.together_client = None
+
+        # OpenRouter (Unified Provider)
+        self.openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        self.openrouter_model = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+        if self.openrouter_key:
+            self.openrouter_client = openai.OpenAI(
+                api_key=self.openrouter_key,
+                base_url="https://openrouter.ai/api/v1"
+            )
+        else:
+            self.openrouter_client = None
+
         # Gemini (Primary)
         self.gemini_key = os.environ.get("GEMINI_API_KEY")
         self.gemini_client = genai.Client(api_key=self.gemini_key) if self.gemini_key else None
@@ -34,12 +56,33 @@ class SovereignAIHub:
     @property
     def has_ai(self) -> bool:
         """Returns True if any AI provider is available (including local)."""
-        return any([self.gemini_client, self.anthropic_client, self.openai_client, self.local_handler.is_available()])
+        return any([
+            self.together_client,
+            self.openrouter_client,
+            self.gemini_client,
+            self.anthropic_client,
+            self.openai_client,
+            self.local_handler.is_available()
+        ])
 
     def analyze_setup(self, prompt: str, image_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Tries to analyze the setup using available providers in priority order.
         """
+        # PRIORITY 0: Together AI (Direct integration)
+        if self.together_client:
+            try:
+                return self._analyze_with_together(prompt, image_path)
+            except Exception as e:
+                logger.warning(f"⚠️ Together AI analysis failed: {e}. Falling back to OpenRouter...")
+
+        # PRIORITY 1: OpenRouter (Unified API key check)
+        if self.openrouter_client:
+            try:
+                return self._analyze_with_openrouter(prompt, image_path)
+            except Exception as e:
+                logger.warning(f"⚠️ OpenRouter analysis failed: {e}. Falling back to Gemini...")
+
         # PRIORITY 1: Gemini
         if self.gemini_client:
             try:
@@ -67,6 +110,50 @@ class SovereignAIHub:
         except Exception as e:
             logger.error(f"💥 All AI providers failed: {e}")
             raise Exception("Total AI Infrastructure Failure")
+
+    def _analyze_with_together(self, prompt: str, image_path: Optional[str]) -> Dict[str, Any]:
+        """Together AI Implementation."""
+        content = [{"type": "text", "text": prompt}]
+        
+        if image_path and os.path.exists(image_path):
+            import base64
+            with open(image_path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                content.insert(0, {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{encoded_string}"}
+                })
+
+        response = self.together_client.chat.completions.create(
+            model=self.together_model,
+            messages=[{"role": "user", "content": content}],
+            max_tokens=1024
+        )
+        return self._parse_json_response(response.choices[0].message.content, provider=f"Together/{self.together_model}")
+
+    def _analyze_with_openrouter(self, prompt: str, image_path: Optional[str]) -> Dict[str, Any]:
+        """OpenRouter Implementation."""
+        content = [{"type": "text", "text": prompt}]
+        
+        if image_path and os.path.exists(image_path):
+            import base64
+            with open(image_path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                content.insert(0, {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{encoded_string}"}
+                })
+
+        response = self.openrouter_client.chat.completions.create(
+            model=self.openrouter_model,
+            messages=[{"role": "user", "content": content}],
+            max_tokens=1024,
+            extra_headers={
+                "HTTP-Referer": "https://sovereignSMC.com",
+                "X-Title": "Sovereign SMC"
+            }
+        )
+        return self._parse_json_response(response.choices[0].message.content, provider=f"OpenRouter/{self.openrouter_model}")
 
     def _analyze_with_gemini(self, prompt: str, image_path: Optional[str]) -> Dict[str, Any]:
         """Gemini Pro / Flash Implementation."""
@@ -154,6 +241,24 @@ class SovereignAIHub:
             
         prompt = "Determine the market trend bias from this chart. Return ONLY 'BULLISH', 'BEARISH', or 'NEUTRAL'."
         
+        # Priority 0: Together AI
+        if self.together_client:
+            try:
+                result = self._analyze_with_together(prompt, image_path)
+                text = str(result).upper()
+                if "BULLISH" in text: return 1
+                if "BEARISH" in text: return -1
+            except: pass
+
+        # Priority 1: OpenRouter
+        if self.openrouter_client:
+            try:
+                result = self._analyze_with_openrouter(prompt, image_path)
+                text = str(result).upper()
+                if "BULLISH" in text: return 1
+                if "BEARISH" in text: return -1
+            except: pass
+
         # Priority: Gemini (Vision is standard)
         if self.gemini_client:
             try:

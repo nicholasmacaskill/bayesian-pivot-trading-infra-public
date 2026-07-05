@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 import re
-from google import genai
+from src.engines.ai_hub import SovereignAIHub
 import requests
 from src.core.config import Config
 from src.core.database import get_db_connection
@@ -19,12 +19,8 @@ class PropGuardian:
         self.max_total_drawdown = Config.get('MAX_DRAWDOWN_LIMIT', 0.06)
         self.target_rr = Config.get('TARGET_RR', 3.0)
         
-        # Initialize Gemini for URL reading
-        self.api_key = os.environ.get("GEMINI_API_KEY")
-        if self.api_key:
-            self.client = genai.Client(api_key=self.api_key)
-        else:
-            self.client = None
+        # Initialize AI Hub for dynamic rule parsing
+        self.hub = SovereignAIHub()
             
         # Try to pull dynamic rules once on init
         self._sync_dynamic_rules()
@@ -34,7 +30,7 @@ class PropGuardian:
         active_firm = Config.get('ACTIVE_FIRM', 'UPCOMERS')
         firm_data = Config.PROP_FIRMS.get(active_firm)
         
-        if not firm_data or not firm_data.get('url') or not self.client:
+        if not firm_data or not firm_data.get('url') or not self.hub.has_ai:
             return
             
         url = firm_data['url']
@@ -84,16 +80,7 @@ class PropGuardian:
             {{"daily_drawdown": 0.04, "total_drawdown": 0.06}}
             """
             
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-                config={'response_mime_type': 'application/json'}
-            )
-            
-            from src.core.token_tracker import track_response_tokens
-            track_response_tokens(response, model_name="gemini-2.5-flash")
-            
-            data = json.loads(response.text)
+            data = self.hub.analyze_setup(prompt)
             
             # Update Internal Limits
             if 'daily_drawdown' in data and data['daily_drawdown'] > 0:
