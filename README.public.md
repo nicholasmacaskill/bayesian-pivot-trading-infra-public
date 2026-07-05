@@ -110,6 +110,12 @@ To maintain 24/7 uptime in a live trading environment:
 - **Localized Database Caching**: Direct local data caching prevents process-forking issues and write-lock errors that arise from multiple concurrent background scan workers.
 - **Vitals Preloading**: System startup logic is reordered to import core config parameters and resolve dependency caching before establishing server connections, neutralizing race conditions on startup.
 
+## 📊 Post-Trade Auditing & Transaction Cost Analysis (TCA)
+To maintain strict execution quality and continuous system evolution:
+- **Auto-Contextualization**: The system automatically captures and reconstructs the exact market state (session volatility, SMT divergence strength, relative range placement) at the millisecond of entry for all trades.
+- **Latency & Slippage Tracking**: Measures execution latency between validation confirmation and broker fill timestamps to log slippage performance.
+- **Semantic Journal Sync**: Outputs structured trade audits (AI-grade score, psychological context, execution metrics) and embeds them into Supabase for semantic search retrieval, allowing natural language queries on historical performance.
+
 ---
 
 ## 🔒 Operational Security (OPSEC)
