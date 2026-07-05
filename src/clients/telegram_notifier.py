@@ -141,6 +141,14 @@ class TelegramNotifier:
         grade   = "🦄 UNICORN" if ai_score >= 8.5 else ("🦅 HIGH ALPHA" if ai_score >= 7.5 else "⚠️ MED ALPHA")
 
         # ── ASSEMBLE ──────────────────────────────────────────────────────────
+        warning_block = ""
+        is_long = "Bullish" in pattern or "LONG" in pattern.upper()
+        if is_long:
+            warning_block = (
+                f"\n\n⚠️ <b>HISTORICAL RISK ALERT:</b> Long trades represent your largest manual draw. "
+                f"Ensure strict limit execution and 50% risk reduction ($50 USD max risk)."
+            )
+
         msg = (
             f"{emoji} <b>{grade}: {symbol}</b>\n"
             f"{header}\n\n"
@@ -148,7 +156,8 @@ class TelegramNotifier:
             f"{confluence}\n\n"
             f"{liquidity}\n\n"
             f"{system_state}"
-            f"{exec_block}\n\n"
+            f"{exec_block}"
+            f"{warning_block}\n\n"
             f"📊 <a href='{tv_link}'>View on TradingView</a>"
             f"{spoiler_block}"
         )
@@ -161,7 +170,8 @@ class TelegramNotifier:
     def send_scan_briefing(self, header_data: dict, account_data: dict,
                            performance_data: dict, confluence_data: dict,
                            market_rows: list, latest_setup: dict | None,
-                           latest_rejected: dict | None = None):
+                           latest_rejected: dict | None = None,
+                           strategic_directive: str | None = None):
         """
         Sends the full V3 Sovereign Briefing on /scan command.
         All ASCII tables are replaced with HTML lists for mobile readability.
@@ -178,7 +188,7 @@ class TelegramNotifier:
         security   = header_data.get('security', 'N/A')
 
         header = (
-            f"🔍 <b>SOVEREIGN BRIEFING v3</b>\n"
+            f"🔍 <b>BAYESIAN PIVOT BRIEFING v3</b>\n"
             f"{badge} | Trust: <code>{trust}/100</code>\n"
             f"🏁 <b>{kz_name}</b> — {sess_phase}\n"
             f"📉 DD: <code>{dd_pct:.1f}%</code> | Buffer: <code>${buf_usd:,.0f}</code>\n"
@@ -274,6 +284,11 @@ class TelegramNotifier:
         if not setup_block:
             setup_block = "🔭 <b>Setups Today</b>\n  <i>No signals detected this session.</i>"
 
+        # ── STRATEGIC DIRECTIVE ───────────────────────────────────────────────
+        directive_block = ""
+        if strategic_directive:
+            directive_block = f"🧠 <b>Strategic Directive</b>\n• {strategic_directive}"
+
         # ── AGENT SPOILER ─────────────────────────────────────────────────────
         agent_payload = {
             "equity": equity,
@@ -289,8 +304,10 @@ class TelegramNotifier:
         spoiler = f"\n<tg-spoiler>agent_data: {json.dumps(agent_payload, default=str)}</tg-spoiler>"
 
         # ── ASSEMBLE ──────────────────────────────────────────────────────────
-        msg = (
-            f"{header}\n\n"
+        msg = f"{header}\n\n"
+        if directive_block:
+            msg += f"{directive_block}\n\n"
+        msg += (
             f"{acct_block}\n\n"
             f"{pos_block}\n\n"
             f"{perf_block}\n\n"
@@ -308,7 +325,7 @@ class TelegramNotifier:
     def send_security_alert(self, title: str, summary: str, severity: str = "HIGH"):
         icon = {"CRITICAL": "🚨", "HIGH": "⚠️", "MEDIUM": "🟡"}.get(severity, "⚠️")
         msg = (
-            f"{icon} <b>SOVEREIGN GUARD — {severity}</b>\n\n"
+            f"{icon} <b>BAYESIAN PIVOT GUARD — {severity}</b>\n\n"
             f"🛡️ <b>{title}</b>\n\n{summary}\n\n"
             f"⏰ <code>{datetime.now().strftime('%H:%M:%S UTC')}</code>"
         )
