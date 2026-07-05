@@ -3,7 +3,7 @@
 # This script should be run daily via crontab
 
 # Navigate to project directory
-cd "/Users/nicholasmacaskill/sovereignSMC/sovereignSMC"
+cd "$(dirname "$0")/.."
 
 # Load environment
 source venv/bin/activate
