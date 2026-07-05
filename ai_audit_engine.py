@@ -1,21 +1,23 @@
-from google import genai
 import os
 import json
 import logging
 from src.core.config import Config
+from src.engines.ai_hub import SovereignAIHub
+from google import genai
 
 logger = logging.getLogger(__name__)
 
 class AIAuditEngine:
     def __init__(self, api_key=None):
-        # Try explicit -> Config -> Env
-        self.api_key = api_key or getattr(Config, 'GEMINI_API_KEY', None) or os.environ.get("GEMINI_API_KEY")
+        self.hub = SovereignAIHub()
         
+        # Keep gemini client only for text embeddings fallback
+        self.api_key = api_key or getattr(Config, 'GEMINI_API_KEY', None) or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
              from dotenv import load_dotenv
              load_dotenv(".env.local")
              self.api_key = os.environ.get("GEMINI_API_KEY")
-
+             
         if self.api_key:
             self.client = genai.Client(api_key=self.api_key)
         else:
@@ -47,7 +49,7 @@ class AIAuditEngine:
         manual_trade: {trade_id, timestamp, symbol, side, entry, exit, pnl}
         system_data: {patterns_found: [], bias: str}
         """
-        if not self.client:
+        if not self.hub.has_ai:
             return {
                 "score": 5.0, 
                 "feedback": "AI Auditor offline. Trade logged without analysis.",
@@ -93,37 +95,7 @@ class AIAuditEngine:
         """
 
         try:
-            # Multi-model fallback for robustness
-            models_to_try = [
-                'gemini-2.5-flash', 
-                'gemini-1.5-flash', 
-                'gemini-1.5-pro'
-            ]
-            response = None
-            last_err = None
-
-            for m in models_to_try:
-                try:
-                    response = self.client.models.generate_content(
-                        model=m,
-                        contents=prompt,
-                        config={
-                            'response_mime_type': 'application/json',
-                            'max_output_tokens': 500
-                        }
-                    )
-                    from src.core.token_tracker import track_response_tokens
-                    track_response_tokens(response, model_name=m)
-                    if response and response.text:
-                        break
-                except Exception as ex:
-                    last_err = ex
-                    continue
-
-            if not response or not response.text:
-                raise last_err or Exception("All Gemini models failed in Audit Engine")
-
-            return json.loads(response.text)
+            return self.hub.analyze_setup(prompt)
         except Exception as e:
             logger.error(f"Audit Engine Failure: {e}")
             return {
@@ -138,7 +110,7 @@ class AIAuditEngine:
         Analyzes a trade taken WITHOUT a system signal.
         Goal: Identify 'Alpha' (Human intuition/missed setup) vs 'Rogue' (Gambling).
         """
-        if not self.client:
+        if not self.hub.has_ai:
             return {"score": 5.0, "feedback": "Auditor offline.", "is_alpha": False}
 
         prompt = f"""
@@ -170,32 +142,7 @@ class AIAuditEngine:
         """
 
         try:
-            # Multi-model fallback
-            models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
-            response = None
-            last_err = None
-            for m in models_to_try:
-                try:
-                    response = self.client.models.generate_content(
-                        model=m,
-                        contents=prompt,
-                        config={
-                            'response_mime_type': 'application/json',
-                            'max_output_tokens': 500
-                        }
-                    )
-                    from src.core.token_tracker import track_response_tokens
-                    track_response_tokens(response, model_name=m)
-                    if response and response.text:
-                        break
-                except Exception as ex:
-                    last_err = ex
-                    continue
-            
-            if not response or not response.text:
-                 raise last_err or Exception("All Gemini models failed in Discretionary Audit")
-
-            return json.loads(response.text)
+            return self.hub.analyze_setup(prompt)
         except Exception as e:
             logger.error(f"Discordant Audit Failure: {e}")
             return {"score": 3.0, "feedback": f"Discordant Audit Error: {e}", "is_alpha": False}

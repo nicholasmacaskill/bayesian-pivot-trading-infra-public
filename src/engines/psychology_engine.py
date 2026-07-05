@@ -2,18 +2,14 @@ import os
 import json
 import logging
 from datetime import datetime
-from google import genai
+from src.engines.ai_hub import SovereignAIHub
 from src.core.config import Config
 
 logger = logging.getLogger("PsychologyEngine")
 
 class PsychologyEngine:
     def __init__(self, api_key=None):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        if self.api_key:
-            self.client = genai.Client(api_key=self.api_key)
-        else:
-            self.client = None
+        self.hub = SovereignAIHub()
             
         self.ledger_path = os.path.join(os.path.dirname(__file__), "psych_ledger.json")
         self.ledger = self._load_ledger()
@@ -39,7 +35,7 @@ class PsychologyEngine:
         Analyzes multimodal input to determine tilt level and sentiment.
         Optionally incorporates physio_tilt from BiometricEngine.
         """
-        if not self.client:
+        if not self.hub.has_ai:
             return {"tilt_score": 0, "sentiment": "Neutral", "reasoning": "AI Unavailable"}
 
         # Load Sovereign Prompts (Private IP)
@@ -53,34 +49,20 @@ class PsychologyEngine:
             prompt = sovereign_prompt.format(text=current_text or "No text provided")
         else:
             # Public Lite Version
-            prompt = f"Analyze the following trader text for emotional state (1-10 score): {current_text}"
-        
-        contents = [prompt]
-        
-        if audio_path and os.path.exists(audio_path):
-            # Pass audio to Gemini for tone analysis
-            from PIL import Image # Placeholder for multimodal handling if needed
-            # Use Gemini's multimodal capabilities
-            # For this implementation, we assume the client.models.generate_content can handle file uploads/paths
-            try:
-                # In real scenario, we'd upload the file first or pass it as Part
-                # For now, we simulate the analysis
-                pass
-            except:
-                pass
+            prompt = f"""
+            Analyze the following trader text for emotional state.
+            Trader text: "{current_text or 'No text provided'}"
+
+            Return EXACTLY a JSON format like this, nothing else:
+            {{
+                "tilt_score": <1-10 score, where 1 is calm and 10 is highly tilted/emotional>,
+                "sentiment": "<Calm, Frustrated, Anxious, Excited, or Neutral>",
+                "reasoning": "<Reason for this classification>"
+            }}
+            """
 
         try:
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=contents,
-                config={
-                    'response_mime_type': 'application/json',
-                    'max_output_tokens': 300
-                }
-            )
-            from src.core.token_tracker import track_response_tokens
-            track_response_tokens(response, model_name="gemini-2.5-flash")
-            result = json.loads(response.text)
+            result = self.hub.analyze_setup(prompt)
             
             # Incorporate Physiological Tilt if provided
             if physio_tilt is not None:
@@ -91,8 +73,8 @@ class PsychologyEngine:
             # Update ledger
             session = {
                 "timestamp": datetime.now().isoformat(),
-                "tilt_score": result['tilt_score'],
-                "sentiment": result['sentiment'],
+                "tilt_score": result.get('tilt_score', 1),
+                "sentiment": result.get('sentiment', 'Calm'),
                 "text": current_text,
                 "physio_tilt": physio_tilt
             }
@@ -104,7 +86,14 @@ class PsychologyEngine:
             return result
         except Exception as e:
             logger.error(f"Psychology analysis failed: {e}")
-            return {"tilt_score": 0, "sentiment": "Error", "reasoning": str(e)}
+            if self.ledger.get('sessions'):
+                last_session = self.ledger['sessions'][-1]
+                return {
+                    "tilt_score": last_session.get("tilt_score", 1),
+                    "sentiment": last_session.get("sentiment", "Calm"),
+                    "reasoning": f"AI API Error ({e}) - Fell back to last known state"
+                }
+            return {"tilt_score": 1, "sentiment": "Calm", "reasoning": str(e)}
 
     def get_risk_multiplier(self, tilt_score):
         """
