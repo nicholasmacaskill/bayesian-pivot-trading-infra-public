@@ -92,7 +92,6 @@ The system is built to ensure ultra-low latency execution while providing premiu
 
 - **Core Engine (Python)**: 1.3M+ lines of highly optimized, vectorized logic handling dynamic market parsing, intermarket confluence validation, and AI orchestration.
 - **Quant Auditor (Rust)**: Standalone high-performance desktop tool built on the Slint GUI framework, executing RSA signature verification on logged trades/signals for cryptographic tamper-proofing.
-- **Alpha Dashboard (TypeScript / Next.js)**: 550k+ lines of React-based infrastructure for real-time Signal visualization, execution auditing, and proprietary "Glass" UI components.
 - **NexusAIHub (Model Orchestration)**: A unified AI gateway dynamically routing natural language reasoning tasks across Together AI (Serverless Llama-3 SFT) and OpenRouter (Gemini 2.5).
 - **Data & Telemetry (PostgreSQL / Supabase)**: Vectorized storage for semantic signal-memory, execution ledgers, and trade provenance.
 - **Ops & Automation (Shell / Bash)**: Hardened cron-based synchronization for continuous execution and public/private repository segregation.
