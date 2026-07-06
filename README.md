@@ -184,11 +184,13 @@ To solve this, we migrated to a **dual-engine, multi-strategy approach**:
 
 ---
 
-## 🧠 The Bayesian Psychologist (Psychology Engine)
-Trading is biological. This engine protects the system from the trader.
-- **Interactive Sentiment**: The system periodically prompts via Telegram for the trader's mental state. Natural language analysis (`PivotAIHub`) determines the "Trader Sentiment" score.
-- **Risk Gating**: High Tilt (Score > 6) triggers automated trade-downsizing with a **0.25x Risk Floor**—protecting equity without a hard-stop on potential alpha. Panic/Revenge indices trigger a **Hard Shutdown**.
-- **Voice Verdicts**: The Gatekeeper provides auditory audits via macOS native TTS to ground the trader during high-volatility events.
+## 🤖 Interactive Telegram Interface (Gatekeeper Mode)
+The infrastructure operates entirely through an interactive Telegram command & control loop, replacing traditional dashboard dependencies with a low-friction interface:
+- **Real-Time Market Alerts**: Pushes formatted markdown signals (Macro Bias, Hurst state, SMT divergence strength, invalidation zones) to the trader the moment a setup is detected.
+- **Biometric-Aware Risk Check-ins (The Psychology Engine)**: Automatically prompts the trader at session starts to update their mental status. It scores replies using LLM sentiment analysis, matching the score with Apple Health telemetry to adjust or lock risk parameters. High Tilt (Score > 6) triggers automated trade-downsizing with a **0.25x Risk Floor**—protecting equity without a hard-stop on potential alpha. Panic/Revenge indices trigger a **Hard Shutdown**.
+- **Rogue Trade Forensic Auditing**: Pushes instant alerts when a manual trade is taken outside system parameters, prompting the trader to reply with their setup narrative. The response is parsed by `PivotAIHub`, matched with reconstructed market state, and logged to the SFT retraining ledger.
+- **Prop Guardian Alerts**: Delivers real-time status updates on account drawdown, consistency metrics, and daily profit/loss limits to maintain strict compliance.
+- **Voice Verdicts**: The Gatekeeper provides auditory audits via macOS native TTS (Text-to-Speech) to ground the trader during high-volatility events.
 
 ---
 
