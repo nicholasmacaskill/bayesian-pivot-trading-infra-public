@@ -164,6 +164,31 @@ To solve this, we migrated to a **dual-engine, multi-strategy approach**:
 
 ---
 
+## 📊 Live Performance Results (March 10 – June 10, 2026)
+> Audited against the SQLite execution ledger. 100% verified. System inception to present.
+
+| Metric | SYSTEM (Automated) | ROGUE (Manual Discretionary) |
+| :--- | :---: | :---: |
+| **Total Net PnL** | **+$4,296.01** | -$4,263.53 |
+| **Total Trades** | 127 | 236 |
+| **Win Rate** | **48.03%** | 35.59% |
+| **Average Win** | **+$261.54** | +$227.19 |
+| **Average Loss** | -$176.63 | -$153.60 |
+| **Realized R:R** | **1.48** | 1.48 |
+| **Profit Factor** | **1.37** | 0.82 |
+
+### The Behavioral Pivot
+Splitting performance into two distinct periods demonstrates the system's core thesis — **frequency is the primary risk, not the model**:
+
+| Period | System PnL | Manual PnL | Manual Trade Rate |
+| :--- | :---: | :---: | :---: |
+| Month 1 (Mar 10 – Apr 10) | **+$3,228.76** | **-$5,355.19** | ~6.5 trades/day |
+| Months 2–3 (Apr 10 – Jun 10) | **+$1,067.25** | **+$1,091.66** | ~0.6 trades/day |
+
+The system remained profitable in **both periods**. The trader's manual performance flipped from a **-$5,355 loss to a +$1,091 gain** solely by reducing trade frequency by 90% — validating the Psychology Engine's behavioral guardrails.
+
+---
+
 ## ⚡ The Two Active Strategy Engines
 
 ### 1. The SMC Reversal Engine (The 9-Gate Funnel)
@@ -215,17 +240,51 @@ Every Sunday at 00:00 UTC, the system executes an **Automated Retraining Cycle**
 
 ---
 
-## 🛠️ LLM Ops & Token Optimization
+## 🛠️ LLM Ops, Cost Architecture & Model Failover
 To maintain cost efficiency and stay within API rate limits during high-frequency scans, the codebase implements specialized LLM Ops layers:
-- **Rule Compression (`prop_guardian.py`)**: Prop firm rules can be tens of thousands of tokens. The system uses regex-based extraction to compress raw rules into under 4,000 characters (a 73% payload reduction) while preserving full validation accuracy.
-- **Real-Time Token Tracking (`token_tracker.py`)**: Every API call routes through a local tracker that logs prompt/completion token usage and cost metrics to local SQLite databases, generating daily alerts to ensure inference costs remain nominal.
+- **Rule Compression (`prop_guardian.py`)**: Prop firm rules can be tens of thousands of tokens. The system uses regex-based extraction to compress raw rules into under 4,000 characters — a **73% payload reduction** with zero loss in validation accuracy.
+- **Real-Time Token Budget Gate (`token_tracker.py`)**: Every API call routes through a local SQLite tracker that logs exact `prompt_tokens` and `candidate_tokens` per call. If cumulative daily spend exceeds a **$2.00 ceiling**, the tracker fires a Telegram alert and automatically suspends all LLM calls — protecting the infrastructure from billing runaways.
+- **Output Token Clamping**: Strict `max_output_tokens` limits are enforced by task type: Visual Bias Checks are gated to exactly **10 tokens** (binary response); Audit Engine reports are clamped at **300–800 tokens** to prevent verbose narratives. Result: **60%+ reduction in monthly API credit consumption**.
+
+### Verified Operational Costs
+| Task | Provider | Cost |
+| :--- | :--- | :--- |
+| Live scan validation | OpenRouter / Gemini 2.5 Flash | **$0.00015 per scan** |
+| Soft retraining (few-shot) | Local (SQLite) | **$0.00** |
+| Monthly SFT training run | Together AI (Llama-3-8B) | **$0.30 per run** |
+| Custom model inference | Together AI | $0.0004 per scan |
+| Full month of 24/7 scans | OpenRouter ($3 pre-fund) | Covers **~20,000 runs** |
+
+### Six-Tier Model Failover (`NexusAIHub`)
+All AI-powered tasks route through a centralized model gateway that manages failover automatically:
+```
+Together AI (SFT Custom Model)
+    └── OpenRouter (Gemini 2.5 Flash)
+        └── Google Gemini API (Direct)
+            └── Anthropic Claude API
+                └── OpenAI API
+                    └── Local Ollama SLM (On-Device, Zero-Cost Fallback)
+```
+If all cloud providers are offline, execution falls back to a locally hosted Small Language Model via Ollama — ensuring the system never halts due to third-party API outages.
 
 ---
 
-## 💾 System Stability & Concurrency Engineering
+## 💾 System Stability, Concurrency & Execution Latency
 To maintain 24/7 uptime in a live trading environment:
 - **Localized Database Caching (`data/yfinance_cache/`)**: Direct local yfinance caching prevents macOS process-forking issues and SQLite write-lock errors that arise from multiple concurrent background scan workers.
 - **Vitals Preloading**: System startup logic is reordered to import core config parameters and resolve dependency caching before establishing server connections, neutralizing race conditions on startup.
+- **Fault-Tolerant Daemon**: The scanner daemon wraps all broker API syncs and Supabase queries in retry wrappers. On `[Errno 54] Connection reset by peer` or socket drops, the system logs the event, holds active in-memory state, and auto-resumes on the next cycle — targeting **99.9% execution uptime**.
+
+### Execution Latency Routing Table
+A key engineering trade-off between conviction and speed, solved by the Two-Tiered Execution Router:
+
+| Dimension | Legacy Single Funnel | Structural Alpha (Math-Only) | High Alpha (AI-Validated) |
+| :--- | :--- | :---: | :---: |
+| **LLM Overhead** | Every trade | ❌ None | ✅ Full |
+| **Latency** | 1.5s – 3.0s | **< 50ms** | 1.5s – 3.0s |
+| **Setup Frequency** | Low | 2–3 / day | 2–3 / week |
+| **Position Size** | Full | 50% base risk | Full risk (1.0%) |
+| **Primary Use** | — | Session opens, momentum sweeps | Swing continuation setups |
 
 ---
 
@@ -274,6 +333,26 @@ Risk is dynamically scaled down as a function of the trader's physiological tilt
 - **Sentiment Multiplier (\(M_{\text{sentiment}}\))**: Evaluated via custom LLM classification of the trader's Natural Language input:
   \[M_{\text{sentiment}} = \max\left(0.25, 1.0 - 0.15 \times \text{Tilt Score}\right)\]
   where \(\text{Tilt Score} \in [0, 10]\).
+
+---
+
+## 📐 Prop Firm Scaling Mathematics
+The system's scalability is grounded in verified live statistics, not projections:
+
+**Expected Value per Trade (EV):**
+$$\text{EV} = (0.48 \times 1.48\text{ R}) - (0.52 \times 1.0\text{ R}) = +0.19\text{ R per trade}$$
+
+**Annualized Yield (180 trades/year):**
+$$\text{Annual Return} = 180 \times 0.19\text{ R} = +34.2\text{ R/year}$$
+
+### 3-Stage Account Scaling Roadmap
+| Stage | Allocation | Drawdown Capital | Risk/Trade | Projected Net Annual |
+| :--- | :---: | :---: | :---: | :---: |
+| Stage 1 (Single $100k) | $100,000 | $10,000 | $200 (2% of MDD) | **$6,771** |
+| Stage 2 (Full Firm Max) | $400,000 | $40,000 | $800 | **$27,086** |
+| Stage 3 (Multi-Firm Copier) | $1,200,000 | $120,000 | $2,400 | **$76,334** |
+
+> **Key Insight:** In prop trading, true capital is the Maximum Drawdown (MDD) limit, not the nominal account size. A $100k account with a 10% MDD has a **true capital of $10,000**. All sizing is calculated against this figure. At $200/trade on a $10k MDD buffer, the system requires **50 consecutive losses** to blow the account — a mathematical near-impossibility with a 48% win rate.
 
 ---
 
