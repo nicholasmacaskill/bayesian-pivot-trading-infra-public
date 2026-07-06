@@ -57,6 +57,22 @@ flowchart TD
 
 ---
 
+## 📊 Live System Performance (March – June 2026)
+> Audited against the live SQLite execution ledger. System inception to present.
+
+| Metric | Value |
+| :--- | :---: |
+| **Total System Trades** | 127 |
+| **System Win Rate** | **48.03%** |
+| **Profit Factor** | **1.37** |
+| **Avg Winning Trade** | +$261.54 |
+| **Avg Losing Trade** | -$176.63 |
+| **Net System PnL** | **+$4,296.01** |
+
+The system remained net profitable across every trading period since inception. Notably, the **Psychology Engine's behavioral guardrails proved their thesis** — when manual trade frequency was cut by 90% in response to Gatekeeper prompts, discretionary performance flipped from a significant loss to a net gain, without any change to the underlying model.
+
+---
+
 ## 🧠 The Multi-Strategy Philosophy: Why Dual Engines?
 Originally, the infrastructure operated solely on a single strict gating funnel. While highly profitable, this approach presented a trade-frequency bottleneck during fast-moving, high-momentum market phases.
 
@@ -105,17 +121,49 @@ The system is built to ensure ultra-low latency execution while providing premiu
 
 ---
 
-## 🛠️ LLM Ops & Token Optimization
+## 🛠️ LLM Ops, Cost Architecture & Model Failover
 To maintain cost efficiency and stay within API rate limits during high-frequency scans, the codebase implements specialized LLM Ops layers:
-- **Rule Compression**: Prop firm rules can be tens of thousands of tokens. The system uses regex-based extraction to compress raw rules (over 70% payload reduction) while preserving full validation accuracy.
-- **Real-Time Token Tracking**: Every API call routes through a local tracker that logs prompt/completion token usage and cost metrics to local SQLite databases, generating daily alerts to ensure inference costs remain nominal.
+- **Rule Compression**: Prop firm rules can be tens of thousands of tokens. The system uses regex-based extraction to compress raw rules — a **73% payload reduction** with zero loss in validation accuracy.
+- **Token Budget Gate**: Every API call routes through a local SQLite tracker logging exact token usage per call. If daily spend exceeds a hard ceiling, the system automatically fires a Telegram alert and suspends all LLM calls — preventing billing runaways without halting execution.
+- **Output Token Clamping**: Strict `max_output_tokens` limits enforced per task type, resulting in **60%+ reduction in monthly API credit consumption**.
+
+### Verified Operational Costs
+| Task | Provider | Cost |
+| :--- | :--- | :--- |
+| Live scan validation | OpenRouter / Gemini 2.5 Flash | **$0.00015 per scan** |
+| Soft retraining (few-shot injection) | Local SQLite | **$0.00** |
+| Monthly SFT training run | Together AI (Llama-3-8B) | **$0.30 per run** |
+| Full month of 24/7 scans | OpenRouter ($3 pre-fund) | Covers **~20,000 runs** |
+
+### Six-Tier Model Failover (NexusAIHub)
+All AI-powered tasks route through a centralized gateway with automatic failover:
+```
+Together AI (SFT Custom Model)
+    └── OpenRouter (Gemini 2.5 Flash)
+        └── Google Gemini API (Direct)
+            └── Anthropic Claude API
+                └── OpenAI API
+                    └── Local Ollama SLM (On-Device, Zero-Cost Fallback)
+```
+If all cloud providers are offline, the system falls back to a locally hosted model — ensuring execution never halts due to third-party outages.
 
 ---
 
-## 💾 System Stability & Concurrency Engineering
+## 💾 System Stability, Concurrency & Execution Latency
 To maintain 24/7 uptime in a live trading environment:
 - **Localized Database Caching**: Direct local data caching prevents process-forking issues and write-lock errors that arise from multiple concurrent background scan workers.
-- **Vitals Preloading**: System startup logic is reordered to import core config parameters and resolve dependency caching before establishing server connections, neutralizing race conditions on startup.
+- **Vitals Preloading**: System startup logic is reordered to import core config parameters before establishing server connections, neutralizing race conditions on startup.
+- **Fault-Tolerant Daemon**: All broker API syncs and database queries are wrapped in retry handlers. On socket drops or connection resets, the system logs the event, holds in-memory state, and auto-resumes — targeting **99.9% execution uptime**.
+
+### Execution Latency Routing
+A core engineering trade-off between validation conviction and execution speed, solved by the Two-Tiered Router:
+
+| Dimension | Structural Alpha (Math-Only) | High Alpha (AI-Validated) |
+| :--- | :---: | :---: |
+| **LLM Overhead** | ❌ None | ✅ Full |
+| **Execution Latency** | **< 50ms** | 1.5s – 3.0s |
+| **Setup Frequency** | 2–3 / day | 2–3 / week |
+| **Use Case** | Session opens, momentum sweeps | Swing continuation setups |
 
 ---
 
