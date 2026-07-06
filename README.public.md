@@ -85,6 +85,13 @@ To solve this, we migrated to a **dual-engine, multi-strategy approach**:
   - *Gate 5 (Trend Alignment):* Forces direction to align with the trend during trending states.
 - **Risk Profile:** Automatically downsized to a fraction of the base risk parameter to maintain strict risk guardrails.
 
+## 🤖 Interactive Telegram Interface (Gatekeeper Mode)
+The infrastructure operates entirely through an interactive Telegram command & control loop, replacing traditional dashboard dependencies with a low-friction interface:
+- **Real-Time Market Alerts**: Pushes formatted markdown signals (Macro Bias, Hurst state, SMT divergence strength, invalidation zones) to the trader the moment a setup is detected.
+- **Biometric-Aware Risk Check-ins**: Automatically prompts the trader at session starts to update their mental status. It scores replies using LLM sentiment analysis, matching the score with Apple Health telemetry to adjust or lock risk parameters.
+- **Rogue Trade Forensic Auditing**: Pushes instant alerts when a manual trade is taken outside system parameters, prompting the trader to reply with their setup narrative. The response is parsed and logged to the SFT retraining ledger.
+- **Prop Guardian Alerts**: Delivers real-time status updates on account drawdown, consistency metrics, and daily profit/loss limits to maintain strict compliance.
+
 ---
 
 ## 🏗️ Polyglot Architecture & Tech Stack
