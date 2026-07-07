@@ -131,12 +131,42 @@ class SMCScanner:
             # 4. SMT Context
             smt_strength = self.intermarket.get_smt_strength(symbol, df)
             
-            # 4b. Dynamic Strategic Playbook
+            # 4b. HTF Gravity Points (Potential Reversals)
+            gravity_msg = ""
+            nearest_resistance = None
+            nearest_support = None
+            try:
+                htf_pois = self.detect_htf_pois(symbol)
+                if htf_pois and df is not None and not df.empty:
+                    current_price = df['close'].iloc[-1]
+                    res_pois = sorted([p for p in htf_pois if p['bottom'] > current_price], key=lambda x: x['bottom'])
+                    sup_pois = sorted([p for p in htf_pois if p['top'] < current_price], key=lambda x: x['top'], reverse=True)
+                    
+                    nearest_resistance = res_pois[0] if res_pois else None
+                    nearest_support = sup_pois[0] if sup_pois else None
+                    
+                    if nearest_resistance:
+                        gravity_msg += f"\n🎯 **HTF Resistance:** {nearest_resistance['level']:.2f} ({nearest_resistance['type'].replace('_', ' ')})"
+                    if nearest_support:
+                        gravity_msg += f"\n🧲 **HTF Support:** {nearest_support['level']:.2f} ({nearest_support['type'].replace('_', ' ')})"
+                    
+                    if gravity_msg:
+                        gravity_msg = "\n───────────────────" + gravity_msg
+            except Exception as e:
+                logger.error(f"Failed to fetch HTF POIs for pulse: {e}")
+            
+            # 4c. Dynamic Strategic Playbook
             interpretation_lines = []
             
             # Bias interpretation
             if "Conflict" in bias_full or "NEUTRAL" in bias_full.upper():
-                interpretation_lines.append("• *Bias:* Trend direction is mixed. Breakout/momentum trades are risky; prefer range sweep fades.")
+                conflict_msg = "• *Bias:* Trend direction is mixed. Breakout/momentum trades are risky; prefer range sweep fades."
+                if 'bias_1d_str' in locals() and 'bias_4h_str' in locals():
+                    if bias_1d_str == "BEAR" and bias_4h_str == "BULL" and nearest_resistance:
+                         conflict_msg += f" Counter-trend rally likely reaching for {nearest_resistance['level']:.2f} HTF Resistance."
+                    elif bias_1d_str == "BULL" and bias_4h_str == "BEAR" and nearest_support:
+                         conflict_msg += f" Deep pullback likely reaching for {nearest_support['level']:.2f} HTF Support."
+                interpretation_lines.append(conflict_msg)
             elif "BULLISH" in bias_full.upper():
                 interpretation_lines.append("• *Bias:* Macro trend aligned upward. Long setups (discount sweeps/reclaims) have higher probability.")
             elif "BEARISH" in bias_full.upper():
@@ -166,7 +196,7 @@ class SMCScanner:
                 f"───────────────────\n"
                 f"🏛️ **Macro Bias:** {bias_full}{bias_breakdown}\n"
                 f"🌀 **Hurst Regime:** {regime} ({hurst:.3f})\n"
-                f"⚡ **SMT Divergence:** {smt_strength:.2f}/1.0\n"
+                f"⚡ **SMT Divergence:** {smt_strength:.2f}/1.0{gravity_msg}\n"
                 f"───────────────────\n"
                 f"💡 **Strategic Playbook:**\n"
                 f"{interpretation_block}\n"
