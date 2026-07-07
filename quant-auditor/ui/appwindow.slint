@@ -1,0 +1,268 @@
+import { ScrollView } from "std-widgets.slint";
+
+struct TradeItem {
+    timestamp: string,
+    symbol: string,
+    direction: string,
+    pnl: string,
+    status: string,     // "Verified System", "System (Unsigned)", "Audited Alpha", "Filtered Rogue"
+    ai_score: string,
+    is_negative: bool,
+}
+
+export component AppWindow inherits Window {
+    title: "Sovereign SMC — Quant Auditor & Provenance Ledger";
+    min-width: 1000px;
+    min-height: 700px;
+    background: #0d1117; // Clean pitch black/slate dark
+
+    // Bindable state from Rust
+    in property <string> total_pnl: "$0.00";
+    in property <string> win_rate: "0.0%";
+    in property <string> sharpe_ratio: "0.00";
+    in property <string> sortino_ratio: "0.00";
+    in property <string> max_drawdown: "0.0%";
+    in property <string> rogue_pnl_avoided: "$0.00";
+    in property <[TradeItem]> trades: [];
+    in property <string> key_fingerprint: "N/A";
+    in property <int> verified_count: 0;
+    in property <int> rogue_count: 0;
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 15px;
+
+        // Header Section
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: space-between;
+
+            VerticalLayout {
+                Text {
+                    text: "SOVEREIGN SMC";
+                    font-size: 20px;
+                    font-weight: 800;
+                    color: #10b981; // Neon green
+                }
+                Text {
+                    text: "Sovereign Account Auditor — Real-Time TradeLocker Ingestion & Signature Verification";
+                    font-size: 12px;
+                    color: #8b949e;
+                }
+            }
+
+            // Public Key Card
+            Rectangle {
+                background: #161b22;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #30363d;
+                padding-left: 15px;
+                padding-right: 15px;
+                height: 40px;
+
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    Text {
+                        text: "🔑 Public Key Fingerprint:";
+                        font-size: 11px;
+                        color: #8b949e;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.key_fingerprint;
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: #c9d1d9;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Metrics Grid (Stats Cards)
+        HorizontalLayout {
+            spacing: 12px;
+            height: 90px;
+
+            // PnL Card
+            Rectangle {
+                background: #161b22;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #30363d;
+                VerticalLayout {
+                    padding: 12px;
+                    alignment: space-between;
+                    Text { text: "Audited Profit (PnL)"; font-size: 11px; color: #8b949e; }
+                    Text { text: root.total_pnl; font-size: 20px; font-weight: 800; color: #10b981; }
+                }
+            }
+
+            // Win Rate Card
+            Rectangle {
+                background: #161b22;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #30363d;
+                VerticalLayout {
+                    padding: 12px;
+                    alignment: space-between;
+                    Text { text: "Win Rate"; font-size: 11px; color: #8b949e; }
+                    Text { text: root.win_rate; font-size: 20px; font-weight: 800; color: #58a6ff; }
+                }
+            }
+
+            // Sharpe Card
+            Rectangle {
+                background: #161b22;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #30363d;
+                VerticalLayout {
+                    padding: 12px;
+                    alignment: space-between;
+                    Text { text: "Sharpe Ratio"; font-size: 11px; color: #8b949e; }
+                    Text { text: root.sharpe_ratio; font-size: 20px; font-weight: 800; color: #ff9b50; }
+                }
+            }
+
+            // Sortino Card
+            Rectangle {
+                background: #161b22;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #30363d;
+                VerticalLayout {
+                    padding: 12px;
+                    alignment: space-between;
+                    Text { text: "Sortino Ratio"; font-size: 11px; color: #8b949e; }
+                    Text { text: root.sortino_ratio; font-size: 20px; font-weight: 800; color: #d858ff; }
+                }
+            }
+
+            // Drawdown Card
+            Rectangle {
+                background: #161b22;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #30363d;
+                VerticalLayout {
+                    padding: 12px;
+                    alignment: space-between;
+                    Text { text: "Max Drawdown"; font-size: 11px; color: #8b949e; }
+                    Text { text: root.max_drawdown; font-size: 20px; font-weight: 800; color: #f85149; }
+                }
+            }
+
+            // Rogue Avoided Card
+            Rectangle {
+                background: #1c1515; // Dark red tint
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #f85149;
+                VerticalLayout {
+                    padding: 12px;
+                    alignment: space-between;
+                    Text { text: "Rogue Noise Avoided"; font-size: 11px; color: #ff7b72; }
+                    Text { text: root.rogue_pnl_avoided; font-size: 20px; font-weight: 800; color: #ff7b72; }
+                }
+            }
+        }
+
+        // Ledger Summary Status Line
+        HorizontalLayout {
+            spacing: 15px;
+            Text {
+                text: "📁 Executed Ledger Audit:  " + root.verified_count + " Cryptographically Signed / Audited Alpha | " + root.rogue_count + " Rogue Discretionary Filtered";
+                font-size: 12px;
+                font-weight: 700;
+                color: #c9d1d9;
+            }
+        }
+
+        // Trades Table
+        Rectangle {
+            background: #161b22;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: #30363d;
+            clip: true;
+
+            VerticalLayout {
+                padding: 10px;
+
+                // Table Header
+                HorizontalLayout {
+                    height: 25px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    Text { text: "Execution Time"; font-size: 11px; font-weight: 700; color: #8b949e; width: 180px; }
+                    Text { text: "Symbol"; font-size: 11px; font-weight: 700; color: #8b949e; width: 100px; }
+                    Text { text: "Side"; font-size: 11px; font-weight: 700; color: #8b949e; width: 80px; }
+                    Text { text: "Realized PnL"; font-size: 11px; font-weight: 700; color: #8b949e; width: 120px; }
+                    Text { text: "AI Grade"; font-size: 11px; font-weight: 700; color: #8b949e; width: 80px; }
+                    Text { text: "Ledger Classification"; font-size: 11px; font-weight: 700; color: #8b949e; }
+                }
+
+                Rectangle { height: 1px; background: #30363d; }
+
+                // Scrollable Table Body
+                ScrollView {
+                    VerticalLayout {
+                        spacing: 2px;
+                        for trade in root.trades: Rectangle {
+                            background: #0d1117;
+                            height: 35px;
+                            border-radius: 4px;
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                alignment: center;
+
+                                Text { text: trade.timestamp; font-size: 11px; color: #c9d1d9; vertical-alignment: center; width: 180px; }
+                                Text { text: trade.symbol; font-size: 11px; color: #c9d1d9; vertical-alignment: center; width: 100px; }
+                                Text { 
+                                    text: trade.direction; 
+                                    font-size: 11px; 
+                                    color: trade.direction == "BUY" || trade.direction == "LONG" ? #58a6ff : #ff7b72;
+                                    vertical-alignment: center; 
+                                    width: 80px; 
+                                }
+                                Text { 
+                                    text: trade.pnl; 
+                                    font-size: 11px; 
+                                    font-weight: 700;
+                                    color: trade.is_negative ? #ff7b72 : #56d364;
+                                    vertical-alignment: center; 
+                                    width: 120px; 
+                                }
+                                Text { text: trade.ai_score + "/10"; font-size: 11px; color: #c9d1d9; vertical-alignment: center; width: 80px; }
+                                
+                                // Status with icon
+                                HorizontalLayout {
+                                    spacing: 5px;
+                                    alignment: start;
+                                    Text {
+                                        text: trade.status == "Verified System" || trade.status == "Audited Alpha" ? "🛡️" : (trade.status == "System (Unsigned)" ? "⚠️" : "❌");
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: trade.status;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        color: trade.status == "Verified System" || trade.status == "Audited Alpha" ? #56d364 : (trade.status == "System (Unsigned)" ? #e3b341 : #ff7b72);
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

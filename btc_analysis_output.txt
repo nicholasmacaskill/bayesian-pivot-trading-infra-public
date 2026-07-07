@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/nicholasmacaskill/sovereignSMC/bayesian-pivot-trading-infra/analyze_current_market.py", line 3, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'

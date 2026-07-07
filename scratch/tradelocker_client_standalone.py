@@ -1,0 +1,518 @@
+"""
+Standalone TradeLocker client — exported from src/clients/tl_client.py
+
+Env vars (.env.local):
+  TRADELOCKER_EMAIL_A, TRADELOCKER_PASSWORD_A, TRADELOCKER_SERVER_A, TRADELOCKER_BASE_URL_A
+  TRADELOCKER_EMAIL_B, TRADELOCKER_PASSWORD_B, TRADELOCKER_SERVER_B, TRADELOCKER_BASE_URL_B  (optional)
+  Legacy fallbacks: TRADELOCKER_EMAIL, TRADELOCKER_PASSWORD, TRADELOCKER_SERVER, TRADELOCKER_BASE_URL
+
+Defaults:
+  base_url = https://demo.tradelocker.com
+  BTC symbol = BTC/USD, instrument_id = 19965 (Upcomers) or 206 (fallback)
+
+Usage:
+  python scratch/tradelocker_client_standalone.py
+  python scratch/tradelocker_client_standalone.py --history 168   # last 7 days closed trades
+"""
+
+import requests
+import os
+import logging
+import argparse
+from datetime import datetime, date
+from dotenv import load_dotenv
+
+load_dotenv('.env.local')
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+class TradeLockerHelper:
+    """Helper to manage a single TradeLocker account session using User-provided logic."""
+    def __init__(self, email, password, server, base_url):
+        self.email = email
+        self.password = password
+        self.server_id = server
+        self.base_url = base_url.rstrip('/')
+        self.access_token = None
+        self.account_id = None
+        self.acc_num = None # New Field for 'accNum' header
+        
+    def resolve_symbol(self, instrument_id):
+        """Maps internal IDs to human-readable symbols."""
+        mapping = {
+            "206": "BTC/USD",
+            "207": "ETH/USD",
+            "214": "ETH/USD",
+            "208": "SOL/USD",
+            "221": "SOL/USD",
+            "1": "EUR/USD",
+            "2": "GBP/USD",
+            "19965": "BTC/USD",
+            "19967": "ETH/USD",
+            "19968": "SOL/USD",
+        }
+        symbol = mapping.get(str(instrument_id))
+        if not symbol:
+            logger.debug(f"Unmapped instrument ID: {instrument_id}")
+            return str(instrument_id)
+        return symbol
+
+    def _get_headers(self, auth=False):
+        """Standard stealth headers combined with user-required logic."""
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Origin": self.base_url,
+            "Referer": f"{self.base_url}/",
+        }
+        if auth and self.access_token:
+            headers["Authorization"] = f"Bearer {self.access_token}"
+        
+        # Include accNum if available (Required by some servers e.g Upcomers)
+        if self.acc_num:
+            headers["accNum"] = str(self.acc_num)
+            
+        return headers
+
+    def login(self):
+        """User-provided login logic with corrected /backend-api prefix."""
+        try:
+            url = f"{self.base_url}/backend-api/auth/jwt/token"
+            payload = {
+                "email": self.email.strip(), # Fix for 400 errors
+                "password": self.password,
+                "server": self.server_id
+            }
+            
+            resp = requests.post(url, json=payload, headers=self._get_headers(), timeout=10)
+            
+            if resp.status_code in [200, 201]:
+                try:
+                    data = resp.json()
+                    self.access_token = data.get('accessToken')
+                    # CRITICAL: Fetch account details to avoid 404s
+                    return self.get_account_details()
+                except Exception:
+                    if "<html" not in resp.text.lower():
+                        logger.warning(f"Login failed: Invalid JSON response")
+                    return False
+            else:
+                logger.warning(f"Login Failed: {resp.status_code}")
+                return False
+        except requests.exceptions.Timeout:
+            logger.warning("TL Login Timeout: Service might be down.")
+            return False
+        except Exception as e:
+            logger.warning(f"TL Connection Error: {e}")
+            return False
+
+    def get_account_details(self):
+        """User-provided account discovery logic via corrected /backend-api."""
+        try:
+            url = f"{self.base_url}/backend-api/auth/jwt/all-accounts"
+            resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
+            if resp.status_code == 200:
+                try:
+                    data = resp.json()
+                    accounts = data.get('accounts', [])
+                except Exception:
+                    # Silent failure during known downtime if it's HTML
+                    if "<html" not in resp.text.lower():
+                        logger.error(f"Invalid JSON from account details: {resp.text[:50]}...")
+                    return False
+
+                if accounts:
+                    # Capture both ID and AccNum
+                    self.account_id = accounts[0]['id']
+                    self.acc_num = accounts[0].get('accNum')
+                    print(f"DEBUG: Account Discovery Meta: {accounts[0]}")
+                    return True
+            if resp.status_code not in [502, 503, 504]:
+                logger.warning(f"Failed to fetch account details: {resp.status_code}")
+            return False
+        except Exception as e:
+            logger.error(f"Account details exception: {e}")
+            return False
+
+    def get_equity(self):
+        """Fetch total equity from ALL accounts associated with this login."""
+        if not self.access_token and not self.login(): return 0.0
+        
+        try:
+            url = f"{self.base_url}/backend-api/auth/jwt/all-accounts"
+            resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
+            if resp.status_code == 200:
+                try:
+                    accounts = resp.json().get('accounts', [])
+                    total_equity = 0.0
+                    for acc in accounts:
+                        logger.info(f"🔍 RAW ACCOUNT META: {acc}")
+                        equity = float(acc.get('projectedEquity') or acc.get('accountBalance', 0.0))
+                        logger.info(f"   found account {acc['id']}: ${equity:,.2f}")
+                        total_equity += equity
+                    return total_equity
+                except Exception:
+                    return 0.0
+            elif resp.status_code == 401:
+                logger.warning(f"401 Unauthorized for {self.email}. Re-authenticating...")
+                if self.login():
+                    return self.get_equity()
+            return 0.0
+        except Exception:
+            return 0.0
+
+    def get_open_positions(self):
+        """Fetches currently active positions."""
+        if not self.access_token and not self.login(): return []
+        
+        try:
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions"
+            resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                trades = []
+                positions = data.get('d', {}).get('positions', [])
+                if not positions and isinstance(data, list): positions = data
+                
+                for p in positions:
+                    print(f"DEBUG LOOP: Type={type(p)}, p={p}")
+                    # Parse Active Position
+                    if isinstance(p, list) and len(p) >= 10:
+                        try:
+                            # Upcomers List Format
+                            trades.append({
+                                'id': str(p[0]),
+                                'symbol': self.resolve_symbol(p[1]), 
+                                'side': 'BUY' if str(p[3]).lower() == 'buy' else 'SELL',
+                                'pnl': float(p[9] or 0.0),
+                                'entry_time': str(p[8]),
+                                'price': float(p[5] or 0.0),
+                                'qty': float(p[4] or 0.0),
+                                'status': 'OPEN'
+                            })
+                        except Exception as e:
+                            print(f"❌ PARSE ERROR: {e} | DATA: {p}")
+                            logger.error(f"Failed to parse list position: {e}")
+                    else:
+                        trades.append({
+                            'id': p.get('id'),
+                            'symbol': self.resolve_symbol(p.get('instrumentId')),
+                            'side': 'BUY' if p.get('side') == 'buy' else 'SELL',
+                            'pnl': float(p.get('floatingProfit') or p.get('profit') or 0.0), 
+                            'entry_time': p.get('openDate') or p.get('created'),
+                            'price': float(p.get('avgOpenPrice') or p.get('openPrice') or 0.0),
+                            'qty': float(p.get('qty') or p.get('lotSize') or 0.0),
+                            'status': 'OPEN'
+                        })
+                return trades
+            elif resp.status_code == 401:
+                logger.warning(f"401 Unauthorized for {self.email} on positions. Re-authenticating...")
+                self.access_token = None # Hard reset
+                if self.login():
+                    return self.get_open_positions()
+                return []
+            else:
+                 return []
+        except Exception as e:
+            logger.error(f"Open Positions Fetch Error: {e}")
+            return []
+
+    def get_recent_history(self, hours=24):
+        """
+        Fetches filled orders from the ordersHistory endpoint.
+        Pairs BUY/SELL orders by position_id to calculate per-trade PnL.
+        """
+        if not self.access_token and not self.login(): return []
+        
+        try:
+            # Correct endpoint for Upcomers/TradeLocker
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/ordersHistory"
+            resp = requests.get(url, headers=self._get_headers(auth=True), params={'limit': 500}, timeout=15)
+            
+            if resp.status_code == 401:
+                logger.warning(f"401 Unauthorized for {self.email} on history. Re-authenticating...")
+                if self.login():
+                    return self.get_recent_history(hours)
+                return []
+            if resp.status_code != 200:
+                logger.error(f"ordersHistory failed: {resp.status_code} - {resp.text[:200]}")
+                return []
+
+            try:
+                data = resp.json()
+            except Exception:
+                logger.error(f"Failed to decode history JSON: {resp.text[:100]}")
+                return []
+                
+            raw_orders = data.get('d', {}).get('ordersHistory', [])
+
+            from datetime import datetime, timedelta
+            cutoff_ms = (datetime.utcnow() - timedelta(hours=hours)).timestamp() * 1000
+
+            # Parse filled orders into normalized dicts
+            # List format: [order_id, instrument_id, acc_num, qty, side, type, status,
+            #               fill_qty, fill_price, limit_price, ..., created_ms, filled_ms, ..., position_id, ...]
+            filled = {}
+            for o in raw_orders:
+                if not isinstance(o, list) or len(o) < 17:
+                    continue
+                status = o[6]
+                if status != 'Filled':
+                    continue
+                filled_ms = int(o[14]) if o[14] else 0
+                if filled_ms < cutoff_ms:
+                    continue
+
+                position_id = str(o[16]) if o[16] else None
+                if not position_id:
+                    continue
+
+                side = str(o[4]).upper()  # 'buy' or 'sell'
+                fill_price = float(o[8]) if o[8] else 0.0
+                qty = float(o[3]) if o[3] else 0.0
+                symbol = self.resolve_symbol(o[1])
+                created_ms = int(o[13]) if o[13] else filled_ms
+
+                if position_id not in filled:
+                    filled[position_id] = {
+                        'id': position_id,
+                        'symbol': symbol,
+                        'orders': []
+                    }
+                filled[position_id]['orders'].append({
+                    'side': side,
+                    'price': fill_price,
+                    'qty': qty,
+                    'time_ms': filled_ms,
+                })
+
+            # Build normalized trade list from position groups
+            trades = []
+            for pos_id, pos in filled.items():
+                orders = pos['orders']
+                buys  = [o for o in orders if o['side'] == 'BUY']
+                sells = [o for o in orders if o['side'] == 'SELL']
+
+                if not buys or not sells:
+                    # Position still open, skip
+                    continue
+
+                avg_buy  = sum(o['price'] * o['qty'] for o in buys)  / sum(o['qty'] for o in buys)
+                avg_sell = sum(o['price'] * o['qty'] for o in sells) / sum(o['qty'] for o in sells)
+                total_qty = min(sum(o['qty'] for o in buys), sum(o['qty'] for o in sells))
+
+                pnl = (avg_sell - avg_buy) * total_qty
+                
+                # Sort orders by time_ms to identify the opening trade side (BUY for Long, SELL for Short)
+                orders_sorted = sorted(orders, key=lambda x: x['time_ms'])
+                side = orders_sorted[0]['side'] if orders_sorted else 'BUY'
+                
+                close_time_ms = max(o['time_ms'] for o in orders)
+                close_time = datetime.utcfromtimestamp(close_time_ms / 1000).isoformat()
+
+                trades.append({
+                    'id': pos_id,
+                    'symbol': pos['symbol'],
+                    'side': side,
+                    'pnl': round(pnl, 2),
+                    'close_time': close_time,
+                    'price': round(avg_sell, 2),
+                    'entry_price': round(avg_buy, 2),
+                    'qty': total_qty,
+                    'status': 'CLOSED',
+                })
+
+            logger.info(f"ordersHistory: {len(raw_orders)} raw orders → {len(trades)} closed trades")
+            return trades
+
+        except Exception as e:
+            logger.error(f"History Fetch Error: {e}")
+            return []
+
+    def place_order(self, instrument_id, side, qty, stop_loss=None, take_profit=None, order_type="market", price=0.0):
+        """Stealth Order Execution Module"""
+        if not self.access_token and not self.login(): return False
+        try:
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/orders"
+            payload = {
+                "tradableInstrumentId": int(instrument_id),
+                "qty": float(qty),
+                "side": side.lower(),
+                "type": order_type.lower(),
+                "routeId": 2025730,
+                "validity": "IOC"
+            }
+            if order_type.lower() == "limit":
+                payload["price"] = float(price)
+            else:
+                payload["price"] = 0.0
+                
+            if stop_loss: payload["stopLoss"] = float(stop_loss)
+            if take_profit: payload["takeProfit"] = float(take_profit)
+            
+            resp = requests.post(url, json=payload, headers=self._get_headers(auth=True), timeout=10)
+            if resp.status_code in [200, 201]:
+                logger.info(f"✅ Order Executed: {side} {qty} on {instrument_id}")
+                return resp.json()
+            else:
+                logger.error(f"❌ Order Failed: {resp.status_code} - {resp.text}")
+                return False
+        except Exception as e:
+            logger.error(f"Order Exception: {e}")
+            return False
+
+    def get_todays_trades_count(self):
+        """Simplified trade count for verification."""
+        if not self.access_token and not self.login(): return 0
+        return 0 # Placeholder for brevity in verification
+
+class TradeLockerClient:
+    """Wrapper that manages multiple TradeLocker accounts (A, B, etc.) and aggregates equity."""
+    def __init__(self):
+        self.helpers = []
+        
+        # Account A (Primary/Legacy)
+        email_a = os.environ.get("TRADELOCKER_EMAIL_A") or os.environ.get("TRADELOCKER_EMAIL")
+        pass_a = os.environ.get("TRADELOCKER_PASSWORD_A") or os.environ.get("TRADELOCKER_PASSWORD")
+        server_a = os.environ.get("TRADELOCKER_SERVER_A") or os.environ.get("TRADELOCKER_SERVER")
+        base_url_a = os.environ.get("TRADELOCKER_BASE_URL_A") or os.environ.get("TRADELOCKER_BASE_URL", "https://demo.tradelocker.com")
+        
+        if email_a and pass_a:
+            self.helpers.append(TradeLockerHelper(email_a, pass_a, server_a, base_url_a))
+            
+        # Account B (Secondary)
+        email_b = os.environ.get("TRADELOCKER_EMAIL_B")
+        pass_b = os.environ.get("TRADELOCKER_PASSWORD_B")
+        server_b = os.environ.get("TRADELOCKER_SERVER_B") or server_a # Fallback to Server A if not specified
+        base_url_b = os.environ.get("TRADELOCKER_BASE_URL_B") or base_url_a # Fallback to Base URL A
+        
+        if email_b and pass_b:
+            self.helpers.append(TradeLockerHelper(email_b, pass_b, server_b, base_url_b))
+
+    def get_open_positions(self):
+        """Aggregates open positions from all accounts."""
+        all_trades = []
+        for helper in self.helpers:
+            trades = helper.get_open_positions()
+            if trades:
+                all_trades.extend(trades)
+        return all_trades
+
+    def get_total_equity(self):
+        """Returns Total Equity across ALL UNIQUE accounts. Defaults to $100k if offline."""
+        total_equity = 0.0
+        seen_account_ids = set()
+        
+        for i, helper in enumerate(self.helpers):
+            # We need to manually call login/fetch to get the account IDs
+            if not helper.access_token:
+                helper.login()
+                
+            try:
+                url = f"{helper.base_url}/backend-api/auth/jwt/all-accounts"
+                resp = requests.get(url, headers=helper._get_headers(auth=True), timeout=10)
+                
+                if resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                        accounts = data.get('accounts', [])
+                    except Exception:
+                        if "<html" not in resp.text.lower():
+                            logger.error(f"Invalid JSON from account check: {resp.text[:50]}...")
+                        continue
+
+                    for acc in accounts:
+                        acc_id = acc['id']
+                        logger.debug(f"Account Discovery Meta: {acc}")
+                        if acc_id in seen_account_ids:
+                            logger.debug(f"Skipping duplicate account {acc_id}")
+                            continue
+                            
+                        equity = float(acc.get('projectedEquity') or acc.get('accountBalance', 0.0))
+                        logger.debug(f"Account {acc_id}: ${equity:,.2f}")
+                        total_equity += equity
+                        seen_account_ids.add(acc_id)
+                else:
+                    if resp.status_code not in [500, 502, 503, 504]: # Don't spam during downtime
+                        logger.error(f"Account {i+1} ({helper.email}) check failed: {resp.status_code}")
+                    
+            except Exception as e:
+                # Silence expected connection errors
+                err_str = str(e)
+                if "Expecting value: line 1 column 1 (char 0)" in err_str:
+                    pass # Handled by the try/except block above
+                elif "503" not in err_str and "timed out" not in err_str.lower():
+                    logger.error(f"Error checking account {i+1}: {e}")
+        
+        return total_equity
+
+    def get_recent_history(self, hours=24):
+        """Aggregates history from all accounts."""
+        all_trades = []
+        for helper in self.helpers:
+            trades = helper.get_recent_history(hours)
+            all_trades.extend(trades)
+        return all_trades
+
+    def get_daily_trades_count(self):
+        """Sum of trades count from all accounts."""
+        total_trades = 0
+        for helper in self.helpers:
+            total_trades += helper.get_todays_trades_count()
+        return total_trades
+
+    def get_trade_history(self, limit=5):
+        return [] # Placeholder
+
+    def execute_trade(self, symbol="BTC/USD", side="buy", qty=0.15, stop_loss=None, take_profit=None):
+        """Executes a trade across the primary account. Uses Upcomers BTC ID 19965."""
+        instrument_id = "19965" if symbol == "BTC/USD" else "206"
+        
+        # We execute on the primary account (Account A)
+        if not self.helpers: return False
+        primary_account = self.helpers[0]
+        
+        return primary_account.place_order(
+            instrument_id=instrument_id,
+            side=side,
+            qty=qty,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            order_type="market"
+        )
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(description="TradeLocker standalone client smoke test")
+    parser.add_argument("--history", type=int, default=24, metavar="HOURS",
+                        help="Fetch closed trades from last N hours (default: 24)")
+    parser.add_argument("--equity", action="store_true", help="Print total equity only")
+    args = parser.parse_args()
+
+    client = TradeLockerClient()
+    if not client.helpers:
+        print("No TRADELOCKER_* credentials found in .env.local")
+        return
+
+    if args.equity:
+        print(f"Total equity: ${client.get_total_equity():,.2f}")
+        return
+
+    positions = client.get_open_positions()
+    print(f"\nOpen positions ({len(positions)}):")
+    for p in positions:
+        print(f"  {p['side']} {p['qty']} {p['symbol']} @ {p['price']}  PnL={p['pnl']}")
+
+    history = client.get_recent_history(hours=args.history)
+    print(f"\nClosed trades last {args.history}h ({len(history)}):")
+    for t in history:
+        print(f"  {t['close_time']}  {t['side']} {t['qty']} {t['symbol']}  "
+              f"entry={t['entry_price']} exit={t['price']}  PnL=${t['pnl']}")
+
+
+if __name__ == "__main__":
+    main()

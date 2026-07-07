@@ -1,0 +1,18 @@
+--- Analyzing market structure for BTC/USD ---
+Current Price: 80582.85
+
+Liquidity Ranges:
+[Asian Range]
+- High (BSL): 81080.06
+- Low (SSL): 79789.5
+- Mid (Equilibrium): 80434.78
+[London Range]
+- High (BSL): 81161.36
+- Low (SSL): 79581.95
+- Mid (Equilibrium): 80371.655
+[CBDR]
+- High (BSL): 80396.15
+- Low (SSL): 79733.52
+- Mid (Equilibrium): 80064.83499999999
+
+SMT Strength: 0.95

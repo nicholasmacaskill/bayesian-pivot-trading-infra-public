@@ -1,0 +1,11 @@
+Fetching live positions from TradeLocker...
+DEBUG: Account Discovery Meta: {'id': '2050184', 'name': 'UPCOMS#6888b1d2-f89f-4198-9aa3-f51c4dfd6631#1#1', 'currency': 'USD', 'accNum': '1', 'accountBalance': '25941.02', 'status': 'ACTIVE'}
+DEBUG LOOP: Type=<class 'list'>, p=['7349874591887990295', '19965', '2025730', 'buy', '0.25', '78262.44', '7349874591981941941', '7349874591981941942', '1778970846456', '-6.69', None]
+--------------------------------------------------
+ID: 7349874591887990295
+Symbol: UNKNOWN-19965
+Side: BUY
+Quantity: 0.25
+Entry Price: 78262.44
+Current PnL: $-6.69
+--------------------------------------------------

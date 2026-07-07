@@ -1,0 +1,30 @@
+🇬🇧 Bayesian Pivot: London Pre-Session Briefing
+Time: 22:30:51 UTC
+============================================================
+
+🔍 Analyzing BTC/USD...
+📈 Bias: BEARISH (-1.0)
+🧠 Regime: Chop (Hurst: 0.49)
+🌏 Asia Range: 78994.64 - 79171.56
+📍 Current Price: 78215.28
+⚠️  Price BELOW Asia Low. Watching for rejection (SFP) or continuation.
+💧 Draw on Liquidity: 78754.55 (OB_BULLISH)
+------------------------------
+
+🔍 Analyzing ETH/USD...
+📈 Bias: BEARISH (-0.5)
+🧠 Regime: Trending (Hurst: 0.55)
+🌏 Asia Range: 2223.58 - 2231.12
+📍 Current Price: 2181.70
+⚠️  Price BELOW Asia Low. Watching for rejection (SFP) or continuation.
+💧 Draw on Liquidity: 2176.91 (FVG_BULLISH)
+------------------------------
+
+🔍 Analyzing SOL/USD...
+📈 Bias: BEARISH (-0.5)
+🧠 Regime: Trending (Hurst: 0.57)
+🌏 Asia Range: 89.17 - 89.34
+📍 Current Price: 86.61
+⚠️  Price BELOW Asia Low. Watching for rejection (SFP) or continuation.
+💧 Draw on Liquidity: 86.51 (FVG_BULLISH)
+------------------------------
