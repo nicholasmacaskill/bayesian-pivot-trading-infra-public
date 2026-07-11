@@ -158,6 +158,8 @@ class Config:
     LONG_RISK_MULTIPLIER = 1.0  # Full size — longs earn it (55.1% win rate, +$5,849 net)
     AI_THRESHOLD = 8.5
     AI_THRESHOLD_ASIAN_FADE = 7.5
+    OFF_HOURS_RISK_MULTIPLIER = 0.5
+    TRANSITION_RISK_MULTIPLIER = 0.5
     
     # ── 98% Reliability Standard Thresholds ──────────────────────
     SYNC_PRICE_DELTA_MAX = 0.005     # 0.5% (Loosened for crypto volatility)
