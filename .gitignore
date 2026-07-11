@@ -42,6 +42,31 @@ data/cache/
 results/
 *.log
 local_runner.log
+logs/
+scratch/
+
+# Runtime artifacts
+*.out
+*.bak
+*.lock
+*.csv
+briefing_output.txt
+btc_analysis_output.txt
+btc_now.txt
+btc_output.txt
+combinatorial_results.csv
+live_trades_output.txt
+pa_output.txt
+pa_output2.txt
+pa_output3.txt
+pa_output4.txt
+pa_output5.txt
+portfolio_results.json
+recent_output.txt
+scanner_backtest_results.json
+data/combinatorial_results.csv
+data/smc_alpha.db.bak
+data/smc_scanner.lock
 
 # Proprietary IP: DO NOT REMOVE
 src/sovereign_core/
