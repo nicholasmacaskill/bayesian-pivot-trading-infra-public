@@ -64,6 +64,10 @@ def init_db():
             c.execute("ALTER TABLE scans ADD COLUMN direction TEXT")
         except sqlite3.OperationalError: pass
 
+        try:
+            c.execute("ALTER TABLE scans ADD COLUMN bias_conflict INTEGER DEFAULT 0")
+        except sqlite3.OperationalError: pass
+
         # New metadata for enriched /scan
         for col in [('session', 'TEXT'), ('killzone', 'TEXT'), ('hurst', 'REAL'), ('adf_p', 'REAL'), ('daily_pnl', 'REAL'), ('total_pnl', 'REAL'), ('smt', 'REAL'), ('formations', 'TEXT')]:
             try:
@@ -175,9 +179,9 @@ def log_scan(scan_data, ai_result):
         INSERT INTO scans (
             timestamp, symbol, timeframe, pattern, bias, direction,
             ai_score, ai_reasoning, verdict, shadow_regime, shadow_multiplier,
-            session, killzone, hurst, adf_p, daily_pnl, total_pnl, smt, formations
+            session, killzone, hurst, adf_p, daily_pnl, total_pnl, smt, formations, bias_conflict
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         scan_data.get('timestamp', datetime.now(timezone.utc).isoformat()),
         scan_data['symbol'],
@@ -197,7 +201,8 @@ def log_scan(scan_data, ai_result):
         scan_data.get('daily_pnl'),
         scan_data.get('total_pnl'),
         scan_data.get('smt_strength', 0.0),
-        scan_data.get('formations', '')
+        scan_data.get('formations', ''),
+        1 if scan_data.get('bias_conflict') else 0
     ))
     scan_id = c.lastrowid
     conn.commit()

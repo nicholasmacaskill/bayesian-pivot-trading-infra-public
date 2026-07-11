@@ -173,6 +173,9 @@ def _init_ledger_table():
     try:
         c.execute("ALTER TABLE signed_ledger ADD COLUMN shadow_regime TEXT")
     except sqlite3.OperationalError: pass
+    try:
+        c.execute("ALTER TABLE signed_ledger ADD COLUMN bias_conflict INTEGER DEFAULT 0")
+    except sqlite3.OperationalError: pass
     
     conn.commit()
     conn.close()
@@ -225,7 +228,8 @@ class TradeLedger:
             'take_profit': setup.get('target', setup.get('tp1', 0.0)),
             'volume_spike': setup.get('volume_spike', 1.0),
             'true_smt':     setup.get('true_smt'),
-            'shadow_regime': setup.get('shadow_regime', 'Unknown')
+            'shadow_regime': setup.get('shadow_regime', 'Unknown'),
+            'bias_conflict': 1 if setup.get('bias_conflict') else 0
         }
 
         payload_hash = hashlib.sha256(
@@ -240,8 +244,8 @@ class TradeLedger:
                 INSERT INTO signed_ledger
                 (signal_id, timestamp, symbol, direction, pattern, ai_score,
                  entry_price, stop_loss, take_profit, payload_hash, signature,
-                 volume_spike, true_smt, shadow_regime)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 volume_spike, true_smt, shadow_regime, bias_conflict)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 signal_id,
                 payload['timestamp'],
@@ -256,7 +260,8 @@ class TradeLedger:
                 signature,
                 payload['volume_spike'],
                 payload['true_smt'],
-                payload['shadow_regime']
+                payload['shadow_regime'],
+                payload['bias_conflict']
             ))
             conn.commit()
         finally:
