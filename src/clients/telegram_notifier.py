@@ -6,6 +6,21 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+def _format_time_ago(minutes):
+    if not isinstance(minutes, (int, float)) or minutes < 0:
+        return "?"
+    days = int(minutes // 1440)
+    hours = int((minutes % 1440) // 60)
+    mins = int(minutes % 60)
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if mins or not parts:
+        parts.append(f"{mins}m")
+    return " ".join(parts) + " ago"
+
 
 class TelegramNotifier:
     def __init__(self, bot_token=None, chat_id=None):
@@ -148,6 +163,13 @@ class TelegramNotifier:
                 f"\n\n⚠️ <b>HISTORICAL RISK ALERT:</b> Long trades represent your largest manual draw. "
                 f"Ensure strict limit execution and 50% risk reduction ($50 USD max risk)."
             )
+        
+        if (bias_data or {}).get('bias_conflict'):
+            conflict_warning = (
+                f"\n\n⚠️ <b>BIAS CONFLICT:</b> Multi-timeframe bias is conflicted (1D vs 4H/1H divergence). "
+                f"Trade size reduced to 50% of normal. Monitor closely for structural break."
+            )
+            warning_block = (warning_block or "") + conflict_warning
 
         msg = (
             f"{emoji} <b>{grade}: {symbol}</b>\n"
@@ -269,7 +291,7 @@ class TelegramNotifier:
         if latest_setup:
             mins_ago = latest_setup.get('mins_ago', '?')
             setup_block += (
-                f"💎 <b>Latest Call</b>: <code>{latest_setup.get('symbol','?')}</code> ({mins_ago}m ago)\n"
+                f"💎 <b>Latest Call</b>: <code>{latest_setup.get('symbol','?')}</code> ({_format_time_ago(mins_ago)})\n"
                 f"  • Formation: <code>{latest_setup.get('pattern','N/A')}</code> | AI: <b>{latest_setup.get('ai_score','N/A')}/10</b>\n"
             )
         
@@ -277,7 +299,7 @@ class TelegramNotifier:
             mins_ago_rej = latest_rejected.get('mins_ago', '?')
             if setup_block: setup_block += "\n"
             setup_block += (
-                f"❌ <b>Latest Rejected</b>: <code>{latest_rejected.get('symbol','?')}</code> ({mins_ago_rej}m ago)\n"
+                f"❌ <b>Latest Rejected</b>: <code>{latest_rejected.get('symbol','?')}</code> ({_format_time_ago(mins_ago_rej)})\n"
                 f"  • Formation: <code>{latest_rejected.get('pattern','N/A')}</code> | AI: <code>{latest_rejected.get('ai_score','N/A')}/10</code>\n"
             )
 
