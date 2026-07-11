@@ -288,6 +288,8 @@ class SMCScanner:
         if df_ccxt is None or df_ccxt.empty:
             return False
             
+        return True # BYPASS: yfinance is causing SQLite locking errors and starving the system
+        
         # Fetch yfinance data internally
         try:
             # Map symbol to yfinance format (BTC/USD -> BTC-USD)
@@ -738,7 +740,7 @@ class SMCScanner:
         """
         pois = []
         for tf in ['1d']: # Removed 1w due to exchange compatibility issues
-            df = self.fetch_data(symbol, tf, limit=100)
+            df = self.fetch_data(symbol, tf, limit=100, synchronized=False)
             if df is None or len(df) < 10:
                 continue
                 
@@ -1594,15 +1596,34 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
         Identifies 'Clean' trend moves that don't satisfy reversal criteria.
         Logic: STRONG 4H/1H Bias Alignment + Retracement to 15m/1H/4H POI.
         """
-        # 1. HARD GATE: Bias Conviction (Must be STRONG and aligned)
+        # 1. BIAS CONVICTION GATE (Allow Conflict with fallback to 4H/1H direction)
         index_context = cached_context or self.intermarket.get_market_context()
         bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=False)
         
         is_strong_bull = "STRONG BULLISH" in bias_full
         is_strong_bear = "STRONG BEARISH" in bias_full
+        bias_conflict = "NEUTRAL" in bias_full or "CONFLICT" in bias_full
         
-        if not is_strong_bull and not is_strong_bear:
-            return None
+        if not (is_strong_bull or is_strong_bear):
+            if bias_conflict:
+                # Fallback: use 4H/1H alignment for trend direction during conflict
+                try:
+                    df_4h = self.fetch_data(symbol, '4h', limit=100, synchronized=False)
+                    df_1h = self.fetch_data(symbol, '1h', limit=100, synchronized=False)
+                    if df_4h is not None and df_1h is not None:
+                        ema20_4h = df_4h['close'].ewm(span=20).mean().iloc[-1]
+                        ema50_4h = df_4h['close'].ewm(span=50).mean().iloc[-1]
+                        ema20_1h = df_1h['close'].ewm(span=20).mean().iloc[-1]
+                        ema50_1h = df_1h['close'].ewm(span=50).mean().iloc[-1]
+                        if ema20_4h > ema50_4h and ema20_1h > ema50_1h:
+                            is_strong_bull = True  # Treat as bullish for scanning
+                        elif ema20_4h < ema50_4h and ema20_1h < ema50_1h:
+                            is_strong_bear = True  # Treat as bearish for scanning
+                except Exception:
+                    pass
+            
+            if not (is_strong_bull or is_strong_bear):
+                return None
 
         # 2. HEURISTIC GATE: Hurst (Must be EXPANSION)
         df = self.fetch_data(symbol, timeframe)
@@ -1681,7 +1702,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             "price_quartiles": self.get_price_quartiles(symbol),
             "index_context": index_context,
             "hurst_regime": round(hurst, 3),
-            "quality": "HIGH"
+            "quality": "HIGH",
+            "bias_conflict": bias_conflict
         }
         
         self._signal_cache[cache_key] = now_ts
@@ -1705,16 +1727,15 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             logger.debug(f"🔇 Deduplicated order flow signal for {symbol} ({int(cooldown_secs - (now_ts - last_fired))}s left)")
             return None
 
-        # 2. BIAS CHECK (Hard Gate)
-        # We reuse the detailed bias logic
+        # 2. BIAS CHECK (Soft Gate — allow conflict, flag for downstream risk reduction)
         index_context = cached_context or self.intermarket.get_market_context()
         bias_full = self.get_detailed_bias(symbol, index_context=index_context, visual_check=False) # Visual done later if needed
         
-        # Parse bias direction
         is_bullish = "BULLISH" in bias_full
         is_bearish = "BEARISH" in bias_full
+        bias_conflict = "NEUTRAL" in bias_full or "CONFLICT" in bias_full
         
-        if not is_bullish and not is_bearish:
+        if not (is_bullish or is_bearish or bias_conflict):
             return None
 
         # 2. Fetch Data
@@ -1821,7 +1842,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             'risk_reward': rr,
             'quality': 'HIGH',
             'true_smt': true_smt_type,
-            'hurst_regime': round(hurst, 3)
+            'hurst_regime': round(hurst, 3),
+            'bias_conflict': bias_conflict
         }
         
         if setup:

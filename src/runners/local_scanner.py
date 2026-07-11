@@ -794,6 +794,7 @@ class LocalScannerRunner:
                     'htf':       htf_bias,
                     'dxy_trend': dxy_trend,
                     'smt_score': f"{market_context.get('DXY', {}).get('change_ltf', 0):+.2f}%" if market_context else 'N/A',
+                    'bias_conflict': "NEUTRAL" in daily_bias or "CONFLICT" in daily_bias,
                 }
 
                 # ── Hurst Gate: The Bayesian Pivot Filter ───────────────────────
@@ -992,6 +993,9 @@ class LocalScannerRunner:
                             risk_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
                             if direction == 'LONG':
                                 risk_mult = risk_mult * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
+                            if setup.get('bias_conflict'):
+                                risk_mult = risk_mult * 0.5
+                                logger.warning(f"⚠️ BIAS CONFLICT: Reducing risk to 50% for {symbol}")
                         # Strict Risk Cap (Bayesian Pivot Guard Cap)
                         max_risk = getattr(Config, 'MAX_RISK_USD', 150.0)
                         if risk_amt > max_risk:
@@ -1098,7 +1102,8 @@ class LocalScannerRunner:
                                 'hurst': hurst_val,
                                 'smt_strength': market_context.get('DXY', {}).get('change_ltf', 0) if market_context else 0.0,
                                 'daily_pnl': self.current_perf.get('daily_pnl', 0),
-                                'total_pnl': self.current_perf.get('total_pnl', 0)
+                                'total_pnl': self.current_perf.get('total_pnl', 0),
+                                'bias_conflict': bias_data.get('bias_conflict', False)
                             }
                             log_scan(scan_data, live)
                         except Exception as p_err:
