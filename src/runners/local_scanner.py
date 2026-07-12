@@ -990,7 +990,7 @@ class LocalScannerRunner:
                             logger.info(f"🛡️ FIXED RISK MODE: Risking a hard limit of ${risk_amt:.2f} per trade")
                         else:
                             base_risk_pct = Config.RISK_PER_TRADE
-                            risk_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * self.alpha_mult
+                            risk_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * getattr(self, 'alpha_mult', 1.0)
                             if direction == 'LONG':
                                 risk_mult = risk_mult * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
                             if setup.get('bias_conflict'):
@@ -1039,7 +1039,7 @@ class LocalScannerRunner:
                             "position_value": position_value,
                             "regime_mult": regime_result.suggested_size_mult,
                             "psych_mult": psych_mult, 
-                            "alpha_mult": self.alpha_mult
+                            "alpha_mult": getattr(self, 'alpha_mult', 1.0)
                         }
 
                         signal_id = self.ledger.sign_signal(setup, live_score) if self.ledger else "UNSIGNED"
