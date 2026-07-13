@@ -117,7 +117,7 @@ def run_dynamic_daemon():
                     # 5-Message Alert Sequence
                     for i in range(5):
                         msg = (
-                            f"🚨 <b>BAYESIAN PIVOT ALERT ({i+1}/5)</b> 🚨\n\n"
+                            f"🚨 <b>BAYESIANPIVOT ALERT ({i+1}/5)</b> 🚨\n\n"
                             f"BTC hit <b>${current_price:,.2f}</b>, sweeping the {direction}.\n\n"
                             f"<b>{status_text}</b>\n\n"
                             f"Suggested Action: {side.upper()} {qty} BTC\n"
