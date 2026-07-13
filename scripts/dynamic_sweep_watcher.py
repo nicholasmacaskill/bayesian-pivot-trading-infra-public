@@ -129,8 +129,65 @@ def run_dynamic_daemon():
                         if i < 4:
                             time.sleep(60)
                             
+                    # === PHASE 2: MSS CONFIRMATION LOOP ===
+                    print("\n⏳ Entering Phase 2: Waiting for Market Structure Shift (MSS) Confirmation...", flush=True)
+                    mss_trigger_price = None
+                    mss_timeout_mins = 30
+                    mss_timer = 0
+                    
+                    # 1. Find the pivot price to break
+                    df_pivot = scanner.fetch_data(symbol, "1m", limit=120)
+                    if df_pivot is not None:
+                        is_high, is_low = scanner.detect_fractals(df_pivot, window=1)
+                        if trigger_type == "UPPER":
+                            max_idx = df_pivot['high'].idxmax()
+                            lows_before = df_pivot[(df_pivot.index < max_idx) & is_low]
+                            if not lows_before.empty:
+                                mss_trigger_price = df_pivot.loc[lows_before.index[-1], 'low']
+                                print(f"📉 Trigger for Bearish MSS: Close below ${mss_trigger_price:,.2f}", flush=True)
+                        else:
+                            min_idx = df_pivot['low'].idxmin()
+                            highs_before = df_pivot[(df_pivot.index < min_idx) & is_high]
+                            if not highs_before.empty:
+                                mss_trigger_price = df_pivot.loc[highs_before.index[-1], 'high']
+                                print(f"📈 Trigger for Bullish MSS: Close above ${mss_trigger_price:,.2f}", flush=True)
+                    
+                    # 2. Polling loop for MSS
+                    if mss_trigger_price is not None:
+                        while mss_timer < (mss_timeout_mins * 60):
+                            df_check = scanner.fetch_data(symbol, "1m", limit=5)
+                            if df_check is not None:
+                                curr_close = df_check['close'].iloc[-1]
+                                mss_confirmed = False
+                                
+                                if trigger_type == "UPPER" and curr_close < mss_trigger_price:
+                                    mss_confirmed = True
+                                elif trigger_type == "LOWER" and curr_close > mss_trigger_price:
+                                    mss_confirmed = True
+                                    
+                                if mss_confirmed:
+                                    print(f"\n✅ [MSS CONFIRMED] Price broke structure at ${curr_close:,.2f}!", flush=True)
+                                    msg = (
+                                        f"✅ <b>MSS CONFIRMED - Reversal Validated</b> ✅\n\n"
+                                        f"BTC has closed past the Market Structure Shift trigger at <b>${mss_trigger_price:,.2f}</b>.\n\n"
+                                        f"Current Price: ${curr_close:,.2f}\n\n"
+                                        f"<i>The {direction} setup is now structurally confirmed.</i>"
+                                    )
+                                    notifier._send_message(msg)
+                                    break
+                            
+                            time.sleep(30)
+                            mss_timer += 30
+                            if mss_timer % 300 == 0:
+                                print(f"⌛ Waiting for MSS... {mss_timer//60}/{mss_timeout_mins} mins elapsed.", flush=True)
+                        
+                        if mss_timer >= (mss_timeout_mins * 60):
+                            print("❌ MSS Confirmation timed out.", flush=True)
+                    else:
+                        print("⚠️ Could not calculate MSS pivot level. Skipping Phase 2.", flush=True)
+
                     targets_hit = True # Break inner loop, trigger full rescan
-                    print("💤 Cooling down for 60 minutes before resetting traps...", flush=True)
+                    print("\n💤 Cooling down for 60 minutes before resetting traps...", flush=True)
                     time.sleep(3600) # Wait 1 hour after a sweep before re-arming
                     break
                 else:
