@@ -101,12 +101,12 @@ def run_dynamic_daemon():
                         side = "sell"
                         sl = current_price + 300
                         tp = current_price - 1000
-                        direction = "Buy-Side Liquidity (Short Trap)"
+                        direction = "Buy-Side Liquidity (Long Trap)"
                     else:
                         side = "buy"
                         sl = current_price - 300
                         tp = current_price + 1000
-                        direction = "Sell-Side Liquidity (Long Trap)"
+                        direction = "Sell-Side Liquidity (Short Trap)"
                         
                     print(f"\n🔔 [{trigger_type} TRIGGERED] BTC at ${current_price:,.2f}", flush=True)
                     

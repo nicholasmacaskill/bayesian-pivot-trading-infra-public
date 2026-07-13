@@ -42,7 +42,7 @@ def monitor_sweep():
                     target_hit = target_lower
                 
                 if trigger_type:
-                    direction = "Asian High (Short Trap)" if trigger_type == "UPPER" else "London Low (Liquidity Grab)"
+                    direction = "Asian High (Long Trap)" if trigger_type == "UPPER" else "London Low (Liquidity Grab)"
                     print(f"\n🔔 [{trigger_type} TRIGGERED] {timestamp} | BTC at ${current_price:,.2f}", flush=True)
                     
                     # Send telegram message 5 times spaced out over 5 minutes
