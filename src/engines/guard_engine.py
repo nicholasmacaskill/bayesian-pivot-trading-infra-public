@@ -164,6 +164,7 @@ class GuardEngine:
         self._t_extensions   = 0
         self._t_hourly       = 0
         self._t_plist        = 0
+        self._t_forensics    = 0
 
         # Clipboard last value
         self._last_clipboard = None
@@ -268,6 +269,10 @@ class GuardEngine:
                 if t - self._t_session > 60:
                     new_threats.extend(self._check_session_hijack())
                     self._t_session = t
+
+                if t - self._t_forensics > 300:
+                    new_threats.extend(self._check_deep_forensics())
+                    self._t_forensics = t
 
                 # ── Dispatch and State Management ─────────────────────────
                 if new_threats:
@@ -682,6 +687,49 @@ class GuardEngine:
                         })
             except Exception:
                 continue
+        return threats
+
+    def _check_deep_forensics(self) -> list:
+        """Deep forensic checks: Code signatures and memory hooks (DYLD)."""
+        threats = []
+        if platform.system() != 'Darwin':
+            return threats
+
+        try:
+            # 1. Check DYLD hooks in the environment
+            result = subprocess.run(['env'], capture_output=True, text=True, timeout=2)
+            if 'DYLD_INSERT_LIBRARIES' in result.stdout:
+                threats.append({
+                    'type': 'MEMORY_INJECTION_HOOK',
+                    'severity': 'CRITICAL',
+                    'title': '🧬 ADVANCED MEMORY HOOK DETECTED',
+                    'summary': '`DYLD_INSERT_LIBRARIES` is active in the environment. Extreme risk of rootkit memory injection.'
+                })
+
+            # 2. Cryptographic Binary Check for active browsers
+            browsers = [
+                '/Applications/Google Chrome.app',
+                '/Applications/Brave Browser.app'
+            ]
+            for b_path in browsers:
+                if not os.path.exists(b_path):
+                    continue
+                try:
+                    # stderr and stdout are mixed because codesign outputs to stderr
+                    cs_res = subprocess.run(['codesign', '-dv', b_path], capture_output=True, text=True, stderr=subprocess.STDOUT, timeout=5)
+                    output_lower = cs_res.stdout.lower()
+                    if 'invalid signature' in output_lower or 'not signed' in output_lower:
+                        threats.append({
+                            'type': 'BROKEN_BINARY_SIGNATURE',
+                            'severity': 'CRITICAL',
+                            'title': '⚠️ COMPROMISED BROWSER BINARY',
+                            'summary': f"The signature for `{os.path.basename(b_path)}` is invalid. The physical application file may have been replaced by a trojan."
+                        })
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug(f"Deep forensic check error: {e}")
+
         return threats
 
     # ------------------------------------------------------------------
