@@ -1058,7 +1058,8 @@ class LocalScannerRunner:
                             liquidity_targets=liquidity_targets,
                             session_info=session_info,
                             security_status=self.guard.get_security_context(),
-                            psych_data={'mood': self.last_psych_state.get('sentiment', 'Unknown')}
+                            psych_data={'mood': self.last_psych_state.get('sentiment', 'Unknown')},
+                            direction=direction
                         )
 
                         # ── LIVE AUTO-EXECUTION ──
