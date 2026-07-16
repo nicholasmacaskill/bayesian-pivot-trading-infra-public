@@ -45,7 +45,8 @@ class TelegramNotifier:
                    session_info=None,
                    shadow_insights=None,
                    security_status=None,
-                   psych_data=None):
+                   psych_data=None,
+                   direction=None):
         """V3 Hierarchy of Edge alert — strict HTML, mobile-first, agent-readable."""
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram credentials not set. Skipping alert.")
@@ -152,12 +153,19 @@ class TelegramNotifier:
         # ── TradingView Link ──────────────────────────────────────────────────
         tv_sym  = symbol.replace("/", "")
         tv_link = f"https://www.tradingview.com/chart/?symbol=BINANCE:{tv_sym}"
-        emoji   = "🟢" if "Bullish" in pattern or "LONG" in pattern.upper() else "🔴"
+        # Derive direction from the explicit signal direction first; fall back to
+        # case-insensitive pattern matching so labels like "FVG_BULLISH" are handled.
+        dir_upper = (direction or "").upper()
+        is_long = (
+            dir_upper == "LONG"
+            or "LONG" in (pattern or "").upper()
+            or "BULLISH" in (pattern or "").upper()
+        )
+        emoji   = "🟢" if is_long else "🔴"
         grade   = "🦄 UNICORN" if ai_score >= 8.5 else ("🦅 HIGH ALPHA" if ai_score >= 7.5 else "⚠️ MED ALPHA")
 
         # ── ASSEMBLE ──────────────────────────────────────────────────────────
         warning_block = ""
-        is_long = "Bullish" in pattern or "LONG" in pattern.upper()
         if is_long:
             warning_block = (
                 f"\n\n⚠️ <b>HISTORICAL RISK ALERT:</b> Long trades represent your largest manual draw. "
@@ -422,7 +430,8 @@ class TelegramNotifier:
 def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A",
                risk_calc=None, buttons=None, shadow_insights=None, security_status=None,
                regime_result=None, health_report=None, bias_data=None,
-               liquidity_targets=None, session_info=None, psych_data=None):
+               liquidity_targets=None, session_info=None, psych_data=None,
+               direction=None):
     TelegramNotifier().send_alert(
         symbol=symbol, timeframe=timeframe, pattern=pattern,
         ai_score=ai_score, reasoning=reasoning, verdict=verdict,
@@ -430,7 +439,7 @@ def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A",
         security_status=security_status, regime_result=regime_result,
         health_report=health_report, bias_data=bias_data,
         liquidity_targets=liquidity_targets, session_info=session_info,
-        psych_data=psych_data,
+        psych_data=psych_data, direction=direction,
     )
 
 def send_system_error(component, error):
