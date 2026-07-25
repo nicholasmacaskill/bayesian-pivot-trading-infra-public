@@ -381,9 +381,11 @@ class TelegramNotifier:
         if not self.bot_token or not self.chat_id:
             return
         try:
+            # Escape dollar signs so Telegram's HTML parser doesn't strip numbers
+            safe_text = text.replace('$', '\\$') if text else text
             payload = {
                 "chat_id": self.chat_id,
-                "text": text,
+                "text": safe_text,
                 "parse_mode": "HTML",
                 "disable_web_page_preview": True,
             }
