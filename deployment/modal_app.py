@@ -142,6 +142,16 @@ def master_watchdog():
     except Exception as e:
         print(f"⚠️ Equity sync failed: {e}")
 
+    # --- 3. Hourly Proactive Dead-Zone Watchdog ---
+    try:
+        now_utc = datetime.utcnow()
+        if now_utc.minute == 0 and now_utc.hour in (7, 14, 16, 17, 22):
+            from src.clients.telegram_notifier import send_deadzone_alert
+            send_deadzone_alert("SYSTEM", "NO_TRADE_HOUR", now_utc.hour)
+            print(f"🚨 Hourly Dead-Zone Broadcast sent to Telegram for UTC {now_utc.hour:02d}:00")
+    except Exception as dz_err:
+        print(f"⚠️ Dead-Zone broadcast check failed: {dz_err}")
+
 @app.function(
     image=image,
     schedule=modal.Cron("*/5 * * * *"), # Every 5 minutes
