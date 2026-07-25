@@ -14,8 +14,10 @@ class AIValidator:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self.hub = SovereignAIHub()
             
-        # Load ICT Oracle Knowledge Base (Attempt Sovereign Core first)
-        self.kb_path = os.path.join(os.getcwd(), "src", "sovereign_core", "ict_oracle_kb.json")
+        # Load ICT Oracle Knowledge Base
+        self.kb_path = os.path.join(os.getcwd(), "docs", "ict_oracle_kb.json")
+        if not os.path.exists(self.kb_path):
+            self.kb_path = os.path.join(os.getcwd(), "src", "sovereign_core", "ict_oracle_kb.json")
         if not os.path.exists(self.kb_path):
             self.kb_path = os.path.join(os.path.dirname(__file__), "ict_oracle_kb.json")
             
@@ -46,11 +48,14 @@ class AIValidator:
         concepts = self.oracle_kb.get('core_concepts', {})
         ground_truth = "### 🔮 THE ORACLE GROUND TRUTH (MICHAEL'S TEACHINGS):\n"
         
-        # Match pattern to KB concept
+        # Match pattern to KB concept flexibly
         matched = False
+        pat_lower = pattern.lower()
         for key, details in concepts.items():
-            if key.lower().replace("_", " ") in pattern.lower():
-                ground_truth += f"- {details['full_name'] if 'full_name' in details else key}: {details['logic'] if 'logic' in details else details['definition']}\n"
+            key_clean = key.lower().replace("_", " ")
+            key_root = key_clean.split()[0]  # e.g., 'judas' from 'judas swing'
+            if key_clean in pat_lower or key_root in pat_lower:
+                ground_truth += f"- {details.get('full_name', key)}: {details.get('logic', details.get('definition', ''))}\n"
                 if 'validation' in details:
                     ground_truth += f"  - Validation Rule: {details['validation']}\n"
                 matched = True
@@ -402,7 +407,12 @@ class AIValidator:
         # DUAL-TRACK PROMPT CONSTRUCTION
         if self.sovereign_prompt:
             # Full Sovereign Version (Master Theory active)
-            # Ensure memory_context has a safe default before formatting
+            if not memory_context:
+                try:
+                    from src.engines.retraining_loop import RetrainingLoop
+                    memory_context = RetrainingLoop().get_few_shot_context()
+                except Exception as e:
+                    pass
             safe_memory = memory_context if memory_context else "No highly similar historical setups found for reference."
             
             prompt = self.sovereign_prompt.format(
@@ -440,6 +450,15 @@ class AIValidator:
             ### STRATEGIC FOCUS:
             If Hurst < 0.40 (Mean-Reverting), PRIORITIZE 'Institutional Fades' and 'Liq Sweeps'.
             If Hurst > 0.55 (Trending), PRIORITIZE 'Trend Pullbacks' and 'Expansion continuations'.
+
+            ### DYNAMIC SCORING RUBRIC (0.0 - 10.0 scale):
+            Calculate exact score starting from baseline 6.0:
+            +1.5 for SMT >= 0.5, +0.8 for SMT 0.35-0.49
+            +1.0 for Regime / Hurst alignment
+            +1.0 for Q2 Judas Manipulation window
+            +0.8 for High volume spike (>= 2.0) with clean sweep
+            +0.7 for Deep Discount / Premium zone
+            -1.5 for High impact news or HTF bias conflict
 
             Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
             """
