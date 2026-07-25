@@ -223,6 +223,7 @@ class AlphaSweepScanner(SMCScanner):
             if not is_premium:
                 risk_amt = risk_amt * getattr(Config, 'OFF_HOURS_RISK_MULTIPLIER', 0.5)
                 logger.info(f"📉 OFF-HOURS RISK ADJUSTMENT: Risk reduced to ${risk_amt:.2f} (50% of base)")
+            is_transition = setup.get('regime') == 'TRANSITION'
             if is_transition:
                 risk_amt = risk_amt * getattr(Config, 'TRANSITION_RISK_MULTIPLIER', 0.5)
                 logger.warning(f"⚠️ TRANSITION REGIME RISK ADJUSTMENT: Risk reduced to ${risk_amt:.2f} (50% of base)")
