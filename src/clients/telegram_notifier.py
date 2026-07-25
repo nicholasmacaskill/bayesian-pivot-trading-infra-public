@@ -463,21 +463,30 @@ class TelegramNotifier:
 
     def send_deadzone_alert(self, symbol: str, direction: str, utc_hour: int):
         """
-        Pushes a Dead-Zone Warning Alert when a trade is placed during historical loss hours.
+        Pushes a Dead-Zone Warning Alert when a trade is placed during historical loss hours,
+        including the exact end time and when the next prime window opens.
         """
         deadzone_map = {
-            7:  {"ast": "04:00 AM", "loss": 2104.43, "wr": "26.7%"},
-            14: {"ast": "11:00 AM", "loss": 1030.64, "wr": "31.2%"},
-            17: {"ast": "02:00 PM", "loss": 1582.72, "wr": "20.0%"},
-            22: {"ast": "07:00 PM", "loss": 1289.39, "wr": "42.9%"},
+            7:  {"ast": "04:00 AM", "ends_at": "05:00 AM AST", "next_prime": "07:00 AM AST (NY AM Session — +$1,565 PnL)", "loss": 2104.43, "wr": "26.7%"},
+            14: {"ast": "11:00 AM", "ends_at": "12:00 PM AST", "next_prime": "03:00 PM AST (NY Close — 62.5% WR)", "loss": 1030.64, "wr": "31.2%"},
+            17: {"ast": "02:00 PM", "ends_at": "03:00 PM AST", "next_prime": "03:00 PM AST (NY Close — 62.5% WR)", "loss": 1582.72, "wr": "20.0%"},
+            22: {"ast": "07:00 PM", "ends_at": "08:00 PM AST", "next_prime": "09:00 PM AST (Asian Open — +$594 PnL)", "loss": 1289.39, "wr": "42.9%"},
         }
-        info = deadzone_map.get(utc_hour, {"ast": f"{utc_hour}:00 UTC", "loss": 1000.0, "wr": "30%"})
+        info = deadzone_map.get(utc_hour, {
+            "ast": f"{utc_hour}:00 UTC",
+            "ends_at": f"{(utc_hour+1)%24}:00 UTC",
+            "next_prime": "Next Prime Killzone",
+            "loss": 1000.0,
+            "wr": "30%"
+        })
         msg = (
             f"🛑 <b>HISTORICAL DEAD-ZONE WARNING ({info['ast']} AST)</b>\n"
             f"⚠️ <b>{symbol} {direction.upper()} Trade Detected</b>\n\n"
             f"<i>Database Audit Warning: Trading during {info['ast']} AST (UTC {utc_hour:02d}:00) has generated "
-            f"<b>-${info['loss']:,.2f}</b> in historical losses across your account (Win Rate: {info['wr']}).\n\n"
-            f"Execution is strongly discouraged to protect your account equity.</i>"
+            f"<b>-${info['loss']:,.2f}</b> in historical losses (Win Rate: {info['wr']}).\n\n"
+            f"⏳ <b>Dead Zone Ends At:</b> {info['ends_at']}\n"
+            f"🟢 <b>Next Prime Window:</b> {info['next_prime']}\n\n"
+            f"Execution is strongly discouraged. Wait for the next prime window.</i>"
         )
         self._send_message(msg)
 
