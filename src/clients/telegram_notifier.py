@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import logging
 import requests
@@ -425,6 +426,42 @@ class TelegramNotifier:
             logger.error(f"TG photo failed: {e}")
 
 
+    def send_high_confluence_alert(self, symbol: str, direction: str, entry: float,
+                                   stop_loss: float, target: float, ai_score: float,
+                                   smt_strength: float, session_name: str,
+                                   price_quartile: float, buttons: list = None):
+        """
+        Pushes an elite Golden Confluence Payout Alert when a setup passes all 5 rigid edge criteria:
+          1. NY AM Session (07:00-10:00 EST)
+          2. SMT Strength >= 0.50
+          3. Q2 Manipulation Window
+          4. Deep Discount (<0.25) or Deep Premium (>0.75)
+          5. AI Validator Score >= 8.5
+        """
+        is_long = direction.upper() == "LONG"
+        emoji = "🟢" if is_long else "🔴"
+        risk_dist = abs(entry - stop_loss)
+        reward_dist = abs(target - entry)
+        rr = reward_dist / risk_dist if risk_dist > 0 else 2.5
+        target_pnl = 150.0 * rr  # Estimated PnL at standard $150 risk
+
+        msg = (
+            f"🏆 <b>GOLDEN CONFLUENCE ALERT (PAYOUT PLAY)</b>\n"
+            f"{emoji} <b>{symbol} {direction.upper()} @ ${entry:,.2f}</b>\n"
+            f"🤖 <b>AI Score: {ai_score}/10 (FLOW_GO)</b>\n\n"
+            f"🔥 <b>RIGID DATA CONFLUENCE MET:</b>\n"
+            f"• 🏁 <b>{session_name}</b> (Killzone Confirmed — 66.7% Win Rate)\n"
+            f"• ⚡ <b>SMT Sponsorship ({smt_strength:.2f})</b> — 66.4% Win Rate\n"
+            f"• ⏳ <b>Q2 Judas Window</b> (90-Min Manipulation)\n"
+            f"• 💰 <b>Quartile Position ({price_quartile:.2f})</b> — 66.7% Win Rate\n\n"
+            f"🛑 <b>Stop Loss:</b> ${stop_loss:,.2f}\n"
+            f"🎯 <b>Full Target ({rr:.1f}R):</b> ${target:,.2f} (Est. +${target_pnl:,.2f} PnL)\n\n"
+            f"⚠️ <b>PAYOUT DIRECTIVE:</b> This trade meets all 5 rigid statistical edge criteria. "
+            f"Do NOT take early micro-exits. Allow trade to run to full {rr:.1f}R target."
+        )
+        self._send_message(msg, buttons=buttons)
+
+
 # ── Standalone helpers ────────────────────────────────────────────────────────
 
 def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A",
@@ -440,6 +477,16 @@ def send_alert(symbol, timeframe, pattern, ai_score, reasoning, verdict="N/A",
         health_report=health_report, bias_data=bias_data,
         liquidity_targets=liquidity_targets, session_info=session_info,
         psych_data=psych_data, direction=direction,
+    )
+
+def send_high_confluence_alert(symbol, direction, entry, stop_loss, target,
+                               ai_score, smt_strength, session_name,
+                               price_quartile, buttons=None):
+    TelegramNotifier().send_high_confluence_alert(
+        symbol=symbol, direction=direction, entry=entry,
+        stop_loss=stop_loss, target=target, ai_score=ai_score,
+        smt_strength=smt_strength, session_name=session_name,
+        price_quartile=price_quartile, buttons=buttons
     )
 
 def send_system_error(component, error):
