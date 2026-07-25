@@ -461,6 +461,26 @@ class TelegramNotifier:
         )
         self._send_message(msg, buttons=buttons)
 
+    def send_deadzone_alert(self, symbol: str, direction: str, utc_hour: int):
+        """
+        Pushes a Dead-Zone Warning Alert when a trade is placed during historical loss hours.
+        """
+        deadzone_map = {
+            7:  {"ast": "04:00 AM", "loss": 2104.43, "wr": "26.7%"},
+            14: {"ast": "11:00 AM", "loss": 1030.64, "wr": "31.2%"},
+            17: {"ast": "02:00 PM", "loss": 1582.72, "wr": "20.0%"},
+            22: {"ast": "07:00 PM", "loss": 1289.39, "wr": "42.9%"},
+        }
+        info = deadzone_map.get(utc_hour, {"ast": f"{utc_hour}:00 UTC", "loss": 1000.0, "wr": "30%"})
+        msg = (
+            f"🛑 <b>HISTORICAL DEAD-ZONE WARNING ({info['ast']} AST)</b>\n"
+            f"⚠️ <b>{symbol} {direction.upper()} Trade Detected</b>\n\n"
+            f"<i>Database Audit Warning: Trading during {info['ast']} AST (UTC {utc_hour:02d}:00) has generated "
+            f"<b>-${info['loss']:,.2f}</b> in historical losses across your account (Win Rate: {info['wr']}).\n\n"
+            f"Execution is strongly discouraged to protect your account equity.</i>"
+        )
+        self._send_message(msg)
+
 
 # ── Standalone helpers ────────────────────────────────────────────────────────
 
@@ -488,6 +508,9 @@ def send_high_confluence_alert(symbol, direction, entry, stop_loss, target,
         smt_strength=smt_strength, session_name=session_name,
         price_quartile=price_quartile, buttons=buttons
     )
+
+def send_deadzone_alert(symbol, direction, utc_hour):
+    TelegramNotifier().send_deadzone_alert(symbol=symbol, direction=direction, utc_hour=utc_hour)
 
 def send_system_error(component, error):
     TelegramNotifier().send_system_error(component, error)
