@@ -247,8 +247,18 @@ class ExecutionAuditEngine:
         audit = self.ai.audit_discretionary_trade({**trade, 'auto_context': narrative})
         strategy_label = "ALPHA" if audit.get('is_alpha', False) else "ROGUE"
 
-        # Embed the auto-generated narrative for semantic search
-        embedding = self.ai.get_text_embedding(narrative)
+        # Check if trade was taken during historical dead-zone hours (UTC 7, 14, 17, 22)
+        try:
+            entry_ts = trade.get('entry_time') or trade.get('time') or trade.get('close_time')
+            if entry_ts:
+                dt_obj = pd.to_datetime(entry_ts, utc=True)
+                utc_hr = dt_obj.hour
+                if utc_hr in (7, 14, 17, 22):
+                    from src.clients.telegram_notifier import send_deadzone_alert
+                    send_deadzone_alert(trade['symbol'], trade['side'], utc_hr)
+                    logger.warning(f"🚨 DEADZONE ALERT PUSHED TO TELEGRAM for {trade['symbol']} at UTC {utc_hr:02d}:00")
+        except Exception as ex:
+            logger.error(f"Failed to process deadzone alert check: {ex}")
 
         self.sb.log_journal_entry(
             trade_id=trade['id'],
