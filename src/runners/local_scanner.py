@@ -585,6 +585,19 @@ class LocalScannerRunner:
         self._cycle_count += 1
         now = datetime.now()
         cycle_time = now.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Dead Zone Hourly Check
+        now_utc = datetime.now(timezone.utc)
+        if not hasattr(self, '_last_deadzone_hour'):
+            self._last_deadzone_hour = -1
+        if now_utc.hour != self._last_deadzone_hour:
+            self._last_deadzone_hour = now_utc.hour
+            if now_utc.hour in (7, 14, 16, 17, 22):
+                try:
+                    from src.clients.telegram_notifier import send_deadzone_alert
+                    send_deadzone_alert("BTC/USD", "WATCHDOG", now_utc.hour)
+                except Exception as ex:
+                    logger.error(f"Failed to send local runner deadzone alert: {ex}")
         
         # Determine Session
         hour = now.hour
