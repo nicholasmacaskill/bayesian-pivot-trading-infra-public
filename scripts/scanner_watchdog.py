@@ -30,13 +30,6 @@ def main():
     if os.path.exists(lock_file):
         return
     
-    # Run Supervisory Agent audit on rejected/expired signals
-    try:
-        from scripts.audit_missed_opportunities import audit_missed_opportunities
-        audit_missed_opportunities()
-    except Exception as e:
-        print(f"⚠️ Supervisory Agent audit failed: {e}")
-
     # Send alert if scanner crashed
     msg = (
         "🚨 <b>CRITICAL SYSTEM ALERT</b> 🚨\n\n"
