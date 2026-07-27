@@ -68,20 +68,15 @@ class SovereignAIHub:
     def analyze_setup(self, prompt: str, image_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Tries to analyze the setup using available providers in priority order.
+        Together AI is strictly reserved for SFT fine-tuning jobs, not routine inference.
         """
-        # PRIORITY 0: Together AI (Direct integration)
-        if self.together_client:
-            try:
-                return self._analyze_with_together(prompt, image_path)
-            except Exception as e:
-                logger.warning(f"⚠️ Together AI analysis failed: {e}. Falling back to OpenRouter...")
-
         # PRIORITY 1: OpenRouter (Unified API key check)
         if self.openrouter_client:
             try:
                 return self._analyze_with_openrouter(prompt, image_path)
             except Exception as e:
                 logger.warning(f"⚠️ OpenRouter analysis failed: {e}. Falling back to Gemini...")
+
 
         # PRIORITY 1: Gemini
         if self.gemini_client:
