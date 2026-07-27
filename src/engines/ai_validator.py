@@ -344,6 +344,49 @@ class AIValidator:
             }
         }
 
+    def check_directional_cooldown(self, symbol: str, direction: str, cooldown_hours: float = 4.0) -> tuple[bool, str]:
+        """
+        Checks if a trade in the SAME direction was stopped out within `cooldown_hours`.
+        Returns (is_allowed, reason).
+        """
+        try:
+            import sqlite3
+            import os
+            import pandas as pd
+            from datetime import datetime, timedelta
+            db_path = os.path.join(os.getcwd(), "data", "smc_alpha.db")
+            if not os.path.exists(db_path):
+                return True, "DB not found for cooldown check"
+                
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            
+            rows = c.execute(
+                "SELECT timestamp, side, pnl FROM journal WHERE status = 'CLOSED' AND pnl < 0 ORDER BY rowid DESC LIMIT 20"
+            ).fetchall()
+            conn.close()
+            
+            if not rows:
+                return True, "No recent losing trades found"
+                
+            cutoff = datetime.utcnow() - timedelta(hours=cooldown_hours)
+            target_side = direction.upper()
+            
+            for r in rows:
+                ts_str, side, pnl = r[0], str(r[1]).upper(), float(r[2] or 0.0)
+                try:
+                    ts = pd.to_datetime(ts_str).tz_localize(None)
+                except Exception:
+                    continue
+                    
+                if ts >= cutoff and side == target_side:
+                    hrs_ago = (datetime.utcnow() - ts).total_seconds() / 3600.0
+                    return False, f"DIRECTIONAL COOLDOWN: Stopped out on {side} trade {hrs_ago:.1f}h ago (< {cooldown_hours}h limit). Cooldown active."
+                    
+            return True, "Directional cooldown clear"
+        except Exception as e:
+            return True, f"Cooldown check bypass on error: {e}"
+
     def analyze_trade(self, setup, sentiment, whales, image_path=None, df=None, exchange=None, memory_context=None, hurst_exponent=None, guard_trust_score=None):
         """
         Calls Gemini API to validate the setup with DUAL-TRACK analysis.
@@ -362,6 +405,29 @@ class AIValidator:
         Returns:
             dict: Dual-track analysis with live_execution and shadow_optimizer sections
         """
+        # Directional Cooldown Check
+        symbol = setup.get('symbol', 'BTC/USD')
+        direction = setup.get('direction', setup.get('side', 'LONG'))
+        cooldown_ok, cooldown_reason = self.check_directional_cooldown(symbol, direction, cooldown_hours=4.0)
+        if not cooldown_ok:
+            print(f"🚫 [AIValidator] Trade rejected by Cooldown Gate: {cooldown_reason}")
+            return {
+                "live_execution": {
+                    "score": 0.0,
+                    "verdict": "REJECTED",
+                    "reasoning": cooldown_reason,
+                    "execution_logic": "Trade blocked due to directional loss cooldown",
+                    "discipline_check": "Preventing loss-clustering"
+                },
+                "shadow_optimizer": {
+                    "suggested_risk_multiplier": 0.0,
+                    "regime_classification": "Cooldown",
+                    "alpha_delta_prediction": "N/A (Cooldown active)",
+                    "slippage_estimate": "N/A",
+                    "optimization_reasoning": cooldown_reason
+                }
+            }
+
         if guard_trust_score is not None:
             setup['guard_trust_score'] = guard_trust_score
 

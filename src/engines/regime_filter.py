@@ -333,8 +333,9 @@ class RegimeFilter:
                 return True, "Insufficient 1H data for HTF trend gate"
             
             # Ensure lower case columns
-            cols = {c: str(c).lower(): c for c in df_1h.columns}
+            cols = {str(c).lower(): c for c in df_1h.columns}
             close_col = cols.get('close', 'Close')
+
             
             ema20 = df_1h[close_col].ewm(span=20).mean().iloc[-1]
             ema50 = df_1h[close_col].ewm(span=50).mean().iloc[-1]
