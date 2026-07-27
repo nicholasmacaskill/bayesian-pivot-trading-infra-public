@@ -152,7 +152,9 @@ class LocalScannerRunner:
             blackout_minutes=Config.get('CALENDAR_BLACKOUT_MINUTES', 30),
         )
         self.regime_filter = RegimeFilter()
+        self.news_catalyst = NewsCatalystScanner()
         self.ledger        = TradeLedger() if Config.get('LEDGER_ENABLED', True) else None
+
         
         # ── Biometrics & Psychology ───────────────────────────────────
         self.psychology    = PsychologyEngine()
