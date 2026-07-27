@@ -19,7 +19,8 @@ except Exception:
 
 class Config:
     # Trading Parameters
-    SYMBOLS = ['BTC/USD']  # Focus exclusively on BTC/USD (Proven System Edge)
+    SYMBOLS = ['BTC/USD', 'ETH/USD']  # BTC/USD and ETH/USD active
+
     
     # Tier 2: High Alpha Altcoins (Judas Sweeps Only)
     ALT_SYMBOLS = []
@@ -41,12 +42,13 @@ class Config:
         "ETH/USD": 0.002,   # 0.2% = ~$3.60 at $1,800
         "SOL/USD": 0.002,   # 0.2% = ~$0.24 at $120
     }
-    # Minimum target distance per asset as % of price (prevents noise-level weekend ATR targets)
+    # Minimum target distance per asset as % of price (ensures 2.5R+ intraday targets pass)
     MIN_TARGET_PCT = {
-        "BTC/USD": 0.010,   # 1.0% = ~$640 at $64k
-        "ETH/USD": 0.010,   # 1.0% = ~$35 at $3,500
-        "SOL/USD": 0.015,   # 1.5% = ~$2.25 at $150
+        "BTC/USD": 0.005,   # 0.5% = ~$320 at $64k
+        "ETH/USD": 0.005,   # 0.5% = ~$17.50 at $3,500
+        "SOL/USD": 0.008,   # 0.8% = ~$1.20 at $150
     }
+
     MAX_POSITION_SIZES = {
         "BTC/USD": 0.25,    # Capped at 0.25 BTC
         "ETH/USD": 27.0,    # ~$49k notional at $1,800
