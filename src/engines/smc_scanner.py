@@ -624,12 +624,13 @@ class SMCScanner:
             self._last_bias_1d = {}
         self._last_bias_1d[symbol] = bias_1d
         
-        # STRICT ENFORCEMENT: 1D, 4H, and 1H Alignment Required
-        if not (bias_1d == bias_4h == bias_1h):
-            logger.info(f"⚖️ {symbol} Bias Conflict: 1D({bias_1d}) 4H({bias_4h}) 1H({bias_1h})")
+        # Intraday Bias Alignment: 4H and 1H Alignment Required (1D cached for macro context)
+        if not (bias_4h == bias_1h):
+            logger.info(f"⚖️ {symbol} Bias Conflict: 4H({bias_4h}) 1H({bias_1h}) [1D={bias_1d}]")
             return "NEUTRAL (Conflict)"
 
-        score = float(bias_1d) # Base score -1 or 1
+        score = float(bias_4h) # Base score -1 or 1 based on 4H/1H alignment
+
 
         # 2. Intermarket (DXY)
         if index_context and 'DXY' in index_context:
