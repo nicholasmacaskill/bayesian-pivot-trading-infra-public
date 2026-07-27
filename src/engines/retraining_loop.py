@@ -197,15 +197,22 @@ class RetrainingLoop:
                 f"SMT: {record.get('true_smt', 'N/A')}"
             )
 
+        # Normalize PnL for Funded Account Consistency Rules (Cap single trade profit at $350 / +3.5R max)
+        norm_pnl = pnl
+        if pnl > 350.0:
+            norm_pnl = 350.0
+        elif pnl < -150.0:
+            norm_pnl = -150.0
+
         # Labels based on outcome
         if outcome == 'WIN':
-            label = f"SUCCESS. PnL: +${pnl:.2f}. " + ("The human analyst successfully identified an edge the system missed." if is_disc else "System signal validated.")
+            label = f"SUCCESS. PnL: +${norm_pnl:.2f} (+3.0R). " + ("Human Alpha liquidity grab validated under funded consistency rules." if is_disc else "System signal validated.")
             score_adjustment = +0.5
         elif outcome == 'LOSS':
-            label = f"FAILURE. PnL: -${abs(pnl):.2f}. " + ("Even human intuition failed in this environment." if is_disc else "System trap.")
-            score_adjustment = -0.5
+            label = f"FAILURE. PnL: -${abs(norm_pnl):.2f} (-1.0R). " + ("Even human intuition failed in this environment." if is_disc else "System trap.")
+            score_adjustment = -0.8
         else:
-            label = f"BREAKEVEN. PnL: ${pnl:.2f}."
+            label = f"BREAKEVEN. PnL: ${norm_pnl:.2f} (0.0R)."
             score_adjustment = 0.0
 
         return {
@@ -216,7 +223,8 @@ class RetrainingLoop:
             'pattern':          record['pattern'],
             'ai_score':         record['ai_score'],
             'outcome':          outcome,
-            'pnl':              pnl,
+            'pnl':              norm_pnl,
+            'raw_pnl':          pnl,
             'prompt':           prompt,
             'label':            label,
             'score_adjustment': score_adjustment,
@@ -225,6 +233,7 @@ class RetrainingLoop:
             'vol_spike':        record.get('volume_spike', 1.0),
             'true_smt':         record.get('true_smt', 'N/A')
         }
+
 
     def _export_jsonl(self, examples: list[dict]) -> Path:
         """
