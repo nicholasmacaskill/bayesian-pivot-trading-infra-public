@@ -313,15 +313,16 @@ class RetrainingLoop:
             if ex:
                 all_examples[ex['signal_id']] = ex
 
-        # Sort: wins first (for positive reinforcement), then losses (calibration)
-        sorted_examples = sorted(
-            all_examples.values(),
-            key=lambda x: (x['outcome'] == 'WIN', abs(x['pnl'] or 0)),
-            reverse=True
-        )[:MAX_FEW_SHOT_EXAMPLES]
+        # Separate wins and losses for balanced 50/50 calibration
+        wins = sorted([e for e in all_examples.values() if e.get('outcome') == 'WIN'], key=lambda x: abs(x.get('pnl') or 0), reverse=True)[:10]
+        losses = sorted([e for e in all_examples.values() if e.get('outcome') == 'LOSS'], key=lambda x: abs(x.get('pnl') or 0), reverse=True)[:10]
+        
+        # Combine top 10 wins + top 10 losses
+        sorted_examples = wins + losses
 
         with open(FEW_SHOT_CACHE_PATH, 'w') as f:
             json.dump(sorted_examples, f, indent=2)
+
 
         logger.info(f"[Retraining] 🧠 Few-shot cache updated: {len(sorted_examples)} examples active.")
 
