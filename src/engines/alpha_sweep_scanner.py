@@ -123,6 +123,13 @@ class AlphaSweepScanner(SMCScanner):
             is_transition = True
             logger.warning(f"⚠️ TRANSITION REGIME (Hurst: {hurst:.3f}): Allowing setup with reduced risk.")
         
+        # Calculate 24h High and Low for Premium/Discount evaluation
+        range_high = float(df_1h['high'].tail(24).max())
+        range_low = float(df_1h['low'].tail(24).min())
+        
+        from src.engines.regime_filter import RegimeFilter
+        rf = RegimeFilter()
+        
         # Long Setup (Sweep of Support)
         for level in recent_lows:
             # 5m candle low must pierce level, close must remain above level
@@ -133,9 +140,16 @@ class AlphaSweepScanner(SMCScanner):
                     # Wick rejection check (lower wick must be >= 30% of total candle range)
                     lower_wick = min(c_open, c_close) - c_low
                     if lower_wick / c_range >= 0.30:
-                        # Trend alignment if trending
-                        if is_trending and trend != "UP":
-                            logger.info(f"Long setup blocked due to trend mismatch (Hurst: {hurst:.3f}, Trend: {trend})")
+                        # HTF Trend Alignment Gate
+                        htf_ok, htf_reason = rf.check_htf_trend_alignment(df_1h, "LONG")
+                        if not htf_ok:
+                            logger.info(f"🚫 LONG sweep blocked: {htf_reason}")
+                            continue
+                            
+                        # Premium/Discount Zone Gate
+                        pd_ok, pd_reason = rf.check_premium_discount(c_close, range_low, range_high, "LONG")
+                        if not pd_ok:
+                            logger.info(f"🚫 LONG sweep blocked: {pd_reason}")
                             continue
                         
                         return {
@@ -159,9 +173,16 @@ class AlphaSweepScanner(SMCScanner):
                     # Wick rejection check (upper wick must be >= 30% of total candle range)
                     upper_wick = c_high - max(c_open, c_close)
                     if upper_wick / c_range >= 0.30:
-                        # Trend alignment if trending
-                        if is_trending and trend != "DOWN":
-                            logger.info(f"Short setup blocked due to trend mismatch (Hurst: {hurst:.3f}, Trend: {trend})")
+                        # HTF Trend Alignment Gate
+                        htf_ok, htf_reason = rf.check_htf_trend_alignment(df_1h, "SHORT")
+                        if not htf_ok:
+                            logger.info(f"🚫 SHORT sweep blocked: {htf_reason}")
+                            continue
+                            
+                        # Premium/Discount Zone Gate
+                        pd_ok, pd_reason = rf.check_premium_discount(c_close, range_low, range_high, "SHORT")
+                        if not pd_ok:
+                            logger.info(f"🚫 SHORT sweep blocked: {pd_reason}")
                             continue
                         
                         return {
@@ -176,6 +197,7 @@ class AlphaSweepScanner(SMCScanner):
                         }
                         
         return None
+
 
     def scan_symbol(self, symbol):
         """
