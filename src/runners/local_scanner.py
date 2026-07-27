@@ -41,6 +41,8 @@ from src.engines.trade_ledger      import TradeLedger
 from src.engines.retraining_loop   import RetrainingLoop
 from src.engines.psychology_engine import PsychologyEngine
 from src.engines.biometric_engine  import BiometricEngine
+from src.engines.news_catalyst_scanner import NewsCatalystScanner
+
 
 # ── ICT Killzone Definitions (UTC hours) ─────────────────────────────────────
 ICT_KILLZONES = [
