@@ -321,4 +321,65 @@ class RegimeFilter:
         except Exception:
             return False, "PO3 Error"
 
+    def check_htf_trend_alignment(self, df_1h: pd.DataFrame, direction: str) -> tuple[bool, str]:
+        """
+        Validates if the trade direction matches the 1H/4H trend stack.
+        - LONG requires Bullish trend (EMA20 >= EMA50 or Close >= EMA50).
+        - SHORT requires Bearish trend (EMA20 <= EMA50 or Close <= EMA50).
+        Returns (is_aligned, reason).
+        """
+        try:
+            if df_1h is None or len(df_1h) < 20:
+                return True, "Insufficient 1H data for HTF trend gate"
+            
+            # Ensure lower case columns
+            cols = {c: str(c).lower(): c for c in df_1h.columns}
+            close_col = cols.get('close', 'Close')
+            
+            ema20 = df_1h[close_col].ewm(span=20).mean().iloc[-1]
+            ema50 = df_1h[close_col].ewm(span=50).mean().iloc[-1]
+            last_close = df_1h[close_col].iloc[-1]
+            
+            direction_upper = direction.upper()
+            
+            if direction_upper in ['LONG', 'BUY']:
+                if ema20 < ema50 and last_close < ema50:
+                    return False, f"HTF BEARISH GATE: Cannot take LONG while 1H EMA20 ({ema20:.2f}) < EMA50 ({ema50:.2f}) & Close ({last_close:.2f}) < EMA50"
+                return True, "HTF Bullish Trend Alignment confirmed"
+            elif direction_upper in ['SHORT', 'SELL']:
+                if ema20 > ema50 and last_close > ema50:
+                    return False, f"HTF BULLISH GATE: Cannot take SHORT while 1H EMA20 ({ema20:.2f}) > EMA50 ({ema50:.2f}) & Close ({last_close:.2f}) > EMA50"
+                return True, "HTF Bearish Trend Alignment confirmed"
+            return True, "Neutral direction"
+        except Exception as e:
+            logger.error(f"Error in check_htf_trend_alignment: {e}")
+            return True, f"HTF alignment bypass on error: {e}"
+
+    def check_premium_discount(self, entry_price: float, range_low: float, range_high: float, direction: str) -> tuple[bool, str]:
+        """
+        Checks if trade is taken in valid Premium/Discount zone.
+        - LONG requires entry price in Discount (< 70% of 24h range).
+        - SHORT requires entry price in Premium (> 30% of 24h range).
+        """
+        try:
+            if range_high <= range_low or entry_price <= 0:
+                return True, "Invalid range bounds for Premium/Discount check"
+            
+            range_span = range_high - range_low
+            rel_pos = (entry_price - range_low) / range_span
+            direction_upper = direction.upper()
+            
+            if direction_upper in ['LONG', 'BUY']:
+                if rel_pos > 0.70:
+                    return False, f"PREMIUM GATE: Cannot take LONG at top {rel_pos:.0%} of 24h range (Price: {entry_price:.2f}, High: {range_high:.2f})"
+                return True, f"Discount location confirmed ({rel_pos:.0%} of range)"
+            elif direction_upper in ['SHORT', 'SELL']:
+                if rel_pos < 0.30:
+                    return False, f"DISCOUNT GATE: Cannot take SHORT at bottom {rel_pos:.0%} of 24h range (Price: {entry_price:.2f}, Low: {range_low:.2f})"
+                return True, f"Premium location confirmed ({rel_pos:.0%} of range)"
+            return True, "Neutral location"
+        except Exception as e:
+            return True, f"Premium/Discount bypass on error: {e}"
+
+
 
