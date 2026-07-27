@@ -105,41 +105,61 @@ class RetrainingLoop:
         elapsed = datetime.utcnow() - self._last_run
         return elapsed.total_seconds() >= 7 * 24 * 3600
 
-    def _fetch_recent_outcomes(self, days_back: int = 120) -> list[dict]:
+    def _fetch_recent_outcomes(self, days_back: int = 365) -> list[dict]:
         """
-        Queries signed_ledger for closed bot trades AND journal for discretionary ALPHA trades.
+        Queries signed_ledger for closed bot trades AND journal for all closed execution trades.
         """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        cutoff = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
         all_data = []
 
         try:
-            # 1. Fetch System Signals (Bot Trades)
-            rows = conn.execute("""
-                SELECT timestamp, symbol, direction, pattern, ai_score, outcome, pnl, signal_id, 
-                       volume_spike, true_smt, shadow_regime, 0 as is_discretionary
-                FROM signed_ledger
-                WHERE is_rogue = 0
-                  AND outcome NOT IN ('PENDING', 'UNKNOWN')
-                  AND timestamp >= ?
-                ORDER BY timestamp DESC
-            """, (cutoff,)).fetchall()
-            all_data.extend([dict(r) for r in rows])
+            if days_back > 0:
+                cutoff = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
+                # 1. Fetch System Signals (Bot Trades)
+                rows = conn.execute("""
+                    SELECT timestamp, symbol, direction, pattern, ai_score, outcome, pnl, signal_id, 
+                           volume_spike, true_smt, shadow_regime, 0 as is_discretionary
+                    FROM signed_ledger
+                    WHERE outcome NOT IN ('PENDING', 'UNKNOWN')
+                      AND timestamp >= ?
+                    ORDER BY timestamp DESC
+                """, (cutoff,)).fetchall()
+                all_data.extend([dict(r) for r in rows])
 
-            # 2. Fetch Human Alpha (Discretionary Trades)
-            # Filter for strategy = 'ALPHA' (Human insight the bot missed)
-            rogue_rows = conn.execute("""
-                SELECT timestamp, symbol, side as direction, deviations as pattern, ai_grade as ai_score, 
-                       CASE WHEN pnl > 0 THEN 'WIN' WHEN pnl < 0 THEN 'LOSS' ELSE 'BREAKEVEN' END as outcome,
-                       pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt, 
-                       notes as shadow_regime, 1 as is_discretionary
-                FROM journal
-                WHERE strategy = 'ALPHA'
-                  AND timestamp >= ?
-                ORDER BY timestamp DESC
-            """, (cutoff,)).fetchall()
-            all_data.extend([dict(r) for r in rogue_rows])
+                # 2. Fetch All Closed Journal Trades (System, Rogue & Discretionary)
+                rogue_rows = conn.execute("""
+                    SELECT timestamp, symbol, side as direction, COALESCE(deviations, strategy) as pattern, ai_grade as ai_score, 
+                           CASE WHEN pnl > 0 THEN 'WIN' WHEN pnl < 0 THEN 'LOSS' ELSE 'BREAKEVEN' END as outcome,
+                           pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt, 
+                           notes as shadow_regime, CASE WHEN strategy = 'ALPHA' THEN 1 ELSE 0 END as is_discretionary
+                    FROM journal
+                    WHERE status = 'CLOSED'
+                    ORDER BY timestamp DESC
+                """).fetchall()
+                all_data.extend([dict(r) for r in rogue_rows])
+            else:
+                rows = conn.execute("""
+                    SELECT timestamp, symbol, direction, pattern, ai_score, outcome, pnl, signal_id, 
+                           volume_spike, true_smt, shadow_regime, 0 as is_discretionary
+                    FROM signed_ledger
+                    WHERE outcome NOT IN ('PENDING', 'UNKNOWN')
+                    ORDER BY timestamp DESC
+                """).fetchall()
+                all_data.extend([dict(r) for r in rows])
+
+                rogue_rows = conn.execute("""
+                    SELECT timestamp, symbol, side as direction, COALESCE(deviations, strategy) as pattern, ai_grade as ai_score, 
+                           CASE WHEN pnl > 0 THEN 'WIN' WHEN pnl < 0 THEN 'LOSS' ELSE 'BREAKEVEN' END as outcome,
+                           pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt, 
+                           notes as shadow_regime, CASE WHEN strategy = 'ALPHA' THEN 1 ELSE 0 END as is_discretionary
+                    FROM journal
+                    WHERE status = 'CLOSED'
+                    ORDER BY timestamp DESC
+                """).fetchall()
+                all_data.extend([dict(r) for r in rogue_rows])
+
+
             
             return all_data
         except Exception as e:
