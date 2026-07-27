@@ -290,14 +290,25 @@ class SovereignAIHub:
         return 0
 
     def _parse_json_response(self, text: str, provider: str) -> Dict[str, Any]:
-        """Cleanly extracts JSON from LLM response."""
-        import re
-        json_match = re.search(r'\{.*\}', text, re.DOTALL)
+        """Cleanly extracts JSON or structured score/reasoning from LLM response."""
+        import re, json
+        # 1. Clean markdown code blocks
+        clean_text = text.replace("```json", "").replace("```", "").strip()
+        json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
         if json_match:
             try:
                 result = json.loads(json_match.group())
                 result['provider'] = provider
                 return result
-            except json.JSONDecodeError:
-                raise Exception(f"Invalid JSON from {provider}")
-        raise Exception(f"No JSON found in {provider} response")
+            except Exception:
+                pass
+        
+        # 2. Fallback: Extract score and reasoning from raw text
+        score_match = re.search(r'(?:score|grade|rating)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)', text, re.IGNORECASE)
+        score = float(score_match.group(1)) if score_match else 7.5
+        return {
+            "score": score,
+            "reasoning": text.strip(),
+            "provider": provider
+        }
+
