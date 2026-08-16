@@ -220,9 +220,9 @@ def run_authentic_quant_ai_backtest():
                 if dd > max_dd:
                     max_dd = dd
 
-                if dd >= 0.10:
+                if dd >= 0.05:
                     is_breached = True
-                    equity = start_equity * 0.90
+                    equity = start_equity * 0.95
 
                 executed.append({'pnl_usd': pnl_usd, 'pnl_r': res['pnl_r'], 'score': ai_score})
 
@@ -252,8 +252,8 @@ def run_authentic_quant_ai_backtest():
         }
 
     # Print Summary Table
-    print(f"{'ACCOUNT':<10} | {'MANDATE':<14} | {'START $':<9} | {'FINAL $':<9} | {'NET PnL ($)':<11} | {'RET (%)':<7} | {'TRADES':<6} | {'WIN %':<6} | {'PF':<6} | {'STATUS'}")
-    print("-" * 105)
+    print(f"{'ACCOUNT':<10} | {'MANDATE':<14} | {'START $':<9} | {'FINAL $':<9} | {'NET PnL ($)':<11} | {'RET (%)':<7} | {'TRADES':<6} | {'WIN %':<6} | {'PF':<5} | {'MAX DD':<7} | {'STATUS (5% RULE)'}")
+    print("-" * 120)
 
     tot_start = 0.0
     tot_final = 0.0
@@ -261,8 +261,9 @@ def run_authentic_quant_ai_backtest():
     for acc_key, res in results.items():
         tot_start += res['start_equity']
         tot_final += res['final_equity']
-        status_str = "🔴 BREACHED" if res['is_breached'] else "🟢 ACTIVE & PROFITABLE"
-        print(f"{acc_key:<10} | {res['strategy_mode']:<14} | ${res['start_equity']:<8,.0f} | ${res['final_equity']:<8,.0f} | ${res['net_pnl']:<+10,.2f} | {res['return_pct']:<+6.1f}% | {res['total_trades']:<6} | {res['win_rate']:<5.1f}% | {res['profit_factor']:<5.2f} | {status_str}")
+        status_str = "🔴 BREACHED (>5%)" if res['is_breached'] else "🟢 PASSED (<5% DD)"
+        print(f"{acc_key:<10} | {res['strategy_mode']:<14} | ${res['start_equity']:<8,.0f} | ${res['final_equity']:<8,.0f} | ${res['net_pnl']:<+10,.2f} | {res['return_pct']:<+6.1f}% | {res['total_trades']:<6} | {res['win_rate']:<5.1f}% | {res['profit_factor']:<5.2f} | {res['max_dd_pct']:<5.2f}% | {status_str}")
+
 
     tot_pnl = tot_final - tot_start
     tot_ret = (tot_pnl / tot_start * 100.0)
