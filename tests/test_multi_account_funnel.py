@@ -36,11 +36,11 @@ class TestMultiAccountFunnel(unittest.TestCase):
         self.assertFalse(passed)
         self.assertTrue(any("HURST_CHAOS_GATE" in r for r in reasons))
 
-    def test_account_d_ai_bypass(self):
+    def test_account_d_reversal_filter(self):
         setup = {"symbol": "ETH/USD", "direction": "BUY", "price": 3000.0, "stop_loss": 2950.0, "take_profit": 3150.0}
-        # AI score is 0.0, but Account D has bypass_ai_gate = True -> should pass if Hurst outside chaos range
+        # Account D requires Hurst <= 0.45 (REVERSAL_ONLY), ai_score >= 7.5, smt_strength >= 0.15
         passed, reasons = self.manager.evaluate_setup_for_account(
-            setup=setup, account_key="ACCOUNT_D", hurst=0.60, ai_score=0.0, cal_safe=True, corr_ok=True, regime_allowed=True
+            setup=setup, account_key="ACCOUNT_D", hurst=0.40, smt_strength=0.25, ai_score=8.0, cal_safe=True, corr_ok=True, regime_allowed=True
         )
         self.assertTrue(passed)
         self.assertEqual(len(reasons), 0)
@@ -51,10 +51,11 @@ class TestMultiAccountFunnel(unittest.TestCase):
 
         # Evaluating BUY on BTC/USD when SELL on BTC/USD exists -> MUST FAIL
         passed, reasons = self.manager.evaluate_setup_for_account(
-            setup=setup_buy, account_key="ACCOUNT_B", hurst=0.60, ai_score=8.5, cal_safe=True, corr_ok=True, regime_allowed=True, open_positions=existing_positions
+            setup=setup_buy, account_key="ACCOUNT_B", hurst=0.60, smt_strength=0.25, ai_score=8.5, cal_safe=True, corr_ok=True, regime_allowed=True, open_positions=existing_positions
         )
         self.assertFalse(passed)
-        self.assertTrue(any("CROSS_ACCOUNT_HEDGING_BLOCKED" in r for r in reasons))
+        self.assertTrue(any("ANTI_HEDGE_POSITION_BLOCKED" in r for r in reasons))
+
 
 
     def test_counterfactual_registration_and_summary(self):

@@ -131,9 +131,9 @@ def run_blind_walkforward():
 
     print(" • Fetching Raw 5m Historical Candles from Binance (60 Days)...")
     df = data_mgr.get_data("BTC/USDT", timeframe='5m', days=60)
-    dxy_df = data_mgr.get_data("DXY", timeframe='5m', days=60)
+    eth_df = data_mgr.get_data("ETH/USDT", timeframe='5m', days=60)
 
-    print(f" • Loaded {len(df)} raw 5m candles. Calculating SMC indicators blindly...")
+    print(f" • Loaded {len(df)} BTC 5m candles and {len(eth_df)} ETH 5m candles. Calculating SMC indicators blindly...")
 
     # Calculate indicators blindly on raw candles (zero Supabase log references!)
     df = indicators.add_atr(df)
@@ -141,11 +141,12 @@ def run_blind_walkforward():
     df['recent_high'] = df['high'].rolling(96).max().shift(1)
     df['recent_low']  = df['low'].rolling(96).min().shift(1)
     df = indicators.add_regime_regime(df)
-    if dxy_df is not None and not dxy_df.empty and 'timestamp' in dxy_df.columns:
-        df = indicators.add_smt_divergence(df, dxy_df)
+    if eth_df is not None and not eth_df.empty and 'timestamp' in eth_df.columns:
+        df = indicators.add_smt_divergence(df, eth_df, symbol_name="ETH")
     else:
         df['smt_bullish'] = False
         df['smt_bearish'] = False
+
 
     df['hour'] = pd.to_datetime(df['timestamp']).dt.hour
     df = indicators.add_displacement(df)

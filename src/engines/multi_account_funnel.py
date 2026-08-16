@@ -1,5 +1,7 @@
 import os
 import logging
+import threading
+import time
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Tuple
 
@@ -10,179 +12,19 @@ class AccountValidatorProfile:
     account_key: str                     # e.g. 'ACCOUNT_A'
     account_name: str                    # e.g. 'Conservative Sovereign Anchor'
     email_env_key: str                   # e.g. 'TRADELOCKER_EMAIL_A'
-    strategy_mode: str                   # 'CONSERVATIVE', 'TREND', 'REVERSAL', 'PURE_PA', 'AGGRESSIVE_SCALP'
+    strategy_mode: str                   # 'CONSERVATIVE', 'TREND', 'REVERSAL'
     hurst_chaos_range: Tuple[float, float] = (0.45, 0.55)
-    hurst_required_mode: Optional[str] = None  # 'TREND_ONLY', 'REVERSAL_ONLY', 'RELAXED_CHAOS', None
-    ai_threshold: float = 8.0
+    hurst_required_mode: Optional[str] = None  # 'TREND_ONLY', 'REVERSAL_ONLY', None
+    ai_threshold: float = 7.5
     bypass_ai_gate: bool = False
-    require_smt_divergence: bool = False
-    min_smt_strength: float = 0.0
-    calendar_blackout_mins: int = 30
+    require_smt_divergence: bool = True
+    min_smt_strength: float = 0.15
+    calendar_blackout_mins: int = 15
     slippage_atr_max: float = 1.5
     correlation_gate_active: bool = True
     target_rr_multiple: float = 2.5
     risk_per_trade: float = 0.005
     max_risk_usd: float = 125.0
-
-class MultiAccountFunnelManager:
-    """
-    Manages tailored Funnel Validator profiles across all live TradeLocker accounts.
-    Evaluates candidate trade setups against per-account filter combinations.
-    """
-    def __init__(self):
-        self.profiles: Dict[str, AccountValidatorProfile] = {
-            "ACCOUNT_A": AccountValidatorProfile(
-                account_key="ACCOUNT_A",
-                account_name="Conservative Sovereign Anchor",
-                email_env_key="TRADELOCKER_EMAIL_A",
-                strategy_mode="CONSERVATIVE",
-                hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode=None,
-                ai_threshold=8.0,
-                bypass_ai_gate=False,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
-                calendar_blackout_mins=30,
-                slippage_atr_max=1.5,
-                correlation_gate_active=True,
-                target_rr_multiple=2.5,
-                risk_per_trade=0.005,
-                max_risk_usd=125.0
-            ),
-            "ACCOUNT_B": AccountValidatorProfile(
-                account_key="ACCOUNT_B",
-                account_name="Volume Expansion Operator",
-                email_env_key="TRADELOCKER_EMAIL_B",
-                strategy_mode="TREND",
-                hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode="TREND_ONLY",
-                ai_threshold=7.0,
-                bypass_ai_gate=False,
-                require_smt_divergence=True,
-                min_smt_strength=0.20,
-                calendar_blackout_mins=15,
-                slippage_atr_max=2.0,
-                correlation_gate_active=True,
-                target_rr_multiple=3.0,
-                risk_per_trade=0.005,
-                max_risk_usd=250.0
-            ),
-            "ACCOUNT_C": AccountValidatorProfile(
-                account_key="ACCOUNT_C",
-                account_name="Turtle Soup Fader",
-                email_env_key="TRADELOCKER_EMAIL_C",
-                strategy_mode="REVERSAL",
-                hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode="REVERSAL_ONLY",
-                ai_threshold=7.5,
-                bypass_ai_gate=False,
-                require_smt_divergence=True,
-                min_smt_strength=0.15,
-                calendar_blackout_mins=30,
-                slippage_atr_max=1.5,
-                correlation_gate_active=True,
-                target_rr_multiple=2.5,
-                risk_per_trade=0.005,
-                max_risk_usd=125.0
-            ),
-            "ACCOUNT_D": AccountValidatorProfile(
-                account_key="ACCOUNT_D",
-                account_name="Pure Technical PA (AI Bypass)",
-                email_env_key="TRADELOCKER_EMAIL_D",
-                strategy_mode="PURE_PA",
-                hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode=None,
-                ai_threshold=0.0,
-                bypass_ai_gate=True,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
-                calendar_blackout_mins=15,
-                slippage_atr_max=1.5,
-                correlation_gate_active=False,
-                target_rr_multiple=2.5,
-                risk_per_trade=0.005,
-                max_risk_usd=65.0
-            ),
-            "ACCOUNT_E": AccountValidatorProfile(
-                account_key="ACCOUNT_E",
-                account_name="High Alpha Aggressive Scalper",
-                email_env_key="TRADELOCKER_EMAIL_E",
-                strategy_mode="AGGRESSIVE_SCALP",
-                hurst_chaos_range=(0.48, 0.52),
-                hurst_required_mode="RELAXED_CHAOS",
-                ai_threshold=6.5,
-                bypass_ai_gate=False,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
-                calendar_blackout_mins=2,  # 2m red-folder buffer for instant prop firm safety
-                slippage_atr_max=2.5,
-                correlation_gate_active=False,
-                target_rr_multiple=2.0,
-                risk_per_trade=0.006,
-                max_risk_usd=65.0
-            ),
-            "ACCOUNT_F": AccountValidatorProfile(
-                account_key="ACCOUNT_F",
-                account_name="50k Oracle Instant Operator",
-                email_env_key="TRADELOCKER_EMAIL_F",
-                strategy_mode="TREND",
-                hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode="TREND_ONLY",
-                ai_threshold=7.5,
-                bypass_ai_gate=False,
-                require_smt_divergence=True,
-                min_smt_strength=0.15,
-                calendar_blackout_mins=15,
-                slippage_atr_max=2.0,
-                correlation_gate_active=True,
-                target_rr_multiple=3.0,
-                risk_per_trade=0.005,
-                max_risk_usd=250.0
-            ),
-            "ACCOUNT_G": AccountValidatorProfile(
-                account_key="ACCOUNT_G",
-                account_name="25k Oracle Instant Operator",
-                email_env_key="TRADELOCKER_EMAIL_G",
-                strategy_mode="CONSERVATIVE",
-                hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode=None,
-                ai_threshold=7.5,
-                bypass_ai_gate=False,
-                require_smt_divergence=True,
-                min_smt_strength=0.15,
-                calendar_blackout_mins=30,
-                slippage_atr_max=1.5,
-                correlation_gate_active=True,
-                target_rr_multiple=2.5,
-                risk_per_trade=0.005,
-                max_risk_usd=125.0
-            ),
-            "ACCOUNT_H": AccountValidatorProfile(
-                account_key="ACCOUNT_H",
-                account_name="10k Oracle Instant Operator",
-                email_env_key="TRADELOCKER_EMAIL_H",
-                strategy_mode="PURE_PA",
-                hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode=None,
-                ai_threshold=7.0,
-                bypass_ai_gate=False,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
-                calendar_blackout_mins=15,
-                slippage_atr_max=1.5,
-                correlation_gate_active=False,
-                target_rr_multiple=2.5,
-                risk_per_trade=0.005,
-                max_risk_usd=65.0
-            ),
-        }
-
-
-
-
-
-import threading
-import time
 
 def align_lot_size(qty: float, min_lot: float = 0.01, lot_step: float = 0.01, max_lot: float = 100.0) -> float:
     """
@@ -211,10 +53,10 @@ class MultiAccountFunnelManager:
                 strategy_mode="CONSERVATIVE",
                 hurst_chaos_range=(0.45, 0.55),
                 hurst_required_mode=None,
-                ai_threshold=8.0,
+                ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
+                require_smt_divergence=True,
+                min_smt_strength=0.15,
                 calendar_blackout_mins=30,
                 slippage_atr_max=1.5,
                 correlation_gate_active=True,
@@ -229,10 +71,10 @@ class MultiAccountFunnelManager:
                 strategy_mode="TREND",
                 hurst_chaos_range=(0.45, 0.55),
                 hurst_required_mode="TREND_ONLY",
-                ai_threshold=7.0,
+                ai_threshold=7.5,
                 bypass_ai_gate=False,
                 require_smt_divergence=True,
-                min_smt_strength=0.20,
+                min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=2.0,
                 correlation_gate_active=True,
@@ -260,15 +102,15 @@ class MultiAccountFunnelManager:
             ),
             "ACCOUNT_D": AccountValidatorProfile(
                 account_key="ACCOUNT_D",
-                account_name="Pure Technical PA (AI Bypass)",
+                account_name="Liquidity Reversal Operator",
                 email_env_key="TRADELOCKER_EMAIL_D",
-                strategy_mode="PURE_PA",
+                strategy_mode="REVERSAL",
                 hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode=None,
-                ai_threshold=0.0,
-                bypass_ai_gate=True,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
+                hurst_required_mode="REVERSAL_ONLY",
+                ai_threshold=7.5,
+                bypass_ai_gate=False,
+                require_smt_divergence=True,
+                min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=1.5,
                 correlation_gate_active=False,
@@ -278,19 +120,19 @@ class MultiAccountFunnelManager:
             ),
             "ACCOUNT_E": AccountValidatorProfile(
                 account_key="ACCOUNT_E",
-                account_name="High Alpha Aggressive Scalper",
+                account_name="High Alpha Reversal Scalper",
                 email_env_key="TRADELOCKER_EMAIL_E",
-                strategy_mode="AGGRESSIVE_SCALP",
-                hurst_chaos_range=(0.48, 0.52),
-                hurst_required_mode="RELAXED_CHAOS",
-                ai_threshold=6.5,
+                strategy_mode="REVERSAL",
+                hurst_chaos_range=(0.45, 0.55),
+                hurst_required_mode="REVERSAL_ONLY",
+                ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
-                calendar_blackout_mins=2,  # 2m red-folder buffer for instant prop firm safety
-                slippage_atr_max=2.5,
+                require_smt_divergence=True,
+                min_smt_strength=0.15,
+                calendar_blackout_mins=15,
+                slippage_atr_max=2.0,
                 correlation_gate_active=False,
-                target_rr_multiple=2.0,
+                target_rr_multiple=2.5,
                 risk_per_trade=0.006,
                 max_risk_usd=65.0
             ),
@@ -334,13 +176,13 @@ class MultiAccountFunnelManager:
                 account_key="ACCOUNT_H",
                 account_name="10k Oracle Instant Operator",
                 email_env_key="TRADELOCKER_EMAIL_H",
-                strategy_mode="PURE_PA",
+                strategy_mode="REVERSAL",
                 hurst_chaos_range=(0.45, 0.55),
-                hurst_required_mode=None,
-                ai_threshold=7.0,
+                hurst_required_mode="REVERSAL_ONLY",
+                ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=False,
-                min_smt_strength=0.0,
+                require_smt_divergence=True,
+                min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=1.5,
                 correlation_gate_active=False,
@@ -364,56 +206,58 @@ class MultiAccountFunnelManager:
         with self._intent_lock:
             self._pending_intents.pop((norm_symbol, norm_dir, account_key), None)
 
-    def _clean_expired_intents(self):
-        """Cleans stale intents older than 10 seconds."""
-        now = time.time()
-        expired = [k for k, ts in self._pending_intents.items() if now - ts > 10.0]
-        for k in expired:
-            self._pending_intents.pop(k, None)
-
-    def check_anti_hedging_gate(self, setup_symbol: str, setup_direction: str, open_positions: list) -> Tuple[bool, Optional[str]]:
+    def check_anti_hedging_gate(
+        self,
+        setup_symbol: str,
+        setup_direction: str,
+        open_positions: List[dict],
+        account_key: Optional[str] = None
+    ) -> Tuple[bool, Optional[str]]:
         """
-        Guarantees 100% compliance with prop firm cross-account hedging rules.
-        Checks both live open positions AND in-flight pending intents across all 8 accounts.
+        Anti-hedging and duplicate intent protection gate.
         """
         norm_symbol = setup_symbol.replace("/", "").replace("_", "").upper()
-        norm_dir = setup_direction.upper()  # 'BUY' or 'SELL'
-        opposite_dir = "SELL" if norm_dir == "BUY" else "BUY"
+        norm_dir = setup_direction.upper()
+        opp_dir = "SELL" if norm_dir == "BUY" else "BUY"
 
-        # 1. Check in-flight pending intents
+        # 1. In-flight intent check
         with self._intent_lock:
-            self._clean_expired_intents()
+            now = time.time()
+            stale_keys = [k for k, ts in self._pending_intents.items() if now - ts > 60.0]
+            for k in stale_keys:
+                self._pending_intents.pop(k, None)
+
             for (p_sym, p_dir, p_acc), _ in self._pending_intents.items():
-                if norm_symbol in p_sym or p_sym in norm_symbol:
-                    if p_dir == opposite_dir:
-                        return False, f"CROSS_ACCOUNT_HEDGING_BLOCKED (In-flight pending {p_dir} on {p_sym} by {p_acc})"
+                if p_sym == norm_symbol:
+                    if p_dir == opp_dir:
+                        return False, f"ANTI_HEDGE_INTENT_BLOCKED: In-flight {p_dir} on {p_sym}"
+                    if account_key and p_acc == account_key and p_dir == norm_dir:
+                        return False, f"DUPLICATE_INTENT_BLOCKED: Active {p_dir} intent for {account_key}"
 
-        # 2. Check live open positions
-        if open_positions:
-            for pos in open_positions:
-                pos_symbol = str(pos.get("symbol", "")).replace("/", "").replace("_", "").upper()
-                pos_side = str(pos.get("side") or pos.get("direction") or "").upper()
+        # 2. Existing positions check
+        for pos in open_positions:
+            pos_sym = str(pos.get("symbol", "")).replace("/", "").replace("_", "").upper()
+            pos_dir = str(pos.get("side", pos.get("direction", ""))).upper()
 
-                if norm_symbol in pos_symbol or pos_symbol in norm_symbol:
-                    if pos_side == opposite_dir:
-                        return False, f"CROSS_ACCOUNT_HEDGING_BLOCKED (Active {pos_side} exists on {pos_symbol})"
+            if pos_sym == norm_symbol and pos_dir == opp_dir:
+                return False, f"ANTI_HEDGE_POSITION_BLOCKED: Open {pos_dir} position on {pos_sym}"
 
         return True, None
-
 
     def evaluate_setup_for_account(
         self,
         setup: dict,
         account_key: str,
-        hurst: float = 0.5,
-        smt_strength: float = 0.0,
-        slippage_ratio: float = 0.0,
+        hurst: float = 0.58,
+        smt_strength: float = 0.20,
+        slippage_ratio: float = 1.0,
         cal_safe: bool = True,
         corr_ok: bool = True,
         regime_allowed: bool = True,
-        ai_score: float = 0.0,
-        open_positions: list = None
+        ai_score: float = 8.0,
+        open_positions: Optional[List[dict]] = None
     ) -> Tuple[bool, List[str]]:
+
         """
         Evaluates a candidate setup against a specific account's validator profile.
         Returns:
@@ -426,14 +270,14 @@ class MultiAccountFunnelManager:
         rejection_reasons = []
 
         # 0. Portfolio Anti-Hedging Gate Check
-        if open_positions:
-            anti_hedge_ok, anti_hedge_reason = self.check_anti_hedging_gate(
-                setup_symbol=setup.get('symbol', ''),
-                setup_direction=setup.get('direction', 'BUY'),
-                open_positions=open_positions
-            )
-            if not anti_hedge_ok:
-                rejection_reasons.append(anti_hedge_reason)
+        anti_hedge_ok, anti_hedge_reason = self.check_anti_hedging_gate(
+            setup_symbol=setup.get('symbol', ''),
+            setup_direction=setup.get('direction', 'BUY'),
+            open_positions=open_positions or [],
+            account_key=account_key
+        )
+        if not anti_hedge_ok:
+            rejection_reasons.append(anti_hedge_reason)
 
         # 1. Hurst Gate Check
         h_low, h_high = profile.hurst_chaos_range
@@ -471,4 +315,3 @@ class MultiAccountFunnelManager:
 
         passed = len(rejection_reasons) == 0
         return passed, rejection_reasons
-
