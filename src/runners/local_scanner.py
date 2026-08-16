@@ -1177,12 +1177,18 @@ class LocalScannerRunner:
 
             if self.retrain_loop: self.retrain_loop.run_if_due()
             # ── Counterfactual Agent Shadow Trade Evaluation ───────────────
+            # Poll incoming Telegram commands (/report, /kill, inline buttons)
+            if hasattr(self, 'tg') and self.tg:
+                self.tg_offset = getattr(self, 'tg_offset', None)
+                self.tg_offset = self.tg.poll_updates_and_dispatch(self.tg_offset)
+
             try:
                 resolved = self.counterfactual_tracker.evaluate_open_shadow_trades(self.scanner)
                 if resolved > 0:
                     logger.info(f"👻 Counterfactual Agents resolved {resolved} shadow trades this cycle.")
             except Exception as _cf_err:
                 logger.error(f"Counterfactual evaluation error: {_cf_err}")
+
 
             self._print_market_overview()
 

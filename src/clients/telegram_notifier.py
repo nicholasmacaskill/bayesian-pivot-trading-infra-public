@@ -416,7 +416,98 @@ class TelegramNotifier:
             logger.error(f"TG getUpdates failed: {e}")
             return None
 
+    def send_executive_report_to_telegram(self):
+        """Generates and sends the daily executive portfolio report directly to Telegram."""
+        from src.clients.tl_client import TradeLockerClient
+        from src.engines.multi_account_funnel import MultiAccountFunnelManager
+        from src.engines.counterfactual_tracker import CounterfactualTracker
+        from src.engines.qa_quant_agent import QAQuantAgent
+
+        tl = TradeLockerClient()
+        funnel = MultiAccountFunnelManager()
+        tracker = CounterfactualTracker()
+        qa = QAQuantAgent()
+
+        total_equity = tl.get_total_equity()
+        open_positions = tl.get_open_positions()
+        summary = tracker.get_counterfactual_summary()
+        health = qa.audit_portfolio_health(total_equity, open_positions)
+
+        msg = (
+            f"📊 <b>BAYESIAN PIVOT — EXECUTIVE REPORT</b>\n"
+            f"⏰ <code>{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</code>\n\n"
+            f"🏛️ <b>Total Portfolio NAV:</b> <code>${total_equity:,.2f}</code>\n"
+            f"📈 <b>Active Open Trades:</b> <code>{len(open_positions)}</code>\n"
+            f"🛡️ <b>Portfolio Health:</b> <code>{health['status']}</code>\n\n"
+            f"👻 <b>COUNTERFACTUAL SHADOW ENGINE</b>\n"
+            f"• Trades Audited: <code>{summary.get('total_shadow_trades', 0)}</code>\n"
+            f"• Prevented Losses: <code>${summary.get('prevented_losses_usd', 0.0):,.2f}</code>\n"
+            f"• Net Filter Impact: <code>${summary.get('net_filter_impact_usd', 0.0):,.2f}</code>\n\n"
+            f"⚡ <i>8 Active Mandates Provisioned & Hardened.</i>"
+        )
+        
+        buttons = [
+            [{"text": "🚨 EMERGENCY KILL SWITCH", "callback_data": "btn_kill"}]
+        ]
+        self._send_message(msg, buttons=buttons)
+
+    def poll_updates_and_dispatch(self, offset=None):
+        """
+        Polls Telegram updates for commands (/report, /kill, /status) or inline buttons,
+        and executes requested actions.
+        """
+        if not self.bot_token or not self.chat_id:
+            return offset
+
+        try:
+            params = {"limit": 50, "allowed_updates": ["message", "callback_query"]}
+            if offset:
+                params["offset"] = offset
+
+            resp = requests.get(f"{self.base_url}/getUpdates", params=params, timeout=5)
+            if resp.status_code != 200:
+                return offset
+
+            results = resp.json().get("result", [])
+            new_offset = offset
+
+            for upd in results:
+                upd_id = upd.get("update_id")
+                if upd_id:
+                    new_offset = upd_id + 1
+
+                # Check text message
+                msg = upd.get("message", {})
+                chat_id = str(msg.get("chat", {}).get("id"))
+                text = str(msg.get("text", "")).strip().lower()
+
+                # Check callback query (button click)
+                cb = upd.get("callback_query", {})
+                cb_data = str(cb.get("data", "")).strip().lower()
+                cb_chat = str(cb.get("message", {}).get("chat", {}).get("id"))
+
+                if (chat_id == str(self.chat_id) and text) or (cb_chat == str(self.chat_id) and cb_data):
+                    target_cmd = text if text else cb_data
+
+                    if target_cmd in ["/report", "btn_report", "/status", "btn_status"]:
+                        logger.info("📱 Telegram Command Received: /report. Generating Executive Summary...")
+                        self.send_executive_report_to_telegram()
+
+                    elif target_cmd in ["/kill", "btn_kill", "/emergency_kill"]:
+                        logger.warning("🚨 Telegram Emergency Kill Command Received! Executing portfolio wipe...")
+                        from scripts.maintenance.emergency_kill_switch import execute_emergency_kill_switch
+                        self._send_message("🚨 <b>EMERGENCY KILL SWITCH TRIGGERED VIA TELEGRAM</b>\nLiquidating all open positions across all 8 accounts...")
+                        execute_emergency_kill_switch()
+                        self._send_message("✅ <b>EMERGENCY LIQUIDATION COMPLETE.</b> All open positions closed across all 8 account mandates.")
+
+            return new_offset
+
+        except Exception as e:
+            logger.error(f"Telegram polling error: {e}")
+            return offset
+
     def send_photo(self, photo_path, caption=None):
+
         try:
             with open(photo_path, 'rb') as f:
                 payload = {'chat_id': self.chat_id}
