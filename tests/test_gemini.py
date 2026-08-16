@@ -7,7 +7,10 @@ if not api_key:
 else:
     try:
         client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(model='gemini-2.0-flash', contents="Say 'AI Active'")
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents='Explain how AI works in one sentence.'
+        )
         print(f"✅ Response: {response.text}")
     except Exception as e:
         print(f"❌ Gemini Error: {e}")

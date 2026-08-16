@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://lvgmstnjcznggbqcgwnk.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2Z21zdG5qY3puZ2dicWNnd25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDg4NjksImV4cCI6MjA4Mzk4NDg2OX0.uINR6vRQ8LV7m5tZJ23Ii7J3DVImx9cA5GP7vESBv7U'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lvgmstnjcznggbqcgwnk.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2Z21zdG5qY3puZ2dicWNnd25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDg4NjksImV4cCI6MjA4Mzk4NDg2OX0.uINR6vRQ8LV7m5tZJ23Ii7J3DVImx9cA5GP7vESBv7U'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
 
 // Database types (auto-generated from schema)
 export type JournalEntry = {

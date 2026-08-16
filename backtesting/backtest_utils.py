@@ -39,10 +39,16 @@ class DataManager:
             df.columns = df.columns.get_level_values(0)
             
         df = df.reset_index()
-        # Rename whatever the first column is (usually 'Datetime' or 'Date')
-        df = df.rename(columns={df.columns[0]: 'timestamp', 'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'})
+        # Explicitly map timestamp column and lowercase OHLCV columns
+        timestamp_col = df.columns[0]
+        col_rename_map = {timestamp_col: 'timestamp'}
+        for c in df.columns:
+            if str(c).capitalize() in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                col_rename_map[c] = str(c).lower()
+        df = df.rename(columns=col_rename_map)
         df['timestamp'] = pd.to_datetime(df['timestamp']).dt.tz_localize(None)
         df.to_csv(cache_file, index=False)
+
         print(f"✅ Cached {len(df)} candles to {cache_file}")
         return df
 
@@ -376,12 +382,15 @@ class VectorizedIndicators:
 class NewsSimulator:
     """Simulates historical red folder events for backtesting."""
     @staticmethod
-    def add_news_blackouts(df, impact_prob=0.01):
+    def add_news_blackouts(df, impact_prob=0.01, seed=42):
         """
         Adds news blackout windows. 
         Since historical calendar access is limited, we simulate 'Red Folders' 
         aligned with NY Open (13:30 UTC) and London Open (07:00 UTC) with 40% probability.
         """
+        if seed is not None:
+            np.random.seed(seed)
+
         df['is_news_event'] = False
         
         # Static events for NY Open / London Open
@@ -394,3 +403,4 @@ class NewsSimulator:
         # Expand blackout to 30m before and after
         df['news_blackout'] = df['is_news_event'].rolling(window=13, center=True).max().fillna(0).astype(bool)
         return df
+

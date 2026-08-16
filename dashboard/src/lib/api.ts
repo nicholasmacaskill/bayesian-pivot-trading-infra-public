@@ -1,6 +1,7 @@
-const BASE_URL = "https://nicholasmacaskill--smc-alpha-scanner";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://nicholasmacaskill--smc-alpha-scanner";
 
 const getUrl = (endpoint: string) => `${BASE_URL}-${endpoint}.modal.run`;
+
 
 // Supabase Integration for Real-Time Data
 import { supabase } from './supabase';

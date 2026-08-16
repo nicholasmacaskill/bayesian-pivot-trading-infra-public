@@ -157,8 +157,9 @@ class SovereignAIHub:
             from PIL import Image
             contents.append(Image.open(image_path))
         
-        # Updated model priority: 2.5-flash (best quality), 2.0-flash (faster/cheaper)
-        for model in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']:
+        # Updated model priority: 2.5-flash, 1.5-flash, 1.5-pro
+        for model in ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']:
+
             try:
                 response = self.gemini_client.models.generate_content(
                     model=model,

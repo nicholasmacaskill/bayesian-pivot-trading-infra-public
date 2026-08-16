@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import itertools
 import sys
 import os
 
@@ -10,12 +11,16 @@ sys.path.insert(0, SMC_ROOT)
 from backtesting.backtest_utils import DataManager, VectorizedIndicators, NewsSimulator
 
 class SniperBacktest:
-    def __init__(self, symbol='BTC/USDT', days=30, timeframe='5m'):
+    def __init__(self, symbol='BTC/USDT', days=30, timeframe='5m', seed=42):
         self.symbol = symbol
         self.data_manager = DataManager()
         self.indicators = VectorizedIndicators()
         self.days = days
         self.timeframe = timeframe
+        self.seed = seed
+        if self.seed is not None:
+            np.random.seed(self.seed)
+
         # Candle multiplier: how many candles = 4 hours
         self.candles_per_4h = {'5m': 48, '15m': 16, '1h': 4, '4h': 1}.get(timeframe, 4)
         # Swing lookback in candles (20 × 4h periods)
@@ -253,8 +258,9 @@ class SniperBacktest:
 
         # Consecutive win/loss streaks
         streaks = (df['pnl_r'] > 0).astype(int)
-        max_consec_wins  = max((sum(1 for _ in g) for k, g in __import__('itertools').groupby(streaks) if k == 1), default=0)
-        max_consec_loss  = max((sum(1 for _ in g) for k, g in __import__('itertools').groupby(streaks) if k == 0), default=0)
+        max_consec_wins  = max((sum(1 for _ in g) for k, g in itertools.groupby(streaks) if k == 1), default=0)
+        max_consec_loss  = max((sum(1 for _ in g) for k, g in itertools.groupby(streaks) if k == 0), default=0)
+
 
         # SMT breakdown
         smt_trades = df[df['smt'] == True]
