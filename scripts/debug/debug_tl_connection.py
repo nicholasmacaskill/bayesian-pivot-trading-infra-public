@@ -17,23 +17,39 @@ logger = logging.getLogger(__name__)
 def debug_connection():
     print("\n--- DEBUG TL CONNECTION ---")
     
-    # Define Accounts
-    accounts = [
-        {
-            "name": "Account A",
-            "email": os.environ.get("TRADELOCKER_EMAIL_A") or os.environ.get("TRADELOCKER_EMAIL"),
-            "password": os.environ.get("TRADELOCKER_PASSWORD_A") or os.environ.get("TRADELOCKER_PASSWORD"),
-            "server": os.environ.get("TRADELOCKER_SERVER_A") or os.environ.get("TRADELOCKER_SERVER"),
-            "base": os.environ.get("TRADELOCKER_BASE_URL_A") or os.environ.get("TRADELOCKER_BASE_URL")
-        },
-        {
-            "name": "Account B",
-            "email": os.environ.get("TRADELOCKER_EMAIL_B"),
-            "password": os.environ.get("TRADELOCKER_PASSWORD_B"),
-            "server": os.environ.get("TRADELOCKER_SERVER_B"),
-            "base": os.environ.get("TRADELOCKER_BASE_URL_B")
-        }
-    ]
+    # Define Accounts dynamically (Account A, B, C...)
+    import string
+    accounts = []
+    default_server = os.environ.get("TRADELOCKER_SERVER_A") or os.environ.get("TRADELOCKER_SERVER", "UPCOMS")
+    default_base = os.environ.get("TRADELOCKER_BASE_URL_A") or os.environ.get("TRADELOCKER_BASE_URL", "https://demo.tradelocker.com")
+    
+    suffixes = [""] + [f"_{c}" for c in string.ascii_uppercase]
+    seen_emails = set()
+    
+    for suffix in suffixes:
+        if suffix == "":
+            email = os.environ.get("TRADELOCKER_EMAIL")
+            password = os.environ.get("TRADELOCKER_PASSWORD")
+            server = os.environ.get("TRADELOCKER_SERVER") or default_server
+            base = os.environ.get("TRADELOCKER_BASE_URL") or default_base
+            name = "Account Legacy"
+        else:
+            email = os.environ.get(f"TRADELOCKER_EMAIL{suffix}")
+            password = os.environ.get(f"TRADELOCKER_PASSWORD{suffix}")
+            server = os.environ.get(f"TRADELOCKER_SERVER{suffix}") or default_server
+            base = os.environ.get(f"TRADELOCKER_BASE_URL{suffix}") or default_base
+            name = f"Account {suffix.strip('_')}"
+            
+        if email and password and email.strip() not in seen_emails:
+            seen_emails.add(email.strip())
+            accounts.append({
+                "name": name,
+                "email": email,
+                "password": password,
+                "server": server,
+                "base": base
+            })
+
 
     for acc in accounts:
         name = acc['name']

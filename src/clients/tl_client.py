@@ -315,36 +315,88 @@ class TradeLockerHelper:
             return []
 
     def place_order(self, instrument_id, side, qty, stop_loss=None, take_profit=None, order_type="market", price=0.0):
-        """Stealth Order Execution Module"""
-        if not self.access_token and not self.login(): return False
-        try:
-            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/orders"
-            payload = {
-                "tradableInstrumentId": int(instrument_id),
-                "qty": float(qty),
-                "side": side.lower(),
-                "type": order_type.lower(),
-                "routeId": 2025730,
-                "validity": "IOC"
-            }
-            if order_type.lower() == "limit":
-                payload["price"] = float(price)
-            else:
-                payload["price"] = 0.0
-                
-            if stop_loss: payload["stopLoss"] = float(stop_loss)
-            if take_profit: payload["takeProfit"] = float(take_profit)
-            
-            resp = requests.post(url, json=payload, headers=self._get_headers(auth=True), timeout=10)
-            if resp.status_code in [200, 201]:
-                logger.info(f"✅ Order Executed: {side} {qty} on {instrument_id}")
-                return resp.json()
-            else:
-                logger.error(f"❌ Order Failed: {resp.status_code} - {resp.text}")
-                return False
-        except Exception as e:
-            logger.error(f"Order Exception: {e}")
+        """Stealth & Idempotent Order Execution Module"""
+        import time
+        from src.engines.multi_account_funnel import align_lot_size
+
+        if not self.access_token and not self.login(): 
             return False
+
+        # 1. Align Lot Size with Broker Metadata Step Constraints
+        aligned_qty = align_lot_size(qty, min_lot=0.01, lot_step=0.01)
+        if aligned_qty <= 0:
+            logger.error(f"❌ Order Rejected: Quantity {qty} below min lot (0.01)")
+            return False
+
+        url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/orders"
+        payload = {
+            "tradableInstrumentId": int(instrument_id),
+            "qty": float(aligned_qty),
+            "side": side.lower(),
+            "type": order_type.lower(),
+            "routeId": 2025730,
+            "validity": "IOC"
+        }
+        if order_type.lower() == "limit":
+            payload["price"] = float(price)
+        else:
+            payload["price"] = 0.0
+
+        if stop_loss: payload["stopLoss"] = float(stop_loss)
+        if take_profit: payload["takeProfit"] = float(take_profit)
+
+        for attempt in range(2):
+            try:
+                resp = requests.post(url, json=payload, headers=self._get_headers(auth=True), timeout=8)
+                
+                # Dynamic Rate Limiting (HTTP 429)
+                if resp.status_code == 429:
+                    retry_after = float(resp.headers.get("Retry-After", 2.0))
+                    logger.warning(f"⚠️ Rate limited (HTTP 429). Sleeping {retry_after}s...")
+                    time.sleep(retry_after)
+                    continue
+
+                # Unhandled 401 Re-Auth
+                if resp.status_code == 401 and attempt == 0:
+                    logger.warning(f"401 Unauthorized during place_order. Refreshing token...")
+                    if self.login():
+                        continue
+                    return False
+
+                if resp.status_code in [200, 201]:
+                    logger.info(f"✅ Order Executed: {side} {aligned_qty} on {instrument_id}")
+                    return resp.json()
+                elif resp.status_code in [500, 502, 503, 504]:
+                    # Server timeout/gateway error: check if order hit book before retrying
+                    logger.warning(f"⚠️ Broker server error ({resp.status_code}). Checking for filled open position...")
+                    time.sleep(1.0)
+                    open_pos = self.get_open_positions()
+                    if open_pos:
+                        for p in open_pos:
+                            if str(p.get("tradableInstrumentId")) == str(instrument_id) and str(p.get("side")).lower() == side.lower():
+                                logger.info(f"✅ Idempotent Reconciliation: Order already filled during timeout!")
+                                return p
+                    # If position not found, retry once
+                    continue
+                else:
+                    logger.error(f"❌ Order Failed: {resp.status_code} - {resp.text}")
+                    return False
+
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                logger.warning(f"⚠️ Network timeout during order dispatch: {e}. Reconciling position state...")
+                time.sleep(1.0)
+                open_pos = self.get_open_positions()
+                if open_pos:
+                    for p in open_pos:
+                        if str(p.get("tradableInstrumentId")) == str(instrument_id) and str(p.get("side")).lower() == side.lower():
+                            logger.info(f"✅ Idempotent Reconciliation: Order filled despite timeout!")
+                            return p
+                if attempt == 1:
+                    logger.error(f"❌ Network dispatch failed after reconciliation.")
+                    return False
+
+        return False
+
 
     def get_todays_trades_count(self):
         """Simplified trade count for verification."""
@@ -352,32 +404,41 @@ class TradeLockerHelper:
         return 0 # Placeholder for brevity in verification
 
 class TradeLockerClient:
-    """Wrapper that manages multiple TradeLocker accounts (A, B, etc.) and aggregates equity."""
+    """Wrapper that manages multiple TradeLocker accounts (A, B, C, etc.) and aggregates equity."""
     def __init__(self):
         self.helpers = []
+        import string
         
-        # Account A (Primary/Legacy)
-        email_a = os.environ.get("TRADELOCKER_EMAIL_A") or os.environ.get("TRADELOCKER_EMAIL")
-        pass_a = os.environ.get("TRADELOCKER_PASSWORD_A") or os.environ.get("TRADELOCKER_PASSWORD")
-        server_a = os.environ.get("TRADELOCKER_SERVER_A") or os.environ.get("TRADELOCKER_SERVER")
-        base_url_a = os.environ.get("TRADELOCKER_BASE_URL_A") or os.environ.get("TRADELOCKER_BASE_URL", "https://demo.tradelocker.com")
+        default_server = os.environ.get("TRADELOCKER_SERVER_A") or os.environ.get("TRADELOCKER_SERVER", "UPCOMS")
+        default_base_url = os.environ.get("TRADELOCKER_BASE_URL_A") or os.environ.get("TRADELOCKER_BASE_URL", "https://demo.tradelocker.com")
         
-        if email_a and pass_a:
-            self.helpers.append(TradeLockerHelper(email_a, pass_a, server_a, base_url_a))
-            
-        # Account B (Secondary)
-        email_b = os.environ.get("TRADELOCKER_EMAIL_B")
-        pass_b = os.environ.get("TRADELOCKER_PASSWORD_B")
-        server_b = os.environ.get("TRADELOCKER_SERVER_B") or server_a # Fallback to Server A if not specified
-        base_url_b = os.environ.get("TRADELOCKER_BASE_URL_B") or base_url_a # Fallback to Base URL A
+        seen_emails = set()
+        suffixes = [""] + [f"_{c}" for c in string.ascii_uppercase]
         
-        if email_b and pass_b:
-            self.helpers.append(TradeLockerHelper(email_b, pass_b, server_b, base_url_b))
+        for suffix in suffixes:
+            if suffix == "":
+                email = os.environ.get("TRADELOCKER_EMAIL")
+                password = os.environ.get("TRADELOCKER_PASSWORD")
+                server = os.environ.get("TRADELOCKER_SERVER") or default_server
+                base_url = os.environ.get("TRADELOCKER_BASE_URL") or default_base_url
+            else:
+                email = os.environ.get(f"TRADELOCKER_EMAIL{suffix}")
+                password = os.environ.get(f"TRADELOCKER_PASSWORD{suffix}")
+                server = os.environ.get(f"TRADELOCKER_SERVER{suffix}") or default_server
+                base_url = os.environ.get(f"TRADELOCKER_BASE_URL{suffix}") or default_base_url
+
+            if email and password and email.strip() not in seen_emails:
+                seen_emails.add(email.strip())
+                self.helpers.append(TradeLockerHelper(email, password, server, base_url))
+
 
     def get_open_positions(self):
-        """Aggregates open positions from all accounts."""
+        """Aggregates open positions from all accounts with rate-limit pacing."""
+        import time
         all_trades = []
-        for helper in self.helpers:
+        for i, helper in enumerate(self.helpers):
+            if i > 0:
+                time.sleep(0.05) # 50ms pacing between account queries
             trades = helper.get_open_positions()
             if trades:
                 all_trades.extend(trades)
@@ -385,11 +446,15 @@ class TradeLockerClient:
 
     def get_total_equity(self):
         """Returns Total Equity across ALL UNIQUE accounts. Defaults to $100k if offline."""
+        import time
         total_equity = 0.0
         seen_account_ids = set()
         
         for i, helper in enumerate(self.helpers):
+            if i > 0:
+                time.sleep(0.05) # 50ms pacing between account queries
             # We need to manually call login/fetch to get the account IDs
+
             if not helper.access_token:
                 helper.login()
                 
