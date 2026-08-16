@@ -2,10 +2,11 @@ from __future__ import annotations
 import json
 import logging
 import requests
-import os
-from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv('.env.local')
 
 logger = logging.getLogger(__name__)
+
 
 def _format_time_ago(minutes):
     if not isinstance(minutes, (int, float)) or minutes < 0:
