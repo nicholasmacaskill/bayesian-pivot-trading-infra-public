@@ -44,6 +44,8 @@ from src.engines.biometric_engine  import BiometricEngine
 from src.engines.news_catalyst_scanner import NewsCatalystScanner
 from src.engines.multi_account_funnel import MultiAccountFunnelManager
 from src.engines.counterfactual_tracker import CounterfactualTracker
+from src.engines.qa_quant_agent import QAQuantAgent
+
 
 
 
@@ -158,9 +160,11 @@ class LocalScannerRunner:
         self.news_catalyst = NewsCatalystScanner()
         self.ledger        = TradeLedger() if Config.get('LEDGER_ENABLED', True) else None
 
-        # ── Multi-Account Funnel Matrix & Counterfactual Tracker ─────
+        # ── Multi-Account Funnel Matrix, Counterfactual Tracker & QA Auditor ─────
         self.funnel_manager = MultiAccountFunnelManager()
         self.counterfactual_tracker = CounterfactualTracker()
+        self.qa_agent = QAQuantAgent()
+
 
 
         
