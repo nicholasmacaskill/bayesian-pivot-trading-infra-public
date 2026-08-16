@@ -453,7 +453,13 @@ class AIValidator:
             if not memory_context:
                 try:
                     from src.engines.retraining_loop import RetrainingLoop
-                    memory_context = RetrainingLoop().get_few_shot_context()
+                    cand_archetype = RetrainingLoop.classify_trade_archetype(
+                        pattern=setup.get('pattern', ''),
+                        regime=regime,
+                        hurst=hurst_exponent if hurst_exponent is not None else 0.50,
+                        symbol=setup.get('symbol', 'BTC/USD')
+                    )
+                    memory_context = RetrainingLoop().get_few_shot_context(target_archetype=cand_archetype)
                 except Exception as e:
                     pass
             safe_memory = memory_context if memory_context else "No highly similar historical setups found for reference."

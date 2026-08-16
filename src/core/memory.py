@@ -18,13 +18,22 @@ class SetupMemory:
 
     def textualize_setup(self, setup):
         """
-        Converts a technical setup dict into a descriptive string for embedding.
+        Converts a technical setup dict into a descriptive forensic string for semantic embedding.
         """
         try:
             symbol = setup.get('symbol', 'Unknown')
             pattern = setup.get('pattern', 'Unknown')
             direction = setup.get('direction', 'Unknown')
             smt = setup.get('smt_strength', 0.0)
+            
+            # 1. Archetype Classification
+            from src.engines.retraining_loop import RetrainingLoop
+            archetype = RetrainingLoop.classify_trade_archetype(
+                pattern=pattern,
+                regime=setup.get('regime', ''),
+                hurst=setup.get('hurst', 0.50),
+                symbol=symbol
+            )
             
             # Extract Session Phase
             quartile = setup.get('time_quartile', {})
@@ -35,10 +44,11 @@ class SetupMemory:
             
             # Construct Technical Narrative
             narrative = (
-                f"{symbol} {direction} Setup: {pattern}. "
+                f"[{archetype}] {symbol} {direction} Setup: {pattern}. "
                 f"Market Phase: {phase}. "
                 f"SMT Confluence: {smt}. "
                 f"Intermarket Context: {index_context}. "
+                f"Regime: {setup.get('regime', 'Neutral')} (Hurst: {setup.get('hurst', 0.50)}). "
                 f"News: {setup.get('news_context', 'Checked')}."
             )
             
