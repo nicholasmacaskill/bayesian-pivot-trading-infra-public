@@ -42,6 +42,9 @@ from src.engines.retraining_loop   import RetrainingLoop
 from src.engines.psychology_engine import PsychologyEngine
 from src.engines.biometric_engine  import BiometricEngine
 from src.engines.news_catalyst_scanner import NewsCatalystScanner
+from src.engines.multi_account_funnel import MultiAccountFunnelManager
+from src.engines.counterfactual_tracker import CounterfactualTracker
+
 
 
 # ── ICT Killzone Definitions (UTC hours) ─────────────────────────────────────
@@ -154,6 +157,11 @@ class LocalScannerRunner:
         self.regime_filter = RegimeFilter()
         self.news_catalyst = NewsCatalystScanner()
         self.ledger        = TradeLedger() if Config.get('LEDGER_ENABLED', True) else None
+
+        # ── Multi-Account Funnel Matrix & Counterfactual Tracker ─────
+        self.funnel_manager = MultiAccountFunnelManager()
+        self.counterfactual_tracker = CounterfactualTracker()
+
 
         
         # ── Biometrics & Psychology ───────────────────────────────────
@@ -957,6 +965,37 @@ class LocalScannerRunner:
                     base_pattern = setup.get('pattern', 'Unknown')
                     enriched_pattern = f"{hunt_label} — {base_pattern}"
 
+                    # ── Multi-Account Funnel Matrix & Counterfactual Agent Dispatch ──
+                    smt_val = market_context.get('DXY', {}).get('change_ltf', 0) if market_context else 0.0
+                    all_open_positions = self.tl_client.get_open_positions() if hasattr(self, 'tl_client') and self.tl_client else []
+                    
+                    for acc_key in ["ACCOUNT_A", "ACCOUNT_B", "ACCOUNT_C", "ACCOUNT_D", "ACCOUNT_E", "ACCOUNT_F", "ACCOUNT_G", "ACCOUNT_H"]:
+
+                        passed, rejection_reasons = self.funnel_manager.evaluate_setup_for_account(
+                            setup=setup,
+                            account_key=acc_key,
+                            hurst=hurst_val,
+                            smt_strength=smt_val,
+                            slippage_ratio=spread_to_atr if 'spread_to_atr' in locals() else 0.0,
+                            cal_safe=cal_safe,
+                            corr_ok=corr_ok,
+                            regime_allowed=regime_result.allowed,
+                            ai_score=live_score,
+                            open_positions=all_open_positions
+                        )
+
+
+                        if passed:
+                            logger.info(f"🎯 Setup PASSED Funnel Validator for {acc_key} ({symbol} {direction})")
+                        else:
+                            profile = self.funnel_manager.profiles[acc_key]
+                            self.counterfactual_tracker.register_shadow_trade(
+                                setup=setup,
+                                account_key=acc_key,
+                                strategy_mode=profile.strategy_mode,
+                                rejection_reasons=rejection_reasons
+                            )
+
                     # Threshold: Bayesian Pivot Standard (8.5)
                     is_asian_fade = setup.get('is_asian_fade', False)
                     if is_asian_fade:
@@ -965,6 +1004,7 @@ class LocalScannerRunner:
                         threshold = Config.AI_THRESHOLD_LONG if direction == 'LONG' else Config.AI_THRESHOLD_SHORT
 
                     if live_score >= threshold:
+
                         setups_found += 1
                         self._last_signal_time = datetime.now(timezone.utc)
 
@@ -1132,7 +1172,16 @@ class LocalScannerRunner:
                 if self.ledger: self._audit_rogue_ledger()
 
             if self.retrain_loop: self.retrain_loop.run_if_due()
+            # ── Counterfactual Agent Shadow Trade Evaluation ───────────────
+            try:
+                resolved = self.counterfactual_tracker.evaluate_open_shadow_trades(self.scanner)
+                if resolved > 0:
+                    logger.info(f"👻 Counterfactual Agents resolved {resolved} shadow trades this cycle.")
+            except Exception as _cf_err:
+                logger.error(f"Counterfactual evaluation error: {_cf_err}")
+
             self._print_market_overview()
+
 
             if setups_found == 0:
                 btc_bias = self.scanner.get_detailed_bias("BTC/USD", index_context=market_context)

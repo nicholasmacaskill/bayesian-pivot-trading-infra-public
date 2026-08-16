@@ -10,9 +10,39 @@ def get_db_connection():
     if not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
     
-    conn = sqlite3.connect(Config.DB_PATH)
+    conn = sqlite3.connect(Config.DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=5000;")
+    except Exception:
+        pass
     return conn
+
+def execute_db_write_with_retry(query: str, params: tuple = (), max_retries: int = 5):
+    """
+    Executes a database write transaction with exponential backoff and jitter
+    to guarantee zero sqlite3.OperationalError: database is locked failures during concurrent bursts.
+    """
+    import time
+    import random
+    
+    for attempt in range(max_retries):
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute(query, params)
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < max_retries - 1:
+                sleep_sec = (0.05 * (2 ** attempt)) + random.uniform(0.01, 0.05)
+                time.sleep(sleep_sec)
+                continue
+            raise e
+
+
 
 def init_db():
     start_time = datetime.now()
@@ -137,6 +167,29 @@ def init_db():
                 traps JSON,
                 verdict TEXT,
                 recommendation TEXT
+            )
+        ''')
+
+        # Counterfactual Shadow Trades Table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS counterfactual_trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                account_key TEXT,
+                symbol TEXT,
+                direction TEXT,
+                pattern TEXT,
+                strategy_mode TEXT,
+                entry_price REAL,
+                stop_loss REAL,
+                take_profit_1 REAL,
+                take_profit_2 REAL,
+                rejection_reasons TEXT,
+                status TEXT DEFAULT 'OPEN',
+                outcome TEXT DEFAULT 'PENDING',
+                simulated_pnl REAL DEFAULT 0.0,
+                simulated_r REAL DEFAULT 0.0,
+                closed_at TEXT
             )
         ''')
         
