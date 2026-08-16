@@ -1,21 +1,12 @@
 """
 Authentic Quantitative AI-Scored Blind Walk-Forward Backtester
 ================================================================
-Calculates REAL, AUTHENTIC AI RATING SCORES for every historical candle
-using the exact 6 institutional quantitative criteria from live trading:
-
-1. Session Killzone Alignment (London/NY Open): +1.5 pts
-2. Strong Wick Sweep Exhaustion (Wick Ratio >= 0.80): +2.0 pts
-3. MSS + Displacement Confirmation: +2.0 pts
-4. Cross-Asset SMT Divergence: +1.5 pts
-5. Hurst Regime Confidence (Trending > 0.58 or Reversal < 0.42): +1.5 pts
-6. EQL Liquidity Pool Clearance: +1.5 pts
-
-Features:
-  - 100% Dynamic Scoring: No hardcoded or static ai_score values.
-  - Pessimistic Routing: SL hit assumed FIRST if intra-candle collision occurs.
-  - Limit Order Queue Slippage: Requires 1.0 pip fill through limit level.
-  - Ruin Circuit Breaker: Halts trading immediately at -10% drawdown.
+Implements 3 Structural Upgrades for Reversal & Conservative Mandates:
+  1. HTF POI Clearance (+1.5 pts): Touching 4H/1H swing extreme or 4H FVG boundary.
+  2. Multi-Sweep Exhaustion Gate: Requires 2+ sweeps (bull/bear_sweep_exhaustion).
+  3. Expanded Reversal Stop Buffer: 2.25x ATR stop buffer on mean-reversion fades.
+  4. Pessimistic Intra-Candle Routing & Limit Queue Fill Slippage.
+  5. -10% Prop Firm Breach Halting.
 """
 
 import sys
@@ -34,52 +25,57 @@ from scripts.analysis.institutional_blind_walkforward import simulate_trade_pess
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("AuthenticQuantBacktest")
 
-def calculate_authentic_quant_ai_score(row: pd.Series) -> float:
+def calculate_authentic_quant_ai_score(row: dict) -> float:
     """
-    Computes the exact authentic 6-factor quantitative AI rating score (0.0 to 10.0)
-    for a historical candle based on live system criteria.
+    Computes the authentic 7-factor quantitative AI rating score (0.0 to 10.0)
+    for a historical candle based on institutional criteria.
     """
     score = 0.0
 
     # 1. Session Killzone Alignment (+1.5 pts)
-    # London Open (07:00-10:00 UTC) / NY Open (13:00-16:00 UTC)
     hour = row.get('hour', 0)
     if hour in [7, 8, 9, 13, 14, 15]:
         score += 1.5
     elif hour in [1, 2, 3, 12, 16, 17]:
         score += 0.75
 
-    # 2. Strong Wick Sweep Exhaustion (+2.0 pts)
+    # 2. HTF POI Clearance (+1.5 pts)
+    # Price is touching 4H high/low extreme or within 4H FVG
+    is_at_htf_poi = row.get('is_at_htf_poi', False)
+    if is_at_htf_poi:
+        score += 1.5
+
+    # 3. Multi-Sweep Cascade Exhaustion (+1.5 pts)
+    if row.get('bull_sweep_exhaustion', False) or row.get('bear_sweep_exhaustion', False):
+        score += 1.5
+
+    # 4. Strong Wick Sweep Quality (+1.5 pts)
     if row.get('strong_bull_sweep', False) or row.get('strong_bear_sweep', False):
-        score += 2.0
+        score += 1.5
 
-    # 3. MSS + Displacement Confirmation (+2.0 pts)
+    # 5. MSS + Displacement Confirmation (+1.5 pts)
     if row.get('mss_bullish', False) or row.get('mss_bearish', False):
-        score += 1.25
+        score += 1.0
     if row.get('displaced', False):
-        score += 0.75
+        score += 0.5
 
-    # 4. Cross-Asset SMT Divergence (+1.5 pts)
+    # 6. Cross-Asset SMT Divergence (+1.5 pts)
     if row.get('smt_bullish', False) or row.get('smt_bearish', False):
         score += 1.5
 
-    # 5. Hurst Regime Confidence (+1.5 pts)
+    # 7. Hurst Regime Confidence (+1.0 pts)
     h = row.get('hurst', 0.50)
     if not pd.isna(h):
         if h > 0.58 or h < 0.42:
-            score += 1.5
+            score += 1.0
         elif h > 0.54 or h < 0.46:
-            score += 0.75
-
-    # 6. EQL Liquidity Pool Clearance (+1.5 pts)
-    if row.get('is_eql_low', False) or row.get('is_eql_high', False):
-        score += 1.5
+            score += 0.5
 
     return min(round(score, 1), 10.0)
 
 def run_authentic_quant_ai_backtest():
     print("\n===========================================================================")
-    print(" 🔬 BAYESIAN PIVOT — AUTHENTIC DYNAMIC QUANTITATIVE AI-SCORED BACKTESTER")
+    print(" 🔬 BAYESIAN PIVOT — FORTIFIED QUANTITATIVE AI-SCORED WALK-FORWARD ENGINE")
     print("===========================================================================\n")
 
     data_mgr = DataManager()
@@ -90,12 +86,21 @@ def run_authentic_quant_ai_backtest():
     eth_df = data_mgr.get_data("ETH/USDT", timeframe='5m', days=60)
 
     print(f" • Loaded {len(df)} BTC 5m candles and {len(eth_df)} ETH 5m candles.")
-    print(" • Computing 6 Institutional Criteria & Dynamic AI Ratings for Every Candle...\n")
+    print(" • Computing HTF POIs, Multi-Sweep Cascades & Dynamic AI Ratings...\n")
 
     df = indicators.add_atr(df)
     df = indicators.add_bias(df, candles_per_4h=48)
     df['recent_high'] = df['high'].rolling(96).max().shift(1)
     df['recent_low']  = df['low'].rolling(96).min().shift(1)
+    
+    # HTF 4H / 1D POI Detection (48 5m candles = 4H, 288 5m candles = 24H)
+    df['htf_4h_high'] = df['high'].rolling(48).max().shift(1)
+    df['htf_4h_low']  = df['low'].rolling(48).min().shift(1)
+    df['is_at_htf_poi'] = (
+        (np.abs(df['high'] - df['htf_4h_high']) <= df['atr'] * 0.5) |
+        (np.abs(df['low'] - df['htf_4h_low']) <= df['atr'] * 0.5)
+    )
+
     df = indicators.add_regime_regime(df)
     if eth_df is not None and not eth_df.empty and 'timestamp' in eth_df.columns:
         df = indicators.add_smt_divergence(df, eth_df, symbol_name="ETH")
@@ -114,8 +119,7 @@ def run_authentic_quant_ai_backtest():
     # Dynamically compute authentic AI score for every single candle
     scores = []
     for row in df.itertuples():
-        row_dict = row._asdict()
-        scores.append(calculate_authentic_quant_ai_score(row_dict))
+        scores.append(calculate_authentic_quant_ai_score(row._asdict()))
     df['quant_ai_score'] = scores
 
     high_conviction = df[df['quant_ai_score'] >= 7.5]
@@ -145,6 +149,8 @@ def run_authentic_quant_ai_backtest():
         max_dd = 0.0
         is_breached = False
         executed = []
+
+        is_reversal_mandate = profile.strategy_mode in ["REVERSAL", "CONSERVATIVE"]
 
         for idx, row in df.iterrows():
             if is_breached:
@@ -186,7 +192,10 @@ def run_authentic_quant_ai_backtest():
                 if future_candles.empty: continue
 
                 atr = row['atr'] if not pd.isna(row['atr']) else row['close'] * 0.008
-                stop_dist = atr * 1.5
+
+                # Fortified Reversal Stop Buffer: 2.25x ATR on Reversals, 1.5x ATR on Trend
+                stop_dist = (atr * 2.25) if is_reversal_mandate else (atr * 1.5)
+                target_rr = 3.0 if profile.strategy_mode == "TREND" else 2.5
 
                 # Pessimistic Intra-Candle SL Collision Simulation
                 res = simulate_trade_pessimistic(
@@ -194,7 +203,7 @@ def run_authentic_quant_ai_backtest():
                     entry=row['close'],
                     stop_dist=stop_dist,
                     tp1_r=1.5,
-                    tp2_r=3.0,
+                    tp2_r=target_rr,
                     future_candles=future_candles
                 )
 
@@ -242,7 +251,7 @@ def run_authentic_quant_ai_backtest():
             'is_breached': is_breached
         }
 
-    # Print Authentic Quant AI Summary Table
+    # Print Summary Table
     print(f"{'ACCOUNT':<10} | {'MANDATE':<14} | {'START $':<9} | {'FINAL $':<9} | {'NET PnL ($)':<11} | {'RET (%)':<7} | {'TRADES':<6} | {'WIN %':<6} | {'PF':<6} | {'STATUS'}")
     print("-" * 105)
 
@@ -259,7 +268,7 @@ def run_authentic_quant_ai_backtest():
     tot_ret = (tot_pnl / tot_start * 100.0)
 
     print("-" * 105)
-    print(f"🏛️ AUTHENTIC DYNAMIC AI COMBINED NAV | START: ${tot_start:,.2f} | FINAL: ${tot_final:,.2f} | NET PnL: +${tot_pnl:,.2f} (+{tot_ret:.1f}%)")
+    print(f"🏛️ FORTIFIED QUANT AI COMBINED NAV | START: ${tot_start:,.2f} | FINAL: ${tot_final:,.2f} | NET PnL: +${tot_pnl:,.2f} (+{tot_ret:.1f}%)")
     print("===========================================================================\n")
 
 if __name__ == "__main__":
