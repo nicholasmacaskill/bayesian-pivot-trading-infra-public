@@ -1,0 +1,64 @@
+//@version=5
+strategy("Sovereign SMC — Trend Expansion Operator", overlay=true, initial_capital=50000, default_qty_type=strategy.percent_of_equity, default_qty_value=1.0)
+
+// ============================================================================
+// INPUT PARAMETERS
+// ============================================================================
+emaFastLen = input.int(20, "Fast EMA Length", group="Trend Parameters")
+emaSlowLen = input.int(50, "Slow EMA Length", group="Trend Parameters")
+atrLen     = input.int(14, "ATR Length", group="Risk Management")
+atrMult    = input.float(2.0, "ATR Stop Loss Multiplier", group="Risk Management")
+rrTarget   = input.float(3.0, "Risk-to-Reward Ratio (R:R)", group="Risk Management")
+
+// Time Filter
+useDateFilter = input.bool(true, "Use Date Range Filter", group="Time Window")
+startDate     = input.time(timestamp("2026-01-01 00:00 +0000"), "Start Date", group="Time Window")
+endDate       = input.time(timestamp("2026-12-31 23:59 +0000"), "End Date", group="Time Window")
+inDateRange   = useDateFilter ? (time >= startDate and time <= endDate) : true
+
+// ============================================================================
+// INDICATORS & CALCULATIONS
+// ============================================================================
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+atr     = ta.atr(atrLen)
+
+// Trend Direction
+isBullishTrend = emaFast > emaSlow and close > emaFast
+isBearishTrend = emaFast < emaSlow and close < emaFast
+
+// Fair Value Gap (FVG) Detection
+isBullishFVG = low[0] > high[2] and close[1] > high[2]
+isBearishFVG = high[0] < low[2] and close[1] < low[2]
+
+// Market Structure Shift (MSS)
+isBullishMSS = isBullishTrend and ta.crossover(close, ta.highest(high[1], 5))
+isBearishMSS = isBearishTrend and ta.crossunder(close, ta.lowest(low[1], 5))
+
+// Entry Signals
+longCondition  = isBullishTrend and isBullishFVG and inDateRange
+shortCondition = isBearishTrend and isBearishFVG and inDateRange
+
+// ============================================================================
+// STRATEGY EXECUTION & PAPER TRADING LOGIC
+// ============================================================================
+if (longCondition and strategy.position_size == 0)
+    stopLoss = close - (atr * atrMult)
+    takeProfit = close + (abs(close - stopLoss) * rrTarget)
+    strategy.entry("Long Trend Expansion", strategy.long)
+    strategy.exit("Exit Long", "Long Trend Expansion", stop=stopLoss, limit=takeProfit)
+
+if (shortCondition and strategy.position_size == 0)
+    stopLoss = close + (atr * atrMult)
+    takeProfit = close - (abs(stopLoss - close) * rrTarget)
+    strategy.entry("Short Trend Expansion", strategy.short)
+    strategy.exit("Exit Short", "Short Trend Expansion", stop=stopLoss, limit=takeProfit)
+
+// ============================================================================
+// VISUALIZATIONS
+// ============================================================================
+plot(emaFast, "EMA Fast (20)", color=color.blue, linewidth=2)
+plot(emaSlow, "EMA Slow (50)", color=color.orange, linewidth=2)
+
+plotshape(longCondition, title="Long Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
+plotshape(shortCondition, title="Short Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
