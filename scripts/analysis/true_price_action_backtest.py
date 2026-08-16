@@ -1,14 +1,15 @@
 """
-True Historical Price Action Backtester (Candle-by-Candle Simulation)
-=======================================================================
-Eliminates all look-ahead bias and placeholder AI score inferences.
-Cross-references every historical scanner setup against REAL CCXT/Binance 5m candles.
+True Historical Price Action Backtester (Exact 1-to-1 Timestamp Matching)
+==========================================================================
+Matches every historical setup in `bot_scans_supabase.json` (Feb 27-28, 2026)
+to its EXACT 1-to-1 historical 5-minute candle timestamp from Binance.
 
 Features:
-  1. Real Candle Simulation: Evaluates SL/TP hits candle-by-candle on actual price action.
-  2. Variable R-Multiple Accounting: Partial TPs, Breakeven Stops, and Spread Widening.
-  3. Realistic Transaction Costs: $7/lot round-turn commission + spread buffer.
-  4. Ruin Circuit Breaker: Halts trading immediately if an account hits -10% drawdown.
+  1. Exact Timestamp Alignment: Matches setup timestamps down to the minute.
+  2. Candle-by-Candle Simulation: Steps through future 5m candles to evaluate SL vs TP hits.
+  3. Variable R-Multiples: Partial TP1 locks, Breakeven Stop transitions, and Timed Exits.
+  4. Real Market Friction: 2 bps spread widening + 1.5 bps commission ($7/lot round-turn).
+  5. Prop Firm Ruin Circuit Breaker: Halts trading immediately if an account hits -10% drawdown.
 """
 
 import sys
@@ -17,28 +18,49 @@ import json
 import logging
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from backtesting.backtest_utils import DataManager
+import ccxt
 from src.engines.multi_account_funnel import MultiAccountFunnelManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("TruePABacktester")
 
-def load_candle_history(data_manager: DataManager, symbol: str, days: int = 60) -> pd.DataFrame:
-    """Fetches real historical candle data from CCXT / cache."""
-    try:
-        df = data_manager.get_data(symbol, timeframe='5m', days=days)
-        if df is not None and not df.empty:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            df = df.sort_values('timestamp').reset_index(drop=True)
-            return df
-    except Exception as e:
-        logger.warning(f"Failed fetching candles for {symbol}: {e}")
-    return pd.DataFrame()
+def fetch_exact_feb2026_candles(symbol: str = "BTC/USDT") -> pd.DataFrame:
+    """Fetches exact 5-minute candles covering Feb 27 - Mar 3, 2026 from Binance."""
+    cache_file = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", f"{symbol.replace('/', '_')}_feb2026_5m.csv")
+    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+
+    if os.path.exists(cache_file):
+        df = pd.read_csv(cache_file)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        return df
+
+    logger.info(f"📥 Fetching exact Feb 27 - Mar 3, 2026 {symbol} 5m candles from Binance...")
+    exchange = ccxt.binance()
+    start_ts = int(datetime(2026, 2, 27, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    end_ts   = int(datetime(2026, 3, 3, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
+
+    all_ohlcv = []
+    curr = start_ts
+    while curr < end_ts:
+        try:
+            candles = exchange.fetch_ohlcv(symbol, '5m', since=curr, limit=1000)
+            if not candles: break
+            all_ohlcv.extend(candles)
+            curr = candles[-1][0] + 1
+        except Exception as e:
+            logger.warning(f"Error fetching candles: {e}")
+            break
+
+    df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms').dt.tz_localize(None)
+    df.to_csv(cache_file, index=False)
+    logger.info(f"✅ Cached {len(df)} exact historical candles to {cache_file}")
+    return df
 
 def simulate_setup_against_candles(
     setup: dict,
@@ -47,8 +69,7 @@ def simulate_setup_against_candles(
     comm_pct: float = 0.00015   # 1.5 bps commission ($7/lot)
 ) -> dict:
     """
-    Simulates a trade candle-by-candle against true future price action.
-    Returns exact realized R-multiple, exit reason, and net PnL R.
+    Simulates a trade candle-by-candle against exact historical price action.
     """
     if candle_df.empty or 'timestamp' not in candle_df.columns:
         return {'pnl_r': -1.0, 'exit_reason': 'NO_CANDLE_DATA'}
@@ -62,7 +83,7 @@ def simulate_setup_against_candles(
     elif hasattr(setup_time, 'tz_localize'):
         setup_time = setup_time.tz_localize(None)
 
-    # Find future candles starting from setup timestamp
+    # Find exact future candles starting from setup timestamp
     future = candle_df[candle_df['timestamp'] >= setup_time].head(288) # Up to 24 hours of 5m candles
     if len(future) < 2:
         return {'pnl_r': 0.0, 'exit_reason': 'TIMEOUT_EXPIRED'}
@@ -81,7 +102,7 @@ def simulate_setup_against_candles(
     # Target 2.5R payout
     tp2_price = entry_price + (stop_dist * 2.5) if is_long else entry_price - (stop_dist * 2.5)
 
-    # Apply Spread to Entry
+    # Apply Spread to Entry Price
     if is_long:
         entry_price *= (1 + spread_pct)
     else:
@@ -94,7 +115,7 @@ def simulate_setup_against_candles(
         if is_long:
             # Check Stop Loss
             if row.low <= stop_level:
-                pnl_r = -1.0 if not hit_tp1 else 0.5 # Partial profit lock if TP1 was hit
+                pnl_r = -1.0 if not hit_tp1 else 0.5 # Partial profit lock if TP1 hit
                 return {'pnl_r': pnl_r - (comm_pct * 100), 'exit_reason': 'STOP_LOSS_HIT'}
             # Check TP1 (Move stop to breakeven)
             if not hit_tp1 and row.high >= tp1_price:
@@ -116,7 +137,7 @@ def simulate_setup_against_candles(
             if hit_tp1 and row.low <= tp2_price:
                 return {'pnl_r': 2.5 - (comm_pct * 100), 'exit_reason': 'TAKE_PROFIT_FULL'}
 
-    # Timeout exit after 24h
+    # Timed Exit after 24 hours
     last_close = future['close'].iloc[-1]
     raw_return = (last_close - entry_price) / entry_price if is_long else (entry_price - last_close) / entry_price
     pnl_r = raw_return / (stop_dist / entry_price)
@@ -124,15 +145,13 @@ def simulate_setup_against_candles(
 
 def run_true_price_action_backtest():
     print("\n===========================================================================")
-    print(" 🔬 BAYESIAN PIVOT — TRUE HISTORICAL PRICE ACTION CANDLE BACKTESTER")
+    print(" 🔬 BAYESIAN PIVOT — TRUE 1-TO-1 TIMESTAMP HISTORICAL CANDLE BACKTESTER")
     print("===========================================================================\n")
 
-    data_mgr = DataManager()
-    print(" • Fetching Real 5m Historical Price Action Candles from CCXT/Binance...")
-    btc_candles = load_candle_history(data_mgr, "BTC/USDT", days=60)
-    eth_candles = load_candle_history(data_mgr, "ETH/USDT", days=60)
+    btc_candles = fetch_exact_feb2026_candles("BTC/USDT")
+    eth_candles = fetch_exact_feb2026_candles("ETH/USDT")
 
-    print(f" • Loaded {len(btc_candles)} BTC 5m candles | {len(eth_candles)} ETH 5m candles.")
+    print(f" • Loaded {len(btc_candles)} BTC 5m candles | {len(eth_candles)} ETH 5m candles (Feb 27 - Mar 3, 2026).")
 
     # Load scanner setups
     scans_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "bot_scans_supabase.json")
@@ -153,7 +172,7 @@ def run_true_price_action_backtest():
                     'smt': float(item.get('smt') or 0.20),
                 })
 
-    print(f" • Auditing {len(raw_setups)} Candidate Setups against True Future Candles...\n")
+    print(f" • Auditing {len(raw_setups)} Setups against Exact Timestamp 5m Candles...\n")
 
     # Simulate true price action outcomes for all setups
     audited_setups = []
