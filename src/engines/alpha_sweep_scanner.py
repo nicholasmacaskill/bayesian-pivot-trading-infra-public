@@ -16,7 +16,7 @@ class AlphaSweepScanner(SMCScanner):
 
     def is_premium_killzone(self, dt=None):
         """
-        Returns the active killzone label, or "OFF_HOURS" if outside premium windows.
+        Returns the active killzone label, or None if outside premium windows.
         Premium Killzones:
         - London Open: 07:00 - 10:00 UTC
         - NY Open: 12:00 - 15:00 UTC
@@ -32,7 +32,7 @@ class AlphaSweepScanner(SMCScanner):
             return "NY_OPEN"
         elif 4 <= hour < 7:
             return "ASIAN_FADE"
-        return "OFF_HOURS"
+        return None
 
     def find_htf_levels(self, df_1h, window=2):
         """
@@ -112,23 +112,12 @@ class AlphaSweepScanner(SMCScanner):
         # Gate regime using Hurst
         # Trending: H > 0.55
         # Mean Reverting: H < 0.45
-        # Transition: 0.45 <= H <= 0.55 (Pass-through with reduced risk)
-        is_trending = False
-        is_transition = False
-        if hurst > 0.55:
-            is_trending = True
-        elif hurst < 0.45:
-            pass
-        else:
-            is_transition = True
-            logger.warning(f"⚠️ TRANSITION REGIME (Hurst: {hurst:.3f}): Allowing setup with reduced risk.")
-        
-        # Calculate 24h High and Low for Premium/Discount evaluation
-        range_high = float(df_1h['high'].tail(24).max())
-        range_low = float(df_1h['low'].tail(24).min())
-        
-        from src.engines.regime_filter import RegimeFilter
-        rf = RegimeFilter()
+        # Random/Chop: 0.45 <= H <= 0.55 (Filtered out)
+        if 0.45 <= hurst <= 0.55:
+            logger.info(f"Regime is Random/Chop (Hurst: {hurst:.3f}). Setup blocked to maintain quality.")
+            return None
+            
+        is_trending = hurst > 0.55
         
         # Long Setup (Sweep of Support)
         for level in recent_lows:
@@ -140,16 +129,9 @@ class AlphaSweepScanner(SMCScanner):
                     # Wick rejection check (lower wick must be >= 30% of total candle range)
                     lower_wick = min(c_open, c_close) - c_low
                     if lower_wick / c_range >= 0.30:
-                        # HTF Trend Alignment Gate
-                        htf_ok, htf_reason = rf.check_htf_trend_alignment(df_1h, "LONG")
-                        if not htf_ok:
-                            logger.info(f"🚫 LONG sweep blocked: {htf_reason}")
-                            continue
-                            
-                        # Premium/Discount Zone Gate
-                        pd_ok, pd_reason = rf.check_premium_discount(c_close, range_low, range_high, "LONG")
-                        if not pd_ok:
-                            logger.info(f"🚫 LONG sweep blocked: {pd_reason}")
+                        # Trend alignment if trending
+                        if is_trending and trend != "UP":
+                            logger.info(f"Long setup blocked due to trend mismatch (Hurst: {hurst:.3f}, Trend: {trend})")
                             continue
                         
                         return {
@@ -173,16 +155,9 @@ class AlphaSweepScanner(SMCScanner):
                     # Wick rejection check (upper wick must be >= 30% of total candle range)
                     upper_wick = c_high - max(c_open, c_close)
                     if upper_wick / c_range >= 0.30:
-                        # HTF Trend Alignment Gate
-                        htf_ok, htf_reason = rf.check_htf_trend_alignment(df_1h, "SHORT")
-                        if not htf_ok:
-                            logger.info(f"🚫 SHORT sweep blocked: {htf_reason}")
-                            continue
-                            
-                        # Premium/Discount Zone Gate
-                        pd_ok, pd_reason = rf.check_premium_discount(c_close, range_low, range_high, "SHORT")
-                        if not pd_ok:
-                            logger.info(f"🚫 SHORT sweep blocked: {pd_reason}")
+                        # Trend alignment if trending
+                        if is_trending and trend != "DOWN":
+                            logger.info(f"Short setup blocked due to trend mismatch (Hurst: {hurst:.3f}, Trend: {trend})")
                             continue
                         
                         return {
@@ -198,17 +173,16 @@ class AlphaSweepScanner(SMCScanner):
                         
         return None
 
-
     def scan_symbol(self, symbol):
         """
         Runs the Bayesian Pivot Alpha scan on the given symbol.
         """
         killzone = self.is_premium_killzone()
-        is_premium = killzone != "OFF_HOURS"
-        if not is_premium:
-            logger.info(f"Scanning {symbol} in OFF_HOURS with reduced risk...")
-        else:
-            logger.info(f"Scanning {symbol} inside {killzone}...")
+        if not killzone:
+            logger.info(f"Skipping {symbol} scan: Outside premium Killzones.")
+            return None
+            
+        logger.info(f"Scanning {symbol} inside {killzone}...")
         
         # Fetch 1H and 5m data
         df_1h = self.fetch_data(symbol, '1h', limit=100, synchronized=False)
@@ -242,13 +216,6 @@ class AlphaSweepScanner(SMCScanner):
             risk_amt = getattr(Config, 'FIXED_RISK_USD', 100.0)
             if setup['direction'] == 'LONG':
                 risk_amt = risk_amt * getattr(Config, 'LONG_RISK_MULTIPLIER', 1.0)
-            if not is_premium:
-                risk_amt = risk_amt * getattr(Config, 'OFF_HOURS_RISK_MULTIPLIER', 0.5)
-                logger.info(f"📉 OFF-HOURS RISK ADJUSTMENT: Risk reduced to ${risk_amt:.2f} (50% of base)")
-            is_transition = setup.get('regime') == 'TRANSITION'
-            if is_transition:
-                risk_amt = risk_amt * getattr(Config, 'TRANSITION_RISK_MULTIPLIER', 0.5)
-                logger.warning(f"⚠️ TRANSITION REGIME RISK ADJUSTMENT: Risk reduced to ${risk_amt:.2f} (50% of base)")
                 
             max_risk = getattr(Config, 'MAX_RISK_USD', 150.0)
             if risk_amt > max_risk:
@@ -293,8 +260,7 @@ class AlphaSweepScanner(SMCScanner):
                 "killzone": killzone,
                 "hurst": setup['hurst'],
                 "smt_strength": 0.0,
-                "formations": f"Sweep of {setup['level']:.2f}",
-                "bias_conflict": is_transition
+                "formations": f"Sweep of {setup['level']:.2f}"
             }
             
             ai_result = {
@@ -318,7 +284,7 @@ class AlphaSweepScanner(SMCScanner):
                     reasoning=ai_result['reasoning'],
                     verdict="CONFIRMED",
                     session_info={"name": killzone, "phase": "EXECUTION"},
-                    bias_data={"daily": setup['trend'], "htf": setup['trend'], "dxy_trend": "N/A", "bias_conflict": is_transition},
+                    bias_data={"daily": setup['trend'], "htf": setup['trend'], "dxy_trend": "N/A"},
                     liquidity_targets={"target_price": setup['level'], "target_type": "SWING_LEVEL", "distance_pips": setup['sweep_dist']},
                     risk_calc={
                         "entry": entry_price,

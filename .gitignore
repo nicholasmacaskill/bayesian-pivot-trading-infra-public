@@ -76,3 +76,8 @@ src/sovereign_core/
 *.mp3
 *.png
 !README_images/*.png
+
+# Repomix & Codebase Exports
+repomix-output*
+codebase_pack_*
+

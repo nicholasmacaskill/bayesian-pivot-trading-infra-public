@@ -1,0 +1,1365 @@
+# TRADELOCKER TRADES LOG — LAST 3 MONTHS (MAY 14, 2026 - AUG 14, 2026)
+# Total Records: 104
+# Format: Tabular Text / Markdown & JSON Copy-Paste Ready
+
+| Trade ID | Account | Timestamp (UTC) | Symbol | Side | Qty/Lots | Entry Price | Close Price | Realized PnL ($) | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 288230376154480959 | s79qv3xetj@upcomers.com | 2026-08-08T14:30:02 | BTC/USD | SELL | 0.15 | 65170.36 | 64877.07 | $-43.99 | CLOSED |
+| 288230376154281885 | 498svcbpfi@upcomers.com | 2026-08-03T03:46:52 | BTC/USD | BUY | 0.2 | 63125.19 | 62744.51 | $-76.14 | CLOSED |
+| 288230376154146000 | 498svcbpfi@upcomers.com | 2026-07-28T23:41:32 | BTC/USD | SELL | 0.25 | 63797.14 | 63564.12 | $-58.25 | CLOSED |
+| 288230376154145996 | 498svcbpfi@upcomers.com | 2026-07-28T23:27:12 | BTC/USD | SELL | 0.25 | 63587.44 | 63558.79 | $-7.16 | CLOSED |
+| 288230376154102326 | s79qv3xetj@upcomers.com | 2026-07-28T00:10:59 | BTC/USD | BUY | 0.12 | 63853.19 | 63534.9 | $-38.19 | CLOSED |
+| 288230376154097190 | s79qv3xetj@upcomers.com | 2026-07-27T22:25:59 | BTC/USD | BUY | 0.12 | 65016.12 | 64601.03 | $-49.81 | CLOSED |
+| 288230376154058342 | 498svcbpfi@upcomers.com | 2026-07-26T22:00:13 | BTC/USD | SELL | 0.15 | 65088.87 | 64753.09 | $-50.37 | CLOSED |
+| 288230376154059335 | s79qv3xetj@upcomers.com | 2026-07-26T22:00:08 | BTC/USD | SELL | 0.15 | 65069.54 | 64733.06 | $-50.47 | CLOSED |
+| 288230376154054503 | s79qv3xetj@upcomers.com | 2026-07-26T15:19:18 | BTC/USD | SELL | 0.15 | 64782.8 | 64383.26 | $-59.93 | CLOSED |
+| 288230376154054589 | 498svcbpfi@upcomers.com | 2026-07-26T14:08:26 | BTC/USD | SELL | 0.15 | 64771.62 | 64372.15 | $-59.92 | CLOSED |
+| 288230376154051743 | 498svcbpfi@upcomers.com | 2026-07-25T17:38:24 | BTC/USD | BUY | 0.15 | 64172.46 | 64238.53 | $9.91 | CLOSED |
+| 288230376154048536 | s79qv3xetj@upcomers.com | 2026-07-25T17:38:15 | BTC/USD | BUY | 0.15 | 64180.32 | 64238.64 | $8.75 | CLOSED |
+| 288230376154001935 | s79qv3xetj@upcomers.com | 2026-07-24T04:06:54 | BTC/USD | BUY | 0.15 | 64889.42 | 65395.12 | $75.86 | CLOSED |
+| 288230376153971534 | s79qv3xetj@upcomers.com | 2026-07-23T12:33:11 | BTC/USD | BUY | 0.12 | 65754.2 | 65313.48 | $-52.89 | CLOSED |
+| 288230376153908905 | s79qv3xetj@upcomers.com | 2026-07-22T18:12:29 | BTC/USD | SELL | 0.12 | 66016.56 | 66674.68 | $78.97 | CLOSED |
+| 288230376153925348 | s79qv3xetj@upcomers.com | 2026-07-22T18:12:21 | BTC/USD | SELL | 0.12 | 66014.01 | 66316.6 | $36.31 | CLOSED |
+| 288230376153925470 | s79qv3xetj@upcomers.com | 2026-07-22T18:12:18 | BTC/USD | SELL | 0.12 | 66015.08 | 66298.87 | $34.05 | CLOSED |
+| 288230376153802839 | s79qv3xetj@upcomers.com | 2026-07-18T20:22:02 | BTC/USD | SELL | 0.15 | 64753.91 | 64471.31 | $-42.39 | CLOSED |
+| 288230376153802361 | s79qv3xetj@upcomers.com | 2026-07-18T18:25:03 | BTC/USD | SELL | 0.15 | 64660.81 | 64290.63 | $-55.53 | CLOSED |
+| 288230376153798495 | s79qv3xetj@upcomers.com | 2026-07-18T16:52:50 | BTC/USD | SELL | 0.2 | 64313.97 | 64136.92 | $-35.41 | CLOSED |
+| 288230376153797988 | s79qv3xetj@upcomers.com | 2026-07-17T19:45:03 | BTC/USD | SELL | 0.3 | 64207.27 | 64003.14 | $-61.24 | CLOSED |
+| 288230376153749786 | s79qv3xetj@upcomers.com | 2026-07-17T18:52:37 | BTC/USD | BUY | 0.1 | 64593.97 | 64266.38 | $-32.76 | CLOSED |
+| 288230376153717556 | s79qv3xetj@upcomers.com | 2026-07-16T07:36:04 | BTC/USD | BUY | 0.1 | 64617.88 | 64314.73 | $-30.32 | CLOSED |
+| 288230376153700140 | s79qv3xetj@upcomers.com | 2026-07-16T01:19:10 | BTC/USD | SELL | 0.15 | 64437.18 | 65442.51 | $150.8 | CLOSED |
+| 288230376153659975 | s79qv3xetj@upcomers.com | 2026-07-15T06:33:11 | BTC/USD | SELL | 0.15 | 65212.98 | 64795.62 | $-62.6 | CLOSED |
+| 288230376153658217 | s79qv3xetj@upcomers.com | 2026-07-14T15:29:20 | BTC/USD | SELL | 0.1 | 64556.44 | 64228.96 | $-32.75 | CLOSED |
+| 288230376153650348 | s79qv3xetj@upcomers.com | 2026-07-14T14:59:45 | BTC/USD | SELL | 0.2 | 64362.27 | 63808.48 | $-110.76 | CLOSED |
+| 288230376153624163 | s79qv3xetj@upcomers.com | 2026-07-13T23:57:25 | BTC/USD | BUY | 0.15 | 61946.89 | 62286.58 | $50.95 | CLOSED |
+| 288230376153615195 | s79qv3xetj@upcomers.com | 2026-07-13T16:31:22 | BTC/USD | BUY | 0.1 | 62649.42 | 62252.66 | $-39.68 | CLOSED |
+| 288230376153607461 | s79qv3xetj@upcomers.com | 2026-07-13T15:18:33 | BTC/USD | BUY | 0.15 | 62377.85 | 62918.18 | $81.05 | CLOSED |
+| 288230376153584507 | s79qv3xetj@upcomers.com | 2026-07-13T00:40:54 | BTC/USD | SELL | 0.1 | 63612.58 | 64286.64 | $67.41 | CLOSED |
+| 288230376153584536 | s79qv3xetj@upcomers.com | 2026-07-13T00:40:52 | BTC/USD | SELL | 0.15 | 63618.17 | 64241.31 | $93.47 | CLOSED |
+| 288230376153576146 | s79qv3xetj@upcomers.com | 2026-07-13T00:15:32 | BTC/USD | BUY | 0.15 | 63883.87 | 64312.81 | $64.34 | CLOSED |
+| 288230376153575503 | s79qv3xetj@upcomers.com | 2026-07-11T22:22:32 | 19957 | BUY | 6.0 | 1819.79 | 1809.09 | $-64.2 | CLOSED |
+| 288230376153575500 | s79qv3xetj@upcomers.com | 2026-07-11T19:33:38 | 19957 | BUY | 2.0 | 1819.2 | 1817.64 | $-3.12 | CLOSED |
+| 288230376153569015 | s79qv3xetj@upcomers.com | 2026-07-11T17:58:13 | BTC/USD | BUY | 0.15 | 63946.64 | 64306.78 | $54.02 | CLOSED |
+| 288230376153547308 | 498svcbpfi@upcomers.com | 2026-07-10T08:16:49 | BTC/USD | SELL | 0.25 | 64263.78 | 63959.04 | $-76.18 | CLOSED |
+| 288230376153537540 | s79qv3xetj@upcomers.com | 2026-07-10T01:49:26 | BTC/USD | BUY | 0.15 | 62988.7 | 63821.28 | $124.89 | CLOSED |
+| 288230376153488310 | s79qv3xetj@upcomers.com | 2026-07-09T06:04:31 | BTC/USD | BUY | 0.25 | 61833.0 | 62618.9 | $196.48 | CLOSED |
+| 288230376153500641 | s79qv3xetj@upcomers.com | 2026-07-09T06:04:29 | BTC/USD | BUY | 0.15 | 62273.8 | 62623.6 | $52.47 | CLOSED |
+| 288230376153458568 | s79qv3xetj@upcomers.com | 2026-07-08T08:27:12 | BTC/USD | BUY | 0.17 | 63023.39 | 62141.72 | $-149.88 | CLOSED |
+| 288230376153419149 | s79qv3xetj@upcomers.com | 2026-07-07T07:57:52 | BTC/USD | BUY | 0.17 | 63055.83 | 63100.95 | $7.67 | CLOSED |
+| 288230376153415855 | s79qv3xetj@upcomers.com | 2026-07-07T05:13:54 | BTC/USD | BUY | 0.15 | 63200.42 | 62864.33 | $-50.41 | CLOSED |
+| 288230376153411681 | s79qv3xetj@upcomers.com | 2026-07-07T01:22:55 | BTC/USD | BUY | 0.17 | 63979.47 | 63974.58 | $-0.83 | CLOSED |
+| 288230376153360185 | s79qv3xetj@upcomers.com | 2026-07-05T23:30:24 | BTC/USD | BUY | 0.2 | 62651.65 | 63668.52 | $203.37 | CLOSED |
+| 288230376153120800 | s79qv3xetj@upcomers.com | 2026-06-26T06:39:25 | BTC/USD | SELL | 0.3 | 60361.29 | 59802.82 | $-167.54 | CLOSED |
+| 288230376152967079 | s79qv3xetj@upcomers.com | 2026-06-23T05:19:39 | BTC/USD | BUY | 0.25 | 64044.08 | 63544.17 | $-124.98 | CLOSED |
+| 288230376152924290 | s79qv3xetj@upcomers.com | 2026-06-22T03:01:53 | BTC/USD | BUY | 0.15 | 64613.39 | 63933.0 | $-102.06 | CLOSED |
+| 288230376152915666 | s79qv3xetj@upcomers.com | 2026-06-21T20:48:38 | BTC/USD | BUY | 0.25 | 64113.49 | 63692.33 | $-105.29 | CLOSED |
+| 288230376152907067 | s79qv3xetj@upcomers.com | 2026-06-20T22:32:35 | BTC/USD | BUY | 0.25 | 63497.45 | 64274.27 | $194.2 | CLOSED |
+| 288230376152903030 | s79qv3xetj@upcomers.com | 2026-06-19T17:05:22 | BTC/USD | BUY | 0.35 | 63181.66 | 62874.22 | $-107.6 | CLOSED |
+| 288230376152876516 | s79qv3xetj@upcomers.com | 2026-06-19T00:30:44 | BTC/USD | SELL | 0.35 | 63020.8 | 62849.75 | $-59.87 | CLOSED |
+| 288230376152873561 | s79qv3xetj@upcomers.com | 2026-06-18T22:34:01 | BTC/USD | SELL | 0.3 | 62768.3 | 63101.13 | $99.85 | CLOSED |
+| 288230376152872225 | s79qv3xetj@upcomers.com | 2026-06-18T20:46:39 | BTC/USD | BUY | 0.2 | 62817.12 | 63112.86 | $59.15 | CLOSED |
+| 288230376152853696 | s79qv3xetj@upcomers.com | 2026-06-18T15:17:06 | BTC/USD | BUY | 0.25 | 64086.0 | 63482.3 | $-150.92 | CLOSED |
+| 288230376152851300 | s79qv3xetj@upcomers.com | 2026-06-18T13:07:49 | 19957 | BUY | 2.0 | 1749.14 | 1747.34 | $-3.6 | CLOSED |
+| 288230376152850930 | s79qv3xetj@upcomers.com | 2026-06-18T13:00:01 | ETH/USD | BUY | 2.0 | 71.77 | 71.21 | $-1.12 | CLOSED |
+| 288230376152848513 | s79qv3xetj@upcomers.com | 2026-06-18T12:58:38 | BTC/USD | BUY | 0.2 | 64013.59 | 64355.42 | $68.37 | CLOSED |
+| 288230376152829420 | s79qv3xetj@upcomers.com | 2026-06-18T01:50:41 | BTC/USD | BUY | 0.15 | 64501.89 | 64502.05 | $0.02 | CLOSED |
+| 288230376152815330 | s79qv3xetj@upcomers.com | 2026-06-17T18:05:41 | BTC/USD | SELL | 0.25 | 64824.02 | 66021.8 | $299.45 | CLOSED |
+| 288230376152815100 | s79qv3xetj@upcomers.com | 2026-06-17T16:38:17 | BTC/USD | SELL | 0.35 | 66072.9 | 66073.98 | $0.38 | CLOSED |
+| 288230376152814930 | s79qv3xetj@upcomers.com | 2026-06-17T16:26:44 | BTC/USD | SELL | 0.35 | 66124.72 | 66044.5 | $-28.08 | CLOSED |
+| 288230376152807552 | s79qv3xetj@upcomers.com | 2026-06-17T15:07:20 | BTC/USD | SELL | 0.35 | 65175.91 | 65184.99 | $3.18 | CLOSED |
+| 288230376152805858 | s79qv3xetj@upcomers.com | 2026-06-17T14:15:16 | BTC/USD | SELL | 0.3 | 65453.91 | 65196.38 | $-77.26 | CLOSED |
+| 288230376152769396 | s79qv3xetj@upcomers.com | 2026-06-16T18:03:42 | BTC/USD | SELL | 0.25 | 66235.46 | 65628.66 | $-151.7 | CLOSED |
+| 288230376152717920 | s79qv3xetj@upcomers.com | 2026-06-15T15:42:46 | BTC/USD | SELL | 0.25 | 66923.86 | 66517.1 | $-101.69 | CLOSED |
+| 288230376152687644 | s79qv3xetj@upcomers.com | 2026-06-14T21:41:39 | BTC/USD | BUY | 0.3 | 64140.57 | 65230.24 | $326.9 | CLOSED |
+| 288230376152684270 | 498svcbpfi@upcomers.com | 2026-06-13T21:42:03 | BTC/USD | SELL | 0.25 | 64685.71 | 64284.65 | $-100.26 | CLOSED |
+| 288230376152633171 | 498svcbpfi@upcomers.com | 2026-06-12T15:00:02 | BTC/USD | SELL | 0.25 | 64028.69 | 63474.24 | $-138.61 | CLOSED |
+| 288230376152656824 | s79qv3xetj@upcomers.com | 2026-06-12T13:46:21 | BTC/USD | SELL | 0.3 | 63177.68 | 63630.44 | $135.83 | CLOSED |
+| 288230376152613347 | s79qv3xetj@upcomers.com | 2026-06-11T17:32:57 | BTC/USD | SELL | 0.35 | 63424.34 | 62995.43 | $-150.12 | CLOSED |
+| 288230376152521822 | s79qv3xetj@upcomers.com | 2026-06-09T14:47:24 | BTC/USD | BUY | 0.3 | 61572.5 | 61235.87 | $-100.99 | CLOSED |
+| 288230376152512572 | s79qv3xetj@upcomers.com | 2026-06-09T14:17:17 | BTC/USD | BUY | 0.3 | 62348.54 | 61852.85 | $-148.71 | CLOSED |
+| 288230376152462266 | s79qv3xetj@upcomers.com | 2026-06-08T12:04:55 | BTC/USD | SELL | 0.3 | 62973.74 | 63832.26 | $257.56 | CLOSED |
+| 288230376152436249 | s79qv3xetj@upcomers.com | 2026-06-07T21:52:41 | BTC/USD | BUY | 0.3 | 61710.58 | 61657.63 | $-15.89 | CLOSED |
+| 288230376152357096 | 498svcbpfi@upcomers.com | 2026-06-04T12:48:30 | BTC/USD | SELL | 0.25 | 63869.08 | 63449.97 | $-104.78 | CLOSED |
+| 288230376152343257 | s79qv3xetj@upcomers.com | 2026-06-04T09:18:01 | BTC/USD | SELL | 0.35 | 63258.99 | 64227.48 | $338.97 | CLOSED |
+| 288230376152343244 | s79qv3xetj@upcomers.com | 2026-06-04T05:01:21 | BTC/USD | SELL | 0.25 | 64274.17 | 64262.56 | $-2.9 | CLOSED |
+| 288230376152341473 | s79qv3xetj@upcomers.com | 2026-06-04T03:42:07 | ETH/USD | SELL | 1.0 | 71.69 | 71.11 | $-0.58 | CLOSED |
+| 288230376152341468 | s79qv3xetj@upcomers.com | 2026-06-04T03:41:56 | ETH/USD | SELL | 0.02 | 71.73 | 71.15 | $-0.01 | CLOSED |
+| 288230376152340966 | s79qv3xetj@upcomers.com | 2026-06-04T03:32:21 | BTC/USD | SELL | 0.25 | 64513.72 | 64106.36 | $-101.84 | CLOSED |
+| 288230376152257019 | s79qv3xetj@upcomers.com | 2026-06-02T11:34:39 | BTC/USD | BUY | 0.35 | 69676.2 | 69395.04 | $-98.41 | CLOSED |
+| 288230376152240264 | s79qv3xetj@upcomers.com | 2026-06-02T01:38:17 | BTC/USD | BUY | 0.25 | 71309.01 | 70791.42 | $-129.4 | CLOSED |
+| 288230376152210589 | s79qv3xetj@upcomers.com | 2026-06-01T12:11:08 | BTC/USD | BUY | 0.25 | 72197.56 | 71995.06 | $-50.62 | CLOSED |
+| 288230376152202967 | s79qv3xetj@upcomers.com | 2026-06-01T11:58:19 | BTC/USD | BUY | 0.2 | 72825.3 | 72486.85 | $-67.69 | CLOSED |
+| 288230376152200829 | s79qv3xetj@upcomers.com | 2026-06-01T07:37:23 | BTC/USD | SELL | 0.2 | 72954.73 | 73186.26 | $46.31 | CLOSED |
+| 288230376152184588 | s79qv3xetj@upcomers.com | 2026-06-01T06:33:45 | BTC/USD | SELL | 0.25 | 73217.08 | 73827.64 | $152.64 | CLOSED |
+| 288230376152084841 | s79qv3xetj@upcomers.com | 2026-05-28T03:18:05 | BTC/USD | BUY | 0.2 | 74398.38 | 73864.89 | $-106.7 | CLOSED |
+| 288230376152084788 | s79qv3xetj@upcomers.com | 2026-05-27T21:47:09 | BTC/USD | BUY | 0.25 | 74785.28 | 74373.42 | $-102.97 | CLOSED |
+| 288230376152084685 | s79qv3xetj@upcomers.com | 2026-05-27T21:22:28 | BTC/USD | SELL | 0.2 | 75183.1 | 75154.06 | $-5.81 | CLOSED |
+| 288230376152084213 | s79qv3xetj@upcomers.com | 2026-05-27T21:12:30 | BTC/USD | SELL | 0.3 | 75188.69 | 75373.96 | $55.58 | CLOSED |
+| 288230376152055602 | s79qv3xetj@upcomers.com | 2026-05-27T12:58:36 | BTC/USD | SELL | 0.35 | 75719.66 | 75967.06 | $86.59 | CLOSED |
+| 288230376152063237 | s79qv3xetj@upcomers.com | 2026-05-27T12:58:33 | BTC/USD | SELL | 0.2 | 75719.18 | 76004.66 | $57.1 | CLOSED |
+| 288230376151994821 | s79qv3xetj@upcomers.com | 2026-05-26T00:58:38 | BTC/USD | SELL | 0.2 | 76817.45 | 77168.36 | $70.18 | CLOSED |
+| 288230376151992980 | s79qv3xetj@upcomers.com | 2026-05-26T00:51:57 | BTC/USD | SELL | 0.3 | 76763.78 | 77603.88 | $252.03 | CLOSED |
+| 288230376151971752 | s79qv3xetj@upcomers.com | 2026-05-25T05:37:18 | BTC/USD | SELL | 0.3 | 77498.67 | 77162.26 | $-100.92 | CLOSED |
+| 288230376151917584 | s79qv3xetj@upcomers.com | 2026-05-22T04:04:34 | BTC/USD | SELL | 0.25 | 77843.52 | 77640.62 | $-50.73 | CLOSED |
+| 288230376151915183 | s79qv3xetj@upcomers.com | 2026-05-22T02:00:56 | BTC/USD | SELL | 0.35 | 77703.73 | 77502.76 | $-70.34 | CLOSED |
+| 288230376151910508 | s79qv3xetj@upcomers.com | 2026-05-22T01:14:03 | BTC/USD | SELL | 0.25 | 77479.08 | 77694.92 | $53.96 | CLOSED |
+| 288230376151868173 | s79qv3xetj@upcomers.com | 2026-05-21T18:54:05 | BTC/USD | SELL | 0.25 | 77421.48 | 77850.24 | $107.19 | CLOSED |
+| 288230376151907134 | s79qv3xetj@upcomers.com | 2026-05-21T18:54:03 | BTC/USD | SELL | 0.15 | 77420.92 | 77678.19 | $38.59 | CLOSED |
+| 288230376151820210 | s79qv3xetj@upcomers.com | 2026-05-20T05:11:43 | BTC/USD | SELL | 0.25 | 77281.28 | 76880.92 | $-100.09 | CLOSED |
+| 7349874591887991212 | s79qv3xetj@upcomers.com | 2026-05-17T23:15:38 | BTC/USD | BUY | 0.25 | 78149.34 | 77746.43 | $-100.73 | CLOSED |
+| 7349874591887990295 | System Journal | 2026-05-17T00:59:11+00:00 | BTC/USD | BUY | N/A | N/A | 77859.0 | $-100.86 | CLOSED |
+
+
+================================================================================
+RAW JSON RECORD BLOCK (COPY & PASTE READY)
+================================================================================
+[
+  {
+    "trade_id": "288230376154480959",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 65170.36,
+    "close_price": 64877.07,
+    "pnl": -43.99,
+    "close_time": "2026-08-08T14:30:02",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154281885",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.2,
+    "entry_price": 63125.19,
+    "close_price": 62744.51,
+    "pnl": -76.14,
+    "close_time": "2026-08-03T03:46:52",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154146000",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 63797.14,
+    "close_price": 63564.12,
+    "pnl": -58.25,
+    "close_time": "2026-07-28T23:41:32",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154145996",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 63587.44,
+    "close_price": 63558.79,
+    "pnl": -7.16,
+    "close_time": "2026-07-28T23:27:12",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154102326",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.12,
+    "entry_price": 63853.19,
+    "close_price": 63534.9,
+    "pnl": -38.19,
+    "close_time": "2026-07-28T00:10:59",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154097190",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.12,
+    "entry_price": 65016.12,
+    "close_price": 64601.03,
+    "pnl": -49.81,
+    "close_time": "2026-07-27T22:25:59",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154058342",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 65088.87,
+    "close_price": 64753.09,
+    "pnl": -50.37,
+    "close_time": "2026-07-26T22:00:13",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154059335",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 65069.54,
+    "close_price": 64733.06,
+    "pnl": -50.47,
+    "close_time": "2026-07-26T22:00:08",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154054503",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 64782.8,
+    "close_price": 64383.26,
+    "pnl": -59.93,
+    "close_time": "2026-07-26T15:19:18",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154054589",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 64771.62,
+    "close_price": 64372.15,
+    "pnl": -59.92,
+    "close_time": "2026-07-26T14:08:26",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154051743",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 64172.46,
+    "close_price": 64238.53,
+    "pnl": 9.91,
+    "close_time": "2026-07-25T17:38:24",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154048536",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 64180.32,
+    "close_price": 64238.64,
+    "pnl": 8.75,
+    "close_time": "2026-07-25T17:38:15",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376154001935",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 64889.42,
+    "close_price": 65395.12,
+    "pnl": 75.86,
+    "close_time": "2026-07-24T04:06:54",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153971534",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.12,
+    "entry_price": 65754.2,
+    "close_price": 65313.48,
+    "pnl": -52.89,
+    "close_time": "2026-07-23T12:33:11",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153908905",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.12,
+    "entry_price": 66016.56,
+    "close_price": 66674.68,
+    "pnl": 78.97,
+    "close_time": "2026-07-22T18:12:29",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153925348",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.12,
+    "entry_price": 66014.01,
+    "close_price": 66316.6,
+    "pnl": 36.31,
+    "close_time": "2026-07-22T18:12:21",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153925470",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.12,
+    "entry_price": 66015.08,
+    "close_price": 66298.87,
+    "pnl": 34.05,
+    "close_time": "2026-07-22T18:12:18",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153802839",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 64753.91,
+    "close_price": 64471.31,
+    "pnl": -42.39,
+    "close_time": "2026-07-18T20:22:02",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153802361",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 64660.81,
+    "close_price": 64290.63,
+    "pnl": -55.53,
+    "close_time": "2026-07-18T18:25:03",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153798495",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.2,
+    "entry_price": 64313.97,
+    "close_price": 64136.92,
+    "pnl": -35.41,
+    "close_time": "2026-07-18T16:52:50",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153797988",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 64207.27,
+    "close_price": 64003.14,
+    "pnl": -61.24,
+    "close_time": "2026-07-17T19:45:03",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153749786",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.1,
+    "entry_price": 64593.97,
+    "close_price": 64266.38,
+    "pnl": -32.76,
+    "close_time": "2026-07-17T18:52:37",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153717556",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.1,
+    "entry_price": 64617.88,
+    "close_price": 64314.73,
+    "pnl": -30.32,
+    "close_time": "2026-07-16T07:36:04",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153700140",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 64437.18,
+    "close_price": 65442.51,
+    "pnl": 150.8,
+    "close_time": "2026-07-16T01:19:10",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153659975",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 65212.98,
+    "close_price": 64795.62,
+    "pnl": -62.6,
+    "close_time": "2026-07-15T06:33:11",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153658217",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.1,
+    "entry_price": 64556.44,
+    "close_price": 64228.96,
+    "pnl": -32.75,
+    "close_time": "2026-07-14T15:29:20",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153650348",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.2,
+    "entry_price": 64362.27,
+    "close_price": 63808.48,
+    "pnl": -110.76,
+    "close_time": "2026-07-14T14:59:45",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153624163",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 61946.89,
+    "close_price": 62286.58,
+    "pnl": 50.95,
+    "close_time": "2026-07-13T23:57:25",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153615195",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.1,
+    "entry_price": 62649.42,
+    "close_price": 62252.66,
+    "pnl": -39.68,
+    "close_time": "2026-07-13T16:31:22",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153607461",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 62377.85,
+    "close_price": 62918.18,
+    "pnl": 81.05,
+    "close_time": "2026-07-13T15:18:33",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153584507",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.1,
+    "entry_price": 63612.58,
+    "close_price": 64286.64,
+    "pnl": 67.41,
+    "close_time": "2026-07-13T00:40:54",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153584536",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 63618.17,
+    "close_price": 64241.31,
+    "pnl": 93.47,
+    "close_time": "2026-07-13T00:40:52",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153576146",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 63883.87,
+    "close_price": 64312.81,
+    "pnl": 64.34,
+    "close_time": "2026-07-13T00:15:32",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153575503",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "19957",
+    "side": "BUY",
+    "qty": 6.0,
+    "entry_price": 1819.79,
+    "close_price": 1809.09,
+    "pnl": -64.2,
+    "close_time": "2026-07-11T22:22:32",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153575500",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "19957",
+    "side": "BUY",
+    "qty": 2.0,
+    "entry_price": 1819.2,
+    "close_price": 1817.64,
+    "pnl": -3.12,
+    "close_time": "2026-07-11T19:33:38",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153569015",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 63946.64,
+    "close_price": 64306.78,
+    "pnl": 54.02,
+    "close_time": "2026-07-11T17:58:13",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153547308",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 64263.78,
+    "close_price": 63959.04,
+    "pnl": -76.18,
+    "close_time": "2026-07-10T08:16:49",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153537540",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 62988.7,
+    "close_price": 63821.28,
+    "pnl": 124.89,
+    "close_time": "2026-07-10T01:49:26",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153488310",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 61833.0,
+    "close_price": 62618.9,
+    "pnl": 196.48,
+    "close_time": "2026-07-09T06:04:31",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153500641",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 62273.8,
+    "close_price": 62623.6,
+    "pnl": 52.47,
+    "close_time": "2026-07-09T06:04:29",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153458568",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.17,
+    "entry_price": 63023.39,
+    "close_price": 62141.72,
+    "pnl": -149.88,
+    "close_time": "2026-07-08T08:27:12",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153419149",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.17,
+    "entry_price": 63055.83,
+    "close_price": 63100.95,
+    "pnl": 7.67,
+    "close_time": "2026-07-07T07:57:52",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153415855",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 63200.42,
+    "close_price": 62864.33,
+    "pnl": -50.41,
+    "close_time": "2026-07-07T05:13:54",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153411681",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.17,
+    "entry_price": 63979.47,
+    "close_price": 63974.58,
+    "pnl": -0.83,
+    "close_time": "2026-07-07T01:22:55",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153360185",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.2,
+    "entry_price": 62651.65,
+    "close_price": 63668.52,
+    "pnl": 203.37,
+    "close_time": "2026-07-05T23:30:24",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376153120800",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 60361.29,
+    "close_price": 59802.82,
+    "pnl": -167.54,
+    "close_time": "2026-06-26T06:39:25",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152967079",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 64044.08,
+    "close_price": 63544.17,
+    "pnl": -124.98,
+    "close_time": "2026-06-23T05:19:39",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152924290",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 64613.39,
+    "close_price": 63933.0,
+    "pnl": -102.06,
+    "close_time": "2026-06-22T03:01:53",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152915666",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 64113.49,
+    "close_price": 63692.33,
+    "pnl": -105.29,
+    "close_time": "2026-06-21T20:48:38",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152907067",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 63497.45,
+    "close_price": 64274.27,
+    "pnl": 194.2,
+    "close_time": "2026-06-20T22:32:35",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152903030",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.35,
+    "entry_price": 63181.66,
+    "close_price": 62874.22,
+    "pnl": -107.6,
+    "close_time": "2026-06-19T17:05:22",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152876516",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 63020.8,
+    "close_price": 62849.75,
+    "pnl": -59.87,
+    "close_time": "2026-06-19T00:30:44",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152873561",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 62768.3,
+    "close_price": 63101.13,
+    "pnl": 99.85,
+    "close_time": "2026-06-18T22:34:01",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152872225",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.2,
+    "entry_price": 62817.12,
+    "close_price": 63112.86,
+    "pnl": 59.15,
+    "close_time": "2026-06-18T20:46:39",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152853696",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 64086.0,
+    "close_price": 63482.3,
+    "pnl": -150.92,
+    "close_time": "2026-06-18T15:17:06",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152851300",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "19957",
+    "side": "BUY",
+    "qty": 2.0,
+    "entry_price": 1749.14,
+    "close_price": 1747.34,
+    "pnl": -3.6,
+    "close_time": "2026-06-18T13:07:49",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152850930",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "ETH/USD",
+    "side": "BUY",
+    "qty": 2.0,
+    "entry_price": 71.77,
+    "close_price": 71.21,
+    "pnl": -1.12,
+    "close_time": "2026-06-18T13:00:01",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152848513",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.2,
+    "entry_price": 64013.59,
+    "close_price": 64355.42,
+    "pnl": 68.37,
+    "close_time": "2026-06-18T12:58:38",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152829420",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.15,
+    "entry_price": 64501.89,
+    "close_price": 64502.05,
+    "pnl": 0.02,
+    "close_time": "2026-06-18T01:50:41",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152815330",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 64824.02,
+    "close_price": 66021.8,
+    "pnl": 299.45,
+    "close_time": "2026-06-17T18:05:41",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152815100",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 66072.9,
+    "close_price": 66073.98,
+    "pnl": 0.38,
+    "close_time": "2026-06-17T16:38:17",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152814930",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 66124.72,
+    "close_price": 66044.5,
+    "pnl": -28.08,
+    "close_time": "2026-06-17T16:26:44",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152807552",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 65175.91,
+    "close_price": 65184.99,
+    "pnl": 3.18,
+    "close_time": "2026-06-17T15:07:20",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152805858",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 65453.91,
+    "close_price": 65196.38,
+    "pnl": -77.26,
+    "close_time": "2026-06-17T14:15:16",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152769396",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 66235.46,
+    "close_price": 65628.66,
+    "pnl": -151.7,
+    "close_time": "2026-06-16T18:03:42",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152717920",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 66923.86,
+    "close_price": 66517.1,
+    "pnl": -101.69,
+    "close_time": "2026-06-15T15:42:46",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152687644",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.3,
+    "entry_price": 64140.57,
+    "close_price": 65230.24,
+    "pnl": 326.9,
+    "close_time": "2026-06-14T21:41:39",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152684270",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 64685.71,
+    "close_price": 64284.65,
+    "pnl": -100.26,
+    "close_time": "2026-06-13T21:42:03",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152633171",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 64028.69,
+    "close_price": 63474.24,
+    "pnl": -138.61,
+    "close_time": "2026-06-12T15:00:02",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152656824",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 63177.68,
+    "close_price": 63630.44,
+    "pnl": 135.83,
+    "close_time": "2026-06-12T13:46:21",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152613347",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 63424.34,
+    "close_price": 62995.43,
+    "pnl": -150.12,
+    "close_time": "2026-06-11T17:32:57",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152521822",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.3,
+    "entry_price": 61572.5,
+    "close_price": 61235.87,
+    "pnl": -100.99,
+    "close_time": "2026-06-09T14:47:24",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152512572",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.3,
+    "entry_price": 62348.54,
+    "close_price": 61852.85,
+    "pnl": -148.71,
+    "close_time": "2026-06-09T14:17:17",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152462266",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 62973.74,
+    "close_price": 63832.26,
+    "pnl": 257.56,
+    "close_time": "2026-06-08T12:04:55",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152436249",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.3,
+    "entry_price": 61710.58,
+    "close_price": 61657.63,
+    "pnl": -15.89,
+    "close_time": "2026-06-07T21:52:41",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152357096",
+    "account": "498svcbpfi@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 63869.08,
+    "close_price": 63449.97,
+    "pnl": -104.78,
+    "close_time": "2026-06-04T12:48:30",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152343257",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 63258.99,
+    "close_price": 64227.48,
+    "pnl": 338.97,
+    "close_time": "2026-06-04T09:18:01",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152343244",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 64274.17,
+    "close_price": 64262.56,
+    "pnl": -2.9,
+    "close_time": "2026-06-04T05:01:21",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152341473",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "ETH/USD",
+    "side": "SELL",
+    "qty": 1.0,
+    "entry_price": 71.69,
+    "close_price": 71.11,
+    "pnl": -0.58,
+    "close_time": "2026-06-04T03:42:07",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152341468",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "ETH/USD",
+    "side": "SELL",
+    "qty": 0.02,
+    "entry_price": 71.73,
+    "close_price": 71.15,
+    "pnl": -0.01,
+    "close_time": "2026-06-04T03:41:56",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152340966",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 64513.72,
+    "close_price": 64106.36,
+    "pnl": -101.84,
+    "close_time": "2026-06-04T03:32:21",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152257019",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.35,
+    "entry_price": 69676.2,
+    "close_price": 69395.04,
+    "pnl": -98.41,
+    "close_time": "2026-06-02T11:34:39",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152240264",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 71309.01,
+    "close_price": 70791.42,
+    "pnl": -129.4,
+    "close_time": "2026-06-02T01:38:17",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152210589",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 72197.56,
+    "close_price": 71995.06,
+    "pnl": -50.62,
+    "close_time": "2026-06-01T12:11:08",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152202967",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.2,
+    "entry_price": 72825.3,
+    "close_price": 72486.85,
+    "pnl": -67.69,
+    "close_time": "2026-06-01T11:58:19",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152200829",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.2,
+    "entry_price": 72954.73,
+    "close_price": 73186.26,
+    "pnl": 46.31,
+    "close_time": "2026-06-01T07:37:23",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152184588",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 73217.08,
+    "close_price": 73827.64,
+    "pnl": 152.64,
+    "close_time": "2026-06-01T06:33:45",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152084841",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.2,
+    "entry_price": 74398.38,
+    "close_price": 73864.89,
+    "pnl": -106.7,
+    "close_time": "2026-05-28T03:18:05",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152084788",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 74785.28,
+    "close_price": 74373.42,
+    "pnl": -102.97,
+    "close_time": "2026-05-27T21:47:09",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152084685",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.2,
+    "entry_price": 75183.1,
+    "close_price": 75154.06,
+    "pnl": -5.81,
+    "close_time": "2026-05-27T21:22:28",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152084213",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 75188.69,
+    "close_price": 75373.96,
+    "pnl": 55.58,
+    "close_time": "2026-05-27T21:12:30",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152055602",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 75719.66,
+    "close_price": 75967.06,
+    "pnl": 86.59,
+    "close_time": "2026-05-27T12:58:36",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376152063237",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.2,
+    "entry_price": 75719.18,
+    "close_price": 76004.66,
+    "pnl": 57.1,
+    "close_time": "2026-05-27T12:58:33",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151994821",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.2,
+    "entry_price": 76817.45,
+    "close_price": 77168.36,
+    "pnl": 70.18,
+    "close_time": "2026-05-26T00:58:38",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151992980",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 76763.78,
+    "close_price": 77603.88,
+    "pnl": 252.03,
+    "close_time": "2026-05-26T00:51:57",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151971752",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.3,
+    "entry_price": 77498.67,
+    "close_price": 77162.26,
+    "pnl": -100.92,
+    "close_time": "2026-05-25T05:37:18",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151917584",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 77843.52,
+    "close_price": 77640.62,
+    "pnl": -50.73,
+    "close_time": "2026-05-22T04:04:34",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151915183",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.35,
+    "entry_price": 77703.73,
+    "close_price": 77502.76,
+    "pnl": -70.34,
+    "close_time": "2026-05-22T02:00:56",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151910508",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 77479.08,
+    "close_price": 77694.92,
+    "pnl": 53.96,
+    "close_time": "2026-05-22T01:14:03",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151868173",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 77421.48,
+    "close_price": 77850.24,
+    "pnl": 107.19,
+    "close_time": "2026-05-21T18:54:05",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151907134",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.15,
+    "entry_price": 77420.92,
+    "close_price": 77678.19,
+    "pnl": 38.59,
+    "close_time": "2026-05-21T18:54:03",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "288230376151820210",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "SELL",
+    "qty": 0.25,
+    "entry_price": 77281.28,
+    "close_price": 76880.92,
+    "pnl": -100.09,
+    "close_time": "2026-05-20T05:11:43",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "7349874591887991212",
+    "account": "s79qv3xetj@upcomers.com",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": 0.25,
+    "entry_price": 78149.34,
+    "close_price": 77746.43,
+    "pnl": -100.73,
+    "close_time": "2026-05-17T23:15:38",
+    "status": "CLOSED"
+  },
+  {
+    "trade_id": "7349874591887990295",
+    "account": "System Journal",
+    "symbol": "BTC/USD",
+    "side": "BUY",
+    "qty": "N/A",
+    "entry_price": "N/A",
+    "close_price": 77859.0,
+    "pnl": -100.86,
+    "close_time": "2026-05-17T00:59:11+00:00",
+    "status": "CLOSED"
+  }
+]

@@ -127,7 +127,7 @@ class RetrainingLoop:
                 """, (cutoff,)).fetchall()
                 all_data.extend([dict(r) for r in rows])
 
-                # 2. Fetch All Closed Journal Trades (System, Rogue & Discretionary)
+                # 2. Fetch High-Conviction Journal Trades (ALPHA & SYSTEM post-June 2026)
                 rogue_rows = conn.execute("""
                     SELECT timestamp, symbol, side as direction, COALESCE(deviations, strategy) as pattern, ai_grade as ai_score, 
                            CASE WHEN pnl > 0 THEN 'WIN' WHEN pnl < 0 THEN 'LOSS' ELSE 'BREAKEVEN' END as outcome,
@@ -135,6 +135,8 @@ class RetrainingLoop:
                            notes as shadow_regime, CASE WHEN strategy = 'ALPHA' THEN 1 ELSE 0 END as is_discretionary
                     FROM journal
                     WHERE status = 'CLOSED'
+                      AND strategy IN ('ALPHA', 'SYSTEM')
+                      AND timestamp >= '2026-06-01'
                     ORDER BY timestamp DESC
                 """).fetchall()
                 all_data.extend([dict(r) for r in rogue_rows])
@@ -155,6 +157,8 @@ class RetrainingLoop:
                            notes as shadow_regime, CASE WHEN strategy = 'ALPHA' THEN 1 ELSE 0 END as is_discretionary
                     FROM journal
                     WHERE status = 'CLOSED'
+                      AND strategy IN ('ALPHA', 'SYSTEM')
+                      AND timestamp >= '2026-06-01'
                     ORDER BY timestamp DESC
                 """).fetchall()
                 all_data.extend([dict(r) for r in rogue_rows])

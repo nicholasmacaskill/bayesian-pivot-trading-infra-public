@@ -405,29 +405,6 @@ class AIValidator:
         Returns:
             dict: Dual-track analysis with live_execution and shadow_optimizer sections
         """
-        # Directional Cooldown Check
-        symbol = setup.get('symbol', 'BTC/USD')
-        direction = setup.get('direction', setup.get('side', 'LONG'))
-        cooldown_ok, cooldown_reason = self.check_directional_cooldown(symbol, direction, cooldown_hours=4.0)
-        if not cooldown_ok:
-            print(f"🚫 [AIValidator] Trade rejected by Cooldown Gate: {cooldown_reason}")
-            return {
-                "live_execution": {
-                    "score": 0.0,
-                    "verdict": "REJECTED",
-                    "reasoning": cooldown_reason,
-                    "execution_logic": "Trade blocked due to directional loss cooldown",
-                    "discipline_check": "Preventing loss-clustering"
-                },
-                "shadow_optimizer": {
-                    "suggested_risk_multiplier": 0.0,
-                    "regime_classification": "Cooldown",
-                    "alpha_delta_prediction": "N/A (Cooldown active)",
-                    "slippage_estimate": "N/A",
-                    "optimization_reasoning": cooldown_reason
-                }
-            }
-
         if guard_trust_score is not None:
             setup['guard_trust_score'] = guard_trust_score
 
