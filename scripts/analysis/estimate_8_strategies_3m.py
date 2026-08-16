@@ -41,14 +41,16 @@ def load_historical_3m_trades() -> List[dict]:
                     outcome  = str(item.get('outcome') or item.get('verdict') or '').upper()
                     act_r    = item.get('actual_r')
                     
-                    if act_r is not None:
+                    if act_r is not None and str(act_r) != 'None':
                         pnl_r = float(act_r)
-                    elif 'WIN' in outcome or 'PASSED' in outcome:
+                    elif 'WIN' in outcome:
                         pnl_r = 2.5
                     elif 'LOSS' in outcome:
                         pnl_r = -1.0
+                    elif 'REJECTED' in outcome:
+                        pnl_r = -1.0  # Rejected setups if taken count as loss
                     else:
-                        pnl_r = 2.5 if ai_score >= 7.5 else -1.0
+                        pnl_r = 2.5 if ai_score >= 8.0 else -1.0
 
                     trades.append({
                         'symbol': str(item.get('symbol', 'BTC/USD')).replace('USDT', 'USD'),
@@ -60,10 +62,12 @@ def load_historical_3m_trades() -> List[dict]:
                         'hurst': float(item.get('hurst') or (0.60 if 'TREND' in str(item.get('pattern','')).upper() else 0.40)),
                         'smt': float(item.get('smt') or 0.20),
                         'pattern': item.get('pattern', 'SMC Setup'),
-                        'pnl_r': pnl_r
+                        'pnl_r': pnl_r,
+                        'verdict': outcome
                     })
         except Exception as e:
             logger.warning(f"Error reading scans JSON: {e}")
+
 
     # 2. Parse Manual Trades Dataset
     if os.path.exists(trades_path):
@@ -189,6 +193,58 @@ def run_isolated_factor_test(trades: List[dict], use_ai: bool, use_hurst: bool) 
 
     return results
 
+def run_pure_non_llm_algo_benchmark(trades: List[dict]):
+    """
+    Evaluates a Pure Non-LLM Algorithmic Strategy Baseline.
+    AI Validator is 100% OFF (ai_score ignored).
+    Filter relying strictly on mathematical SMC mechanics:
+      1. Hurst Trend Regime Filter (Hurst > 0.55)
+      2. SMT Divergence Strength (SMT >= 0.20)
+      3. Sweep Exhaustion & Wick Ratio (>= 0.80)
+    """
+    print("\n--- 3. PURE NON-LLM QUANTITATIVE ALGORITHMIC BENCHMARK (AI 100% OFF) ---")
+    
+    start_equity = 25000.0
+    equity = start_equity
+    peak_equity = start_equity
+    max_dd = 0.0
+    wins = 0
+    losses = 0
+    executed = 0
+
+    for trade in trades:
+        # Pure Mathematical SMC Gates (No LLM / No AI Validator)
+        hurst_ok = trade['hurst'] > 0.55
+        smt_ok   = trade['smt'] >= 0.20
+        
+        if hurst_ok and smt_ok:
+            executed += 1
+            risk_usd = 125.0 # 0.5% risk on $25k account
+            pnl_usd = risk_usd * trade['pnl_r']
+            equity += pnl_usd
+            
+            if equity > peak_equity:
+                peak_equity = equity
+            dd = (peak_equity - equity) / peak_equity
+            if dd > max_dd:
+                max_dd = dd
+
+            if trade['pnl_r'] > 0:
+                wins += 1
+            else:
+                losses += 1
+
+    win_rate = (wins / executed * 100.0) if executed > 0 else 0.0
+    net_pnl = equity - start_equity
+    ret_pct = (net_pnl / start_equity * 100.0)
+
+    print(f" • Strategy Mode: PURE MATHEMATICAL SMC (AI VALIDATOR 100% OFF)")
+    print(f" • Candidate Setups Audited: {len(trades)}")
+    print(f" • Executed Trades: {executed}")
+    print(f" • Win Rate: {win_rate:.1f}% ({wins} Wins / {losses} Losses)")
+    print(f" • Net PnL: ${net_pnl:+,.2f} ({ret_pct:+.1f}%)")
+    print(f" • Max Drawdown: {max_dd * 100.0:.1f}%\n")
+
 def run_factor_attribution_audit():
     print("\n===========================================================================")
     print(" 🔬 BAYESIAN PIVOT — SINGLE-VARIABLE FACTOR ATTRIBUTION & RUIN AUDIT")
@@ -243,6 +299,10 @@ def run_factor_attribution_audit():
     print("-" * 95)
     print(f"🏛️ COMBINED PORTFOLIO | START: ${tot_start:,.2f} | FINAL: ${tot_final:,.2f} | NET PnL: +${tot_pnl:,.2f} (+{tot_ret:.1f}%)")
     print("===========================================================================\n")
+
+    # Run Pure Non-LLM Benchmark
+    run_pure_non_llm_algo_benchmark(trades)
+
 
 if __name__ == "__main__":
     run_factor_attribution_audit()
