@@ -45,6 +45,7 @@ from src.engines.news_catalyst_scanner import NewsCatalystScanner
 from src.engines.multi_account_funnel import MultiAccountFunnelManager
 from src.engines.counterfactual_tracker import CounterfactualTracker
 from src.engines.qa_quant_agent import QAQuantAgent
+from src.engines.inducement_tracker import InducementTracker
 
 
 
@@ -164,6 +165,7 @@ class LocalScannerRunner:
         self.funnel_manager = MultiAccountFunnelManager()
         self.counterfactual_tracker = CounterfactualTracker()
         self.qa_agent = QAQuantAgent()
+        self.inducement_tracker = InducementTracker()
 
 
 
@@ -826,13 +828,20 @@ class LocalScannerRunner:
                     'bias_conflict': "NEUTRAL" in daily_bias or "CONFLICT" in daily_bias,
                 }
 
-                # ── Hurst Gate: The Bayesian Pivot Filter ───────────────────────
+                # ── Hurst Gate & Outlier Inducement Tracking (Strategy 9) ───────
                 hurst_val = 0.5
                 try:
                     df_tmp = self.scanner.fetch_data(symbol, Config.TIMEFRAME, limit=100)
-                    if df_tmp is not None:
+                    if df_tmp is not None and len(df_tmp) >= 30:
+                        # 1. Strategy 9: Track Extreme Outliers & Judas Inducements
+                        outlier_event = self.inducement_tracker.detect_outlier_candle(df_tmp, idx=-1)
+                        if outlier_event:
+                            self.inducement_tracker.log_inducement_event(outlier_event)
+
+                        # 2. Calculate Hurst Exponent
                         hurst_val = self.scanner.get_hurst_exponent(df_tmp['close'].values)
-                except: pass
+                except Exception as e:
+                    logger.debug(f"Outlier/Hurst tracking error on {symbol}: {e}")
 
                 # 🚫 THE MEAT GRINDER: Block symbols in the 0.45 - 0.55 randomness zone
                 if Config.HURST_CHAOS_RANGE[0] <= hurst_val <= Config.HURST_CHAOS_RANGE[1]:
