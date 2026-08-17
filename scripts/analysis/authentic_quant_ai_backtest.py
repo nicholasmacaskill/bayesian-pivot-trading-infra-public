@@ -216,13 +216,18 @@ def run_authentic_quant_ai_backtest():
 
                 if equity > peak_equity:
                     peak_equity = equity
-                dd = (peak_equity - equity) / peak_equity
-                if dd > max_dd:
-                    max_dd = dd
+                
+                # Perpetual HWM Trailing DD
+                hwm_dd = (peak_equity - equity) / peak_equity
+                if hwm_dd > max_dd:
+                    max_dd = hwm_dd
 
-                if dd >= 0.05:
+                # Exact Prop Firm Rule: Trailing Floor stops trailing once it reaches Starting Equity
+                # Floor trails at Peak - 5% until it locks at Starting Balance
+                prop_floor = min(start_equity, peak_equity - (start_equity * 0.05))
+                if equity < prop_floor:
                     is_breached = True
-                    equity = start_equity * 0.95
+                    equity = prop_floor
 
                 executed.append({'pnl_usd': pnl_usd, 'pnl_r': res['pnl_r'], 'score': ai_score})
 
