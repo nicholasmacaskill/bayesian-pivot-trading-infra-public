@@ -1018,6 +1018,126 @@ class SMCScanner:
         
         return metadata
 
+    def calculate_ote(self, swing_low: float, swing_high: float, direction: str) -> dict:
+        """
+        Optimal Trade Entry (OTE) — Algorithmic Fibonacci Retracement Levels.
+        Computes 62.0%, 70.5% (Golden Sweet Spot), and 79.0% discount/premium zones.
+        """
+        leg_range = abs(swing_high - swing_low)
+        if leg_range <= 0:
+            return {}
+            
+        if direction.upper() == 'LONG':
+            ote_62 = swing_high - (leg_range * 0.62)
+            ote_705 = swing_high - (leg_range * 0.705)
+            ote_79 = swing_high - (leg_range * 0.79)
+            return {
+                "direction": "LONG",
+                "ote_62": round(ote_62, 2),
+                "ote_sweet_spot": round(ote_705, 2),
+                "ote_79": round(ote_79, 2),
+                "zone_high": round(ote_62, 2),
+                "zone_low": round(ote_79, 2)
+            }
+        else:
+            ote_62 = swing_low + (leg_range * 0.62)
+            ote_705 = swing_low + (leg_range * 0.705)
+            ote_79 = swing_low + (leg_range * 0.79)
+            return {
+                "direction": "SHORT",
+                "ote_62": round(ote_62, 2),
+                "ote_sweet_spot": round(ote_705, 2),
+                "ote_79": round(ote_79, 2),
+                "zone_high": round(ote_79, 2),
+                "zone_low": round(ote_62, 2)
+            }
+
+    def validate_fvg_consequent_encroachment(self, df: pd.DataFrame, fvg_top: float, fvg_bottom: float, direction: str) -> bool:
+        """
+        Consequent Encroachment (50% CE) Validation for Fair Value Gaps.
+        Returns False if any recent candle body (close) has closed beyond the 50% midpoint.
+        """
+        ce_level = (fvg_top + fvg_bottom) / 2.0
+        recent = df.iloc[-5:]
+        
+        if direction.upper() == 'LONG':
+            # Bullish FVG: candle close must NOT close below CE level
+            breached = any(recent['close'] < ce_level)
+            return not breached
+        else:
+            # Bearish FVG: candle close must NOT close above CE level
+            breached = any(recent['close'] > ce_level)
+            return not breached
+
+    def validate_order_block_mean_threshold(self, df: pd.DataFrame, ob_top: float, ob_bottom: float, direction: str) -> bool:
+        """
+        Mean Threshold (50% MT) Validation for Order Blocks.
+        Returns False if any recent candle body (close) has closed beyond the 50% midpoint.
+        """
+        mt_level = (ob_top + ob_bottom) / 2.0
+        recent = df.iloc[-5:]
+        
+        if direction.upper() == 'LONG':
+            breached = any(recent['close'] < mt_level)
+            return not breached
+        else:
+            breached = any(recent['close'] > mt_level)
+            return not breached
+
+    def check_turtle_soup_time_in_zone(self, df: pd.DataFrame, swept_level: float, direction: str, max_candles: int = 4) -> bool:
+        """
+        Turtle Soup Velocity / Time-in-Zone Invalidation Gate.
+        A true liquidity sweep is V-shaped and rejects rapidly.
+        If price stays beyond the swept level for more than max_candles (4), it is a true breakout, not a sweep.
+        """
+        recent = df.iloc[-8:]
+        if direction.upper() == 'LONG':
+            # Swept Low: count candles whose close remained below swept_level
+            candles_below = sum(recent['close'] < swept_level)
+            return candles_below <= max_candles
+        else:
+            # Swept High: count candles whose close remained above swept_level
+            candles_above = sum(recent['close'] > swept_level)
+            return candles_above <= max_candles
+
+    def detect_breaker_blocks(self, df: pd.DataFrame) -> List[dict]:
+        """
+        Breaker Block Detection:
+        Identifies an Order Block that resulted in a liquidity sweep of previous swing points,
+        followed by an aggressive displacement break back through the Order Block, flipping it into support/resistance.
+        """
+        breakers = []
+        if df is None or len(df) < 30:
+            return breakers
+            
+        is_high, is_low = self.detect_fractals(df)
+        recent_highs = df[is_high]
+        recent_lows = df[is_low]
+        
+        if len(recent_highs) < 2 or len(recent_lows) < 2:
+            return breakers
+            
+        last_high = recent_highs.iloc[-1]['high']
+        last_low = recent_lows.iloc[-1]['low']
+        current_close = df.iloc[-1]['close']
+        
+        if current_close > last_high:
+            breakers.append({
+                "type": "BREAKER_BULLISH",
+                "direction": "LONG",
+                "level": last_high,
+                "invalidation": last_low
+            })
+        elif current_close < last_low:
+            breakers.append({
+                "type": "BREAKER_BEARISH",
+                "direction": "SHORT",
+                "level": last_low,
+                "invalidation": last_high
+            })
+            
+        return breakers
+
     def detect_inducement_trap(self, df, direction):
         """
         Detects 'Retail Inducement' (minor highs/lows) swept just before reversal.
