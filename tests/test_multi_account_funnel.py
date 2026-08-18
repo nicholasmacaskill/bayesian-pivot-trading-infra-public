@@ -14,7 +14,7 @@ class TestMultiAccountFunnel(unittest.TestCase):
         self.tracker = CounterfactualTracker()
 
     def test_profile_initialization(self):
-        self.assertEqual(len(self.manager.profiles), 8)
+        self.assertEqual(len(self.manager.profiles), 9)
         self.assertIn("ACCOUNT_A", self.manager.profiles)
         self.assertIn("ACCOUNT_B", self.manager.profiles)
         self.assertIn("ACCOUNT_C", self.manager.profiles)
@@ -23,6 +23,7 @@ class TestMultiAccountFunnel(unittest.TestCase):
         self.assertIn("ACCOUNT_F", self.manager.profiles)
         self.assertIn("ACCOUNT_G", self.manager.profiles)
         self.assertIn("ACCOUNT_H", self.manager.profiles)
+        self.assertIn("ACCOUNT_I", self.manager.profiles)
 
 
 

@@ -190,6 +190,24 @@ class MultiAccountFunnelManager:
                 risk_per_trade=0.005,
                 max_risk_usd=65.0
             ),
+            "ACCOUNT_I": AccountValidatorProfile(
+                account_key="ACCOUNT_I",
+                account_name="Judas Inducement & Macro Operator",
+                email_env_key="TRADELOCKER_EMAIL_I",
+                strategy_mode="REVERSAL",
+                hurst_chaos_range=(0.45, 0.55),
+                hurst_required_mode=None,
+                ai_threshold=7.5,
+                bypass_ai_gate=False,
+                require_smt_divergence=True,
+                min_smt_strength=0.15,
+                calendar_blackout_mins=15,
+                slippage_atr_max=2.0,
+                correlation_gate_active=False,
+                target_rr_multiple=2.5,
+                risk_per_trade=0.005,
+                max_risk_usd=65.0
+            ),
         }
 
     def register_in_flight_intent(self, symbol: str, direction: str, account_key: str):

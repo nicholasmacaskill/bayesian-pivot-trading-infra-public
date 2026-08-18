@@ -1031,7 +1031,7 @@ class LocalScannerRunner:
 
                     all_open_positions = self.tl_client.get_open_positions() if hasattr(self, 'tl_client') and self.tl_client else []
                     
-                    for acc_key in ["ACCOUNT_A", "ACCOUNT_B", "ACCOUNT_C", "ACCOUNT_D", "ACCOUNT_E", "ACCOUNT_F", "ACCOUNT_G", "ACCOUNT_H"]:
+                    for acc_key in self.funnel_manager.profiles.keys():
 
                         passed, rejection_reasons = self.funnel_manager.evaluate_setup_for_account(
                             setup=setup,
