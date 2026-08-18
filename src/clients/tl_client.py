@@ -514,15 +514,26 @@ class TradeLockerClient:
     def get_trade_history(self, limit=5):
         return [] # Placeholder
 
-    def execute_trade(self, symbol="BTC/USD", side="buy", qty=0.15, stop_loss=None, take_profit=None):
-        """Executes a trade across the primary account. Uses Upcomers BTC ID 19965."""
-        instrument_id = "19965" if symbol == "BTC/USD" else "206"
+    def resolve_instrument_id(self, symbol="BTC/USD") -> str:
+        """Resolves broker instrument ID for BTC/USD and ETH/USD on TradeLocker (Upcomers)."""
+        norm = symbol.replace("/", "").replace("_", "").upper()
+        if "BTC" in norm:
+            return "19965"
+        elif "ETH" in norm:
+            return "19967"
+        return "19965"
+
+    def execute_trade(self, symbol="BTC/USD", side="buy", qty=0.15, stop_loss=None, take_profit=None, account_index=0):
+        """Executes a trade across the selected TradeLocker account. Uses dynamic instrument ID."""
+        instrument_id = self.resolve_instrument_id(symbol)
         
-        # We execute on the primary account (Account A)
-        if not self.helpers: return False
-        primary_account = self.helpers[0]
+        if not self.helpers:
+            logger.error("No TradeLocker account helpers configured.")
+            return False
+            
+        target_account = self.helpers[account_index] if 0 <= account_index < len(self.helpers) else self.helpers[0]
         
-        return primary_account.place_order(
+        return target_account.place_order(
             instrument_id=instrument_id,
             side=side,
             qty=qty,
