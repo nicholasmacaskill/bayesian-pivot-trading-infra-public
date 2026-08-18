@@ -1021,7 +1021,14 @@ class LocalScannerRunner:
                     enriched_pattern = f"{hunt_label} — {base_pattern}"
 
                     # ── Multi-Account Funnel Matrix & Counterfactual Agent Dispatch ──
-                    smt_val = market_context.get('DXY', {}).get('change_ltf', 0) if market_context else 0.0
+                    smt_val = setup.get('smt_strength', 0.0)
+                    if smt_val == 0.0:
+                        if setup.get('is_judas_inducement', False) or setup.get('is_asian_fade', False):
+                            smt_val = 0.50  # Boundary / Judas sweeps inherit implicit liquidity sponsorship
+                        else:
+                            dxy_chg = abs(market_context.get('DXY', {}).get('change_ltf', 0)) if market_context else 0.0
+                            smt_val = max(smt_val, dxy_chg * 10.0 if dxy_chg > 0 else 0.0)
+
                     all_open_positions = self.tl_client.get_open_positions() if hasattr(self, 'tl_client') and self.tl_client else []
                     
                     for acc_key in ["ACCOUNT_A", "ACCOUNT_B", "ACCOUNT_C", "ACCOUNT_D", "ACCOUNT_E", "ACCOUNT_F", "ACCOUNT_G", "ACCOUNT_H"]:
@@ -1175,8 +1182,8 @@ class LocalScannerRunner:
                         )
 
                         # ── LIVE AUTO-EXECUTION ──
-                        if Config.LIVE_AUTO_EXECUTION and live_score >= 9.0:
-                            logger.info(f"⚡ LIVE AUTO-EXECUTION (9+/10 Setup): Submitting order to TradeLocker: {direction} {lots} {symbol} SL={_sl} TP={_tp}")
+                        if Config.LIVE_AUTO_EXECUTION and live_score >= threshold:
+                            logger.info(f"⚡ LIVE AUTO-EXECUTION ({live_score}/10 Setup): Submitting order to TradeLocker: {direction} {lots} {symbol} SL={_sl} TP={_tp}")
                             try:
                                 exec_side = "buy" if direction.upper() == "LONG" else "sell"
                                 trade_success = self.tl.execute_trade(
@@ -1188,7 +1195,7 @@ class LocalScannerRunner:
                                 )
                                 if trade_success:
                                     logger.info(f"✅ Trade executed successfully on TradeLocker.")
-                                    self.notifier._send_message(f"⚡ <b>AUTO-EXECUTION SUCCESS:</b> Placed <code>{exec_side.upper()} {lots} lots</code> of {symbol} (SL: <code>{_sl:,.2f}</code>, TP: <code>{_tp:,.2f}</code>)")
+                                    self.notifier._send_message(f"⚡ <b>AUTO-EXECUTION SUCCESS:</b> Placed <a href='https://t.me/bayesianpivot_bot'>{exec_side.upper()} {lots} lots</a> of {symbol} (SL: <b>${_sl:,.2f}</b>, TP: <b>${_tp:,.2f}</b>)")
                                 else:
                                     logger.error(f"❌ Trade execution rejected by TradeLocker broker client.")
                                     self.notifier._send_message(f"⚠️ <b>AUTO-EXECUTION FAILURE:</b> Broker rejected order request for {symbol}.")
@@ -1196,7 +1203,7 @@ class LocalScannerRunner:
                                 logger.error(f"❌ Error executing live TradeLocker trade: {exec_err}", exc_info=True)
                                 self.notifier._send_message(f"🚨 <b>AUTO-EXECUTION EXCEPTION:</b> {str(exec_err)}")
                         elif Config.LIVE_AUTO_EXECUTION:
-                            logger.info(f"ℹ️ Skipping auto-execution: setup score is {live_score}/10 (Only 9.0+ setups are automated).")
+                            logger.info(f"ℹ️ Skipping auto-execution: setup score is {live_score}/10 (Required threshold: {threshold}/10).")
 
                         # ── V3 Persistence ──
                         try:
