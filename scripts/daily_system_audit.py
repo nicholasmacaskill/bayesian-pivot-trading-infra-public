@@ -31,6 +31,10 @@ from src.engines.ai_validator import AIValidator
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("DailyAuditWatchdog")
 
+def _teal(text) -> str:
+    """Formats text with Telegram sleek teal link accent (clean, zero code pills)."""
+    return f'<a href="https://t.me/bayesianpivot_bot">{text}</a>'
+
 def run_daily_audit():
     print("\n" + "=" * 75)
     print(" 🛡️ BAYESIAN PIVOT — DAILY SYSTEM HEALTH & DIAGNOSTIC AUDIT")
@@ -66,7 +70,7 @@ def run_daily_audit():
         subprocess.run(["launchctl", "unload", os.path.expanduser("~/Library/LaunchAgents/com.sovereign.scanner.plist")])
         subprocess.run(["launchctl", "load", os.path.expanduser("~/Library/LaunchAgents/com.sovereign.scanner.plist")])
 
-    report_lines.append(f"• <b>Daemon Status:</b> <code>{daemon_status}</code>")
+    report_lines.append(f"• <b>Daemon Status:</b> {_teal(daemon_status)}")
 
     # ──────────────────────────────────────────────────────────────────────────
     # 2. SCAN FRESHNESS & SQLITE DATABASE HEALTH
@@ -95,14 +99,14 @@ def run_daily_audit():
 
         db_status = f"✅ Healthy (Integrity: {integrity} | Scans: {scan_count:,} | Inducements: {inducement_count} | Shadow Trades: {cf_count})"
         print(f"       • {db_status}")
-        report_lines.append(f"• <b>Database Health:</b> <code>{integrity} (WAL Optimized)</code>")
-        report_lines.append(f"• <b>Logged Activity:</b> <code>{scan_count:,} scans | {inducement_count} inducements | {cf_count} shadow trades</code>")
+        report_lines.append(f"• <b>Database Health:</b> {_teal(f'{integrity} (WAL Optimized)')}")
+        report_lines.append(f"• <b>Logged Activity:</b> {_teal(f'{scan_count:,} scans | {inducement_count} inducements | {cf_count} shadow trades')}")
     except Exception as e:
         db_status = f"❌ Database Error: {e}"
         print(f"       • {db_status}")
         issues_found.append(f"Database error: {e}")
         all_healthy = False
-        report_lines.append(f"• <b>Database Health:</b> <code>{db_status}</code>")
+        report_lines.append(f"• <b>Database Health:</b> {_teal(db_status)}")
 
     # ──────────────────────────────────────────────────────────────────────────
     # 3. EXCHANGE LIVE MARKET DATA CHECK
@@ -125,13 +129,13 @@ def run_daily_audit():
             print(f"       • {feed_status}")
             issues_found.append("Exchange market feed returned empty dataframe")
             all_healthy = False
-        report_lines.append(f"• <b>Market Data Feed:</b> <code>{feed_status}</code>")
+        report_lines.append(f"• <b>Market Data Feed:</b> {_teal(feed_status)}")
     except Exception as e:
         feed_status = f"❌ Exchange Error: {e}"
         print(f"       • {feed_status}")
         issues_found.append(f"Exchange connection failed: {e}")
         all_healthy = False
-        report_lines.append(f"• <b>Market Data Feed:</b> <code>{feed_status}</code>")
+        report_lines.append(f"• <b>Market Data Feed:</b> {_teal(feed_status)}")
 
     # ──────────────────────────────────────────────────────────────────────────
     # 4. TRADELOCKER BROKER API & 8-ACCOUNT SYNC
@@ -150,13 +154,13 @@ def run_daily_audit():
             print(f"       • {tl_status}")
             issues_found.append("TradeLocker total equity returned 0")
             all_healthy = False
-        report_lines.append(f"• <b>TradeLocker Broker:</b> <code>{tl_status}</code>")
+        report_lines.append(f"• <b>TradeLocker Broker:</b> {_teal(tl_status)}")
     except Exception as e:
         tl_status = f"❌ TradeLocker Error: {e}"
         print(f"       • {tl_status}")
         issues_found.append(f"TradeLocker sync error: {e}")
         all_healthy = False
-        report_lines.append(f"• <b>TradeLocker Broker:</b> <code>{tl_status}</code>")
+        report_lines.append(f"• <b>TradeLocker Broker:</b> {_teal(tl_status)}")
 
     # ──────────────────────────────────────────────────────────────────────────
     # 5. MULTI-MODAL AI VALIDATOR CONNECTIVITY
@@ -178,11 +182,11 @@ def run_daily_audit():
         else:
             ai_status = "⚠️ GEMINI_API_KEY not set (Using local fallback)"
             print(f"       • {ai_status}")
-        report_lines.append(f"• <b>AI Validator (Gemini):</b> <code>{ai_status}</code>")
+        report_lines.append(f"• <b>AI Validator (Gemini):</b> {_teal(ai_status)}")
     except Exception as e:
         ai_status = f"⚠️ AI Network Warning: {e} (Cascade fallback active)"
         print(f"       • {ai_status}")
-        report_lines.append(f"• <b>AI Validator:</b> <code>{ai_status}</code>")
+        report_lines.append(f"• <b>AI Validator:</b> {_teal(ai_status)}")
 
     # ──────────────────────────────────────────────────────────────────────────
     # 6. SYSTEM MEMORY, SWAP & DISK STORAGE
@@ -197,7 +201,10 @@ def run_daily_audit():
         
         sys_status = f"✅ Disk Free: {disk_avail} | Swap: {swap_str}"
         print(f"       • {sys_status}")
-        report_lines.append(f"• <b>System Resources:</b> <code>Disk Free: {disk_avail} | Swap: {swap_str}</code>")
+        report_lines.append(f"• <b>System Resources:</b> {_teal(f'Disk Free: {disk_avail} | Swap: {swap_str}')}")
+    except Exception as e:
+        sys_status = f"Error: {e}"
+        report_lines.append(f"• <b>System Resources:</b> {_teal(sys_status)}")
     except Exception as e:
         sys_status = f"Error: {e}"
         report_lines.append(f"• <b>System Resources:</b> <code>{sys_status}</code>")

@@ -25,6 +25,11 @@ def _format_time_ago(minutes):
     return " ".join(parts) + " ago"
 
 
+def _teal(text: any) -> str:
+    """Formats text with Telegram sleek teal link accent (clean, zero code pills)."""
+    return f'<a href="https://t.me/bayesianpivot_bot">{text}</a>'
+
+
 class TelegramNotifier:
     def __init__(self, bot_token=None, chat_id=None):
         self.bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -75,16 +80,16 @@ class TelegramNotifier:
         badge = '⚠️ [WARNING]' if dd_pct >= 3.0 else '🛡️ [SECURE]'
         header = (
             f"{badge} | 🏁 <b>{kz_name} — {sess_phase}</b> | "
-            f"📉 Buffer: <code>${equity_buf:,.0f}</code>"
+            f"📉 Buffer: {_teal(f'${equity_buf:,.0f}')}"
         )
 
         # ── 2. BIAS CONFLUENCE ────────────────────────────────────────────────
         bd  = bias_data or {}
         confluence = (
             f"📐 <b>BIAS CONFLUENCE</b>\n"
-            f"• Daily: <code>{bd.get('daily','N/A')}</code> | "
-            f"HTF: <code>{bd.get('htf','N/A')}</code> | "
-            f"Intermarket: <code>{bd.get('dxy_trend','N/A')}</code>"
+            f"• Daily: {_teal(bd.get('daily','N/A'))} | "
+            f"HTF: {_teal(bd.get('htf','N/A'))} | "
+            f"Intermarket: {_teal(bd.get('dxy_trend','N/A'))}"
         )
 
         # ── 3. LIQUIDITY EDGE ─────────────────────────────────────────────────
@@ -96,14 +101,14 @@ class TelegramNotifier:
         if isinstance(dist_pips, float): dist_pips = f"{dist_pips:.1f}"
         liquidity = (
             f"🎯 <b>LIQUIDITY EDGE</b>\n"
-            f"• Draw on Liquidity: <code>{draw_px}</code> <i>({draw_type})</i>\n"
-            f"• Gravity: <code>{dist_pips} pips</code>"
+            f"• Draw on Liquidity: {_teal(draw_px)} <i>({draw_type})</i>\n"
+            f"• Gravity: {_teal(f'{dist_pips} pips')}"
         )
 
         # ── 4. THE HUNT ───────────────────────────────────────────────────────
         hunt = (
             f"🦅 <b>THE HUNT</b>\n"
-            f"• Active Strategy: <code>{pattern}</code> (<b>{ai_score}/10</b>)\n"
+            f"• Active Strategy: {_teal(pattern)} (<b>{ai_score}/10</b>)\n"
             f"• Hunt Logic: <i>{reasoning}</i>"
         )
 
@@ -118,8 +123,8 @@ class TelegramNotifier:
 
         system_state = (
             f"🔬 <b>SYSTEM STATE</b>\n"
-            f"• Mood: <code>{mood}</code> | Alpha Persistence: <code>{alpha_mult}x</code>\n"
-            f"• Volatility: <code>{atr_pct_ile}th %ile</code> | Slip: <code>{slip}</code>"
+            f"• Mood: {_teal(mood)} | Alpha Persistence: {_teal(f'{alpha_mult}x')}\n"
+            f"• Volatility: {_teal(f'{atr_pct_ile}th %ile')} | Slip: {_teal(slip)}"
         )
 
         # ── 6. EXECUTION ──────────────────────────────────────────────────────
@@ -132,12 +137,12 @@ class TelegramNotifier:
             tp    = risk_calc.get('take_profit', 'OPEN')
             tp_str = f"${tp:,.4f}" if isinstance(tp, (int, float)) else str(tp)
             
-            val_str = f" | Position Value: <code>${pos_val:,.2f}</code>" if pos_val > 0 else ""
+            val_str = f" | Position Value: {_teal(f'${pos_val:,.2f}')}" if pos_val > 0 else ""
             
             exec_block = (
                 f"\n💷 <b>EXECUTION</b>\n"
-                f"• Entry: <code>${entry:,.4f}</code> | SL: <code>${sl:,.4f}</code> | TP: <code>{tp_str}</code>\n"
-                f"• Position Size: <code>{lots}</code>{val_str}"
+                f"• Entry: {_teal(f'${entry:,.4f}')} | SL: {_teal(f'${sl:,.4f}')} | TP: {_teal(tp_str)}\n"
+                f"• Position Size: {_teal(lots)}{val_str}"
             )
 
         # ── 7. AGENT-READABLE JSON SPOILER ────────────────────────────────────
@@ -222,16 +227,16 @@ class TelegramNotifier:
 
         header = (
             f"🔍 <b>BAYESIAN PIVOT BRIEFING v3</b>\n"
-            f"{badge} | Trust: <code>{trust}/100</code>\n"
+            f"{badge} | Trust: {_teal(f'{trust}/100')}\n"
             f"🏁 <b>{kz_name}</b> — {sess_phase}\n"
-            f"📉 DD: <code>{dd_pct:.1f}%</code> | Buffer: <code>${buf_usd:,.0f}</code>\n"
-            f"🕒 Uptime: <code>{uptime}</code> | Cycle <code>#{cycle}</code>\n"
-            f"🔐 <code>{security}</code>"
+            f"📉 DD: {_teal(f'{dd_pct:.1f}%')} | Buffer: {_teal(f'${buf_usd:,.0f}')}\n"
+            f"🕒 Uptime: {_teal(uptime)} | Cycle {_teal(f'#{cycle}')}\n"
+            f"🔐 {_teal(security)}"
         )
 
         # ── ACCOUNT ───────────────────────────────────────────────────────────
         equity    = account_data.get('equity', 0)
-        acct_block = f"💰 <b>Account</b>\n• Equity: <code>${equity:,.2f}</code>"
+        acct_block = f"💰 <b>Account</b>\n• Equity: {_teal(f'${equity:,.2f}')}"
 
         # ── OPEN POSITIONS ────────────────────────────────────────────────────
         positions = account_data.get('positions', [])
@@ -241,7 +246,8 @@ class TelegramNotifier:
                 pnl  = p.get('pnl', 0)
                 icon = '🟢' if pnl >= 0 else '🔴'
                 side = 'BUY' if p.get('side','').upper() == 'BUY' else 'SELL'
-                pos_lines.append(f"  {icon} <code>{p.get('symbol','N/A')}</code> {side} @ <code>{p.get('price',0):.4f}</code> → <code>{pnl:+.2f}</code>")
+                px = p.get('price', 0)
+                pos_lines.append(f"  {icon} {_teal(p.get('symbol','N/A'))} {side} @ {_teal(f'{px:.4f}')} → {_teal(f'{pnl:+.2f}')}")
             pos_block = f"📂 <b>Open ({len(positions)})</b>\n" + "\n".join(pos_lines)
         else:
             pos_block = "📂 <b>Open Positions</b>\n  <i>None</i>"
@@ -256,8 +262,8 @@ class TelegramNotifier:
 
         perf_block = (
             f"📈 <b>Performance ({n_trades} trades)</b>\n"
-            f"• Win Rate: <code>{win_rate:.1f}%</code> | Avg RR: <code>{avg_rr:.2f}</code>\n"
-            f"• Avg Win: <code>${avg_win:+.2f}</code> | Avg Loss: <code>-${avg_loss:.2f}</code>"
+            f"• Win Rate: {_teal(f'{win_rate:.1f}%')} | Avg RR: {_teal(f'{avg_rr:.2f}')}\n"
+            f"• Avg Win: {_teal(f'${avg_win:+.2f}')} | Avg Loss: {_teal(f'-${avg_loss:.2f}')}"
         )
         if recent:
             perf_block += "\n\n🕔 <b>Last 5 Closed</b>"
@@ -265,21 +271,24 @@ class TelegramNotifier:
                 pnl  = t.get('pnl', 0)
                 icon = '🟢' if pnl >= 0 else '🔴'
                 ts   = t.get('close_time', '')[:10]
-                perf_block += f"\n  {icon} <code>{t.get('symbol','?')}</code> {t.get('side','')} {ts} → <code>{pnl:+.2f}</code>"
+                perf_block += f"\n  {icon} {_teal(t.get('symbol','?'))} {t.get('side','')} {ts} → {_teal(f'{pnl:+.2f}')}"
 
         # ── BIAS CONFLUENCE ───────────────────────────────────────────────────
         dxy = confluence_data.get('dxy', {})
         nq  = confluence_data.get('nq', {})
         tnx = confluence_data.get('tnx', {})
+        dxy_chg = dxy.get('change_ltf', 0)
+        nq_chg = nq.get('change_ltf', 0)
+        tnx_chg = tnx.get('change_ltf', 0)
         alpha_mult      = confluence_data.get('alpha_mult', 1.0)
         alpha_reasoning = confluence_data.get('alpha_reasoning', 'N/A')
 
         confluence_block = (
             f"📐 <b>Confluence (Intermarket)</b>\n"
-            f"• DXY: <code>{dxy.get('trend','N/A')}</code> (<code>{dxy.get('change_ltf',0):+.2f}%</code>)\n"
-            f"• NQ: <code>{nq.get('trend','N/A')}</code> (<code>{nq.get('change_ltf',0):+.2f}%</code>)\n"
-            f"• TNX: <code>{tnx.get('trend','N/A')}</code> (<code>{tnx.get('change_ltf',0):+.2f}%</code>)\n"
-            f"✨ Alpha: <code>{alpha_mult:.2f}x</code> — <i>{alpha_reasoning}</i>"
+            f"• DXY: {_teal(dxy.get('trend','N/A'))} ({_teal(f'{dxy_chg:+.2f}%')})\n"
+            f"• NQ: {_teal(nq.get('trend','N/A'))} ({_teal(f'{nq_chg:+.2f}%')})\n"
+            f"• TNX: {_teal(tnx.get('trend','N/A'))} ({_teal(f'{tnx_chg:+.2f}%')})\n"
+            f"✨ Alpha: {_teal(f'{alpha_mult:.2f}x')} — <i>{alpha_reasoning}</i>"
         )
 
         # ── MARKET STATE (HTML list, no ASCII table) ──────────────────────────
@@ -292,8 +301,8 @@ class TelegramNotifier:
                 h      = row.get('hurst', 0.5)
                 strat  = 'Turtle Soup' if h < 0.45 else ('Trend Align' if h > 0.55 else 'Structure')
                 draw   = row.get('draw', None)
-                draw_str = f" | Draw: <code>{draw}</code>" if draw else ""
-                market_block += f"• <b>{sym}</b> — <code>{bias}</code> | {regime} | H:{h:.2f} [{strat}]{draw_str}\n"
+                draw_str = f" | Draw: {_teal(draw)}" if draw else ""
+                market_block += f"• <b>{sym}</b> — {_teal(bias)} | {regime} | H:<b>{h:.2f}</b> [{strat}]{draw_str}\n"
         else:
             market_block = "📊 <b>Market State</b>\n<i>No scan data yet.</i>"
 
@@ -302,16 +311,17 @@ class TelegramNotifier:
         if latest_setup:
             mins_ago = latest_setup.get('mins_ago', '?')
             setup_block += (
-                f"💎 <b>Latest Call</b>: <code>{latest_setup.get('symbol','?')}</code> ({_format_time_ago(mins_ago)})\n"
-                f"  • Formation: <code>{latest_setup.get('pattern','N/A')}</code> | AI: <b>{latest_setup.get('ai_score','N/A')}/10</b>\n"
+                f"💎 <b>Latest Call</b>: {_teal(latest_setup.get('symbol','?'))} ({_format_time_ago(mins_ago)})\n"
+                f"  • Formation: {_teal(latest_setup.get('pattern','N/A'))} | AI: <b>{latest_setup.get('ai_score','N/A')}/10</b>\n"
             )
         
         if latest_rejected:
             mins_ago_rej = latest_rejected.get('mins_ago', '?')
+            rej_ai = latest_rejected.get('ai_score', 'N/A')
             if setup_block: setup_block += "\n"
             setup_block += (
-                f"❌ <b>Latest Rejected</b>: <code>{latest_rejected.get('symbol','?')}</code> ({_format_time_ago(mins_ago_rej)})\n"
-                f"  • Formation: <code>{latest_rejected.get('pattern','N/A')}</code> | AI: <code>{latest_rejected.get('ai_score','N/A')}/10</code>\n"
+                f"❌ <b>Latest Rejected</b>: {_teal(latest_rejected.get('symbol','?'))} ({_format_time_ago(mins_ago_rej)})\n"
+                f"  • Formation: {_teal(latest_rejected.get('pattern','N/A'))} | AI: {_teal(f'{rej_ai}/10')}\n"
             )
 
         if not setup_block:
@@ -360,7 +370,7 @@ class TelegramNotifier:
         msg = (
             f"{icon} <b>BAYESIAN PIVOT GUARD — {severity}</b>\n\n"
             f"🛡️ <b>{title}</b>\n\n{summary}\n\n"
-            f"⏰ <code>{datetime.now().strftime('%H:%M:%S UTC')}</code>"
+            f"⏰ {_teal(datetime.now().strftime('%H:%M:%S UTC'))}"
         )
         self._send_message(msg)
 
@@ -374,8 +384,8 @@ class TelegramNotifier:
     def send_system_error(self, component, error):
         self._send_message(
             f"🆘 <b>CRITICAL ERROR</b>\n\n"
-            f"📍 Component: <code>{component}</code>\n"
-            f"❌ Error: <code>{str(error)[:300]}</code>\n\n"
+            f"📍 Component: {_teal(component)}\n"
+            f"❌ Error: <i>{str(error)[:300]}</i>\n\n"
             f"Check local logs for details."
         )
 
@@ -383,8 +393,7 @@ class TelegramNotifier:
         if not self.bot_token or not self.chat_id:
             return
         try:
-            # Escape dollar signs so Telegram's HTML parser doesn't strip numbers
-            safe_text = text.replace('$', '\\$') if text else text
+            safe_text = text if text else ""
             payload = {
                 "chat_id": self.chat_id,
                 "text": safe_text,
@@ -435,16 +444,19 @@ class TelegramNotifier:
         summary = tracker.get_counterfactual_summary()
         health = qa.audit_portfolio_health(total_equity, open_positions)
 
+        prev_loss = summary.get('prevented_losses_usd', 0.0)
+        net_impact = summary.get('net_filter_impact_usd', 0.0)
+
         msg = (
             f"📊 <b>BAYESIAN PIVOT — EXECUTIVE REPORT</b>\n"
-            f"⏰ <code>{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</code>\n\n"
-            f"🏛️ <b>Total Portfolio NAV:</b> <code>${total_equity:,.2f}</code>\n"
-            f"📈 <b>Active Open Trades:</b> <code>{len(open_positions)}</code>\n"
-            f"🛡️ <b>Portfolio Health:</b> <code>{health['status']}</code>\n\n"
+            f"⏰ {_teal(datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC'))}\n\n"
+            f"🏛️ <b>Total Portfolio NAV:</b> {_teal(f'${total_equity:,.2f}')}\n"
+            f"📈 <b>Active Open Trades:</b> {_teal(len(open_positions))}\n"
+            f"🛡️ <b>Portfolio Health:</b> {_teal(health['status'])}\n\n"
             f"👻 <b>COUNTERFACTUAL SHADOW ENGINE</b>\n"
-            f"• Trades Audited: <code>{summary.get('total_shadow_trades', 0)}</code>\n"
-            f"• Prevented Losses: <code>${summary.get('prevented_losses_usd', 0.0):,.2f}</code>\n"
-            f"• Net Filter Impact: <code>${summary.get('net_filter_impact_usd', 0.0):,.2f}</code>\n\n"
+            f"• Trades Audited: {_teal(summary.get('total_shadow_trades', 0))}\n"
+            f"• Prevented Losses: {_teal(f'${prev_loss:,.2f}')}\n"
+            f"• Net Filter Impact: {_teal(f'${net_impact:,.2f}')}\n\n"
             f"⚡ <i>8 Active Mandates Provisioned & Hardened.</i>"
         )
         

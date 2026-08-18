@@ -258,15 +258,18 @@ class LocalScannerRunner:
             conn.close()
             
             btc_bias = self.scanner.get_detailed_bias("BTC/USD")
+            alpha_val = getattr(self, 'alpha_mult', 1.0)
+            
+            def _t(txt): return f'<a href="https://t.me/bayesianpivot_bot">{txt}</a>'
             
             msg = (
                 f"📊 <b>BAYESIAN PIVOT STATUS</b>\n\n"
-                f"💰 <b>Equity:</b> <code>${equity:,.2f}</code>\n"
-                f"📈 <b>Trades Today:</b> <code>{trades_today or 0}</code> (Wins: <code>{wins or 0}</code>)\n"
-                f"🧠 <b>Mood:</b> <code>{self.last_psych_state.get('sentiment', 'Neutral')}</code>\n"
-                f"🛡️ <b>Risk Mult:</b> <code>{self.risk_multiplier:.2f}x</code> (Tilt: <code>{self.current_tilt_score}</code>)\n"
-                f"✨ <b>Alpha Persistence:</b> <code>{getattr(self, 'alpha_mult', 1.0)}x</code>\n"
-                f"🌎 <b>Market Pulse:</b> <code>{btc_bias}</code>\n\n"
+                f"💰 <b>Equity:</b> {_t(f'${equity:,.2f}')}\n"
+                f"📈 <b>Trades Today:</b> {_t(trades_today or 0)} (Wins: {_t(wins or 0)})\n"
+                f"🧠 <b>Mood:</b> {_t(self.last_psych_state.get('sentiment', 'Neutral'))}\n"
+                f"🛡️ <b>Risk Mult:</b> {_t(f'{self.risk_multiplier:.2f}x')} (Tilt: {_t(self.current_tilt_score)})\n"
+                f"✨ <b>Alpha Persistence:</b> {_t(f'{alpha_val:.2f}x')}\n"
+                f"🌎 <b>Market Pulse:</b> {_t(btc_bias)}\n\n"
                 f"🕒 <i>Cycle #{self._cycle_count} Active</i>"
             )
             self.notifier._send_message(msg)
