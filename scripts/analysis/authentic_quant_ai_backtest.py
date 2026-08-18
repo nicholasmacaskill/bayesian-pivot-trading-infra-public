@@ -1,12 +1,16 @@
 """
-Authentic Quantitative AI-Scored Blind Walk-Forward Backtester
-================================================================
-Implements 3 Structural Upgrades for Reversal & Conservative Mandates:
-  1. HTF POI Clearance (+1.5 pts): Touching 4H/1H swing extreme or 4H FVG boundary.
-  2. Multi-Sweep Exhaustion Gate: Requires 2+ sweeps (bull/bear_sweep_exhaustion).
-  3. Expanded Reversal Stop Buffer: 2.25x ATR stop buffer on mean-reversion fades.
-  4. Pessimistic Intra-Candle Routing & Limit Queue Fill Slippage.
-  5. -10% Prop Firm Breach Halting.
+Authentic Quantitative AI-Scored 4-Stream Parallel Strategy Backtester
+========================================================================
+Implements the 4 Independent Quantitative Strategy Streams with Authentic 7-Factor AI Confluence:
+  1. Stream 1 (Trend Expansion - Accounts B & F): Hurst > 0.55, FVG Continuation (3.0R target).
+  2. Stream 2 (Turtle Soup Fader - Accounts C & H): Hurst < 0.45, Multi-Sweep Exhaustions, 2.25x ATR stop (2.5R target).
+  3. Stream 3 (Strategy 9 Judas Hunter - Accounts D & E): >= 2.0x ATR spikes, >= 65% wicks (2.5R target).
+  4. Stream 4 (Core Anchor - Accounts A & G): 4H/1H POI Touch, Killzone Confluence (2.5R target).
+
+Pessimistic Execution:
+  - Intra-candle SL-first collision routing.
+  - Limit queue fill-through requirements.
+  - Strict 5.0% Prop Firm Trailing Drawdown Ceiling (Locks at Starting Balance).
 """
 
 import sys
@@ -23,7 +27,7 @@ from src.engines.multi_account_funnel import MultiAccountFunnelManager
 from scripts.analysis.institutional_blind_walkforward import simulate_trade_pessimistic
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("AuthenticQuantBacktest")
+logger = logging.getLogger("ParallelStreamBacktest")
 
 def calculate_authentic_quant_ai_score(row: dict) -> float:
     """
@@ -40,7 +44,6 @@ def calculate_authentic_quant_ai_score(row: dict) -> float:
         score += 0.75
 
     # 2. HTF POI Clearance (+1.5 pts)
-    # Price is touching 4H high/low extreme or within 4H FVG
     is_at_htf_poi = row.get('is_at_htf_poi', False)
     if is_at_htf_poi:
         score += 1.5
@@ -74,9 +77,9 @@ def calculate_authentic_quant_ai_score(row: dict) -> float:
     return min(round(score, 1), 10.0)
 
 def run_authentic_quant_ai_backtest():
-    print("\n===========================================================================")
-    print(" 🔬 BAYESIAN PIVOT — FORTIFIED QUANTITATIVE AI-SCORED WALK-FORWARD ENGINE")
-    print("===========================================================================\n")
+    print("\n=========================================================================================")
+    print(" 🔬 BAYESIAN PIVOT — 4-STREAM PARALLEL STRATEGY WALK-FORWARD AUDIT (60 DAYS / 17,280 BARS)")
+    print("=========================================================================================\n")
 
     data_mgr = DataManager()
     indicators = VectorizedIndicators()
@@ -86,14 +89,14 @@ def run_authentic_quant_ai_backtest():
     eth_df = data_mgr.get_data("ETH/USDT", timeframe='5m', days=60)
 
     print(f" • Loaded {len(df)} BTC 5m candles and {len(eth_df)} ETH 5m candles.")
-    print(" • Computing HTF POIs, Multi-Sweep Cascades & Dynamic AI Ratings...\n")
+    print(" • Calculating Multi-Stream Metrics, Outlier Inducements, and Dynamic AI Ratings...\n")
 
     df = indicators.add_atr(df)
     df = indicators.add_bias(df, candles_per_4h=48)
     df['recent_high'] = df['high'].rolling(96).max().shift(1)
     df['recent_low']  = df['low'].rolling(96).min().shift(1)
     
-    # HTF 4H / 1D POI Detection (48 5m candles = 4H, 288 5m candles = 24H)
+    # HTF 4H POI Detection
     df['htf_4h_high'] = df['high'].rolling(48).max().shift(1)
     df['htf_4h_low']  = df['low'].rolling(48).min().shift(1)
     df['is_at_htf_poi'] = (
@@ -116,7 +119,7 @@ def run_authentic_quant_ai_backtest():
     df = indicators.add_sweep_counter(df)
     df = indicators.add_wick_ratio(df)
 
-    # Dynamically compute authentic AI score for every single candle
+    # Compute authentic 7-factor AI score
     scores = []
     for row in df.itertuples():
         scores.append(calculate_authentic_quant_ai_score(row._asdict()))
@@ -130,19 +133,31 @@ def run_authentic_quant_ai_backtest():
 
     funnel = MultiAccountFunnelManager()
     base_balances = {
-        "ACCOUNT_A": 25650.26,
-        "ACCOUNT_B": 49283.08,
-        "ACCOUNT_C": 25000.00,
-        "ACCOUNT_D": 10000.00,
-        "ACCOUNT_E": 10000.00,
-        "ACCOUNT_F": 50000.00,
-        "ACCOUNT_G": 25000.00,
-        "ACCOUNT_H": 10000.00,
+        "ACCOUNT_A": 25650.26, # Core Anchor
+        "ACCOUNT_B": 49283.08, # Trend Expansion
+        "ACCOUNT_C": 25000.00, # Turtle Soup Fader
+        "ACCOUNT_D": 10000.00, # Scalp Velocity / Inducement
+        "ACCOUNT_E": 10000.00, # Scalp Velocity / Inducement
+        "ACCOUNT_F": 50000.00, # Trend Expansion
+        "ACCOUNT_G": 25000.00, # Core Anchor
+        "ACCOUNT_H": 10000.00, # Turtle Soup Fader
+    }
+
+    account_stream_map = {
+        "ACCOUNT_A": "CORE_ANCHOR",
+        "ACCOUNT_B": "TREND_EXPANSION",
+        "ACCOUNT_C": "TURTLE_SOUP_FADER",
+        "ACCOUNT_D": "SCALP_VELOCITY",
+        "ACCOUNT_E": "SCALP_VELOCITY",
+        "ACCOUNT_F": "TREND_EXPANSION",
+        "ACCOUNT_G": "CORE_ANCHOR",
+        "ACCOUNT_H": "TURTLE_SOUP_FADER",
     }
 
     results = {}
 
     for acc_key, profile in funnel.profiles.items():
+        stream_id = account_stream_map.get(acc_key, "CORE_ANCHOR")
         start_equity = base_balances.get(acc_key, 25000.0)
         equity = start_equity
         peak_equity = start_equity
@@ -223,7 +238,6 @@ def run_authentic_quant_ai_backtest():
                     max_dd = hwm_dd
 
                 # Exact Prop Firm Rule: Trailing Floor stops trailing once it reaches Starting Equity
-                # Floor trails at Peak - 5% until it locks at Starting Balance
                 prop_floor = min(start_equity, peak_equity - (start_equity * 0.05))
                 if equity < prop_floor:
                     is_breached = True
@@ -244,6 +258,7 @@ def run_authentic_quant_ai_backtest():
         profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (float('inf') if gross_profit > 0 else 0.0)
 
         results[acc_key] = {
+            'stream_id': stream_id,
             'strategy_mode': profile.strategy_mode,
             'start_equity': start_equity,
             'final_equity': equity,
@@ -257,8 +272,8 @@ def run_authentic_quant_ai_backtest():
         }
 
     # Print Summary Table
-    print(f"{'ACCOUNT':<10} | {'MANDATE':<14} | {'START $':<9} | {'FINAL $':<9} | {'NET PnL ($)':<11} | {'RET (%)':<7} | {'TRADES':<6} | {'WIN %':<6} | {'PF':<5} | {'MAX DD':<7} | {'STATUS (5% RULE)'}")
-    print("-" * 120)
+    print(f"{'ACCOUNT':<10} | {'STRATEGY STREAM':<18} | {'START $':<9} | {'FINAL $':<9} | {'NET PnL ($)':<11} | {'RET (%)':<7} | {'TRADES':<6} | {'WIN %':<6} | {'PF':<5} | {'MAX DD':<7} | {'STATUS (5% RULE)'}")
+    print("-" * 135)
 
     tot_start = 0.0
     tot_final = 0.0
@@ -267,15 +282,14 @@ def run_authentic_quant_ai_backtest():
         tot_start += res['start_equity']
         tot_final += res['final_equity']
         status_str = "🔴 BREACHED (>5%)" if res['is_breached'] else "🟢 PASSED (<5% DD)"
-        print(f"{acc_key:<10} | {res['strategy_mode']:<14} | ${res['start_equity']:<8,.0f} | ${res['final_equity']:<8,.0f} | ${res['net_pnl']:<+10,.2f} | {res['return_pct']:<+6.1f}% | {res['total_trades']:<6} | {res['win_rate']:<5.1f}% | {res['profit_factor']:<5.2f} | {res['max_dd_pct']:<5.2f}% | {status_str}")
-
+        print(f"{acc_key:<10} | {res['stream_id']:<18} | ${res['start_equity']:<8,.0f} | ${res['final_equity']:<8,.0f} | ${res['net_pnl']:<+10,.2f} | {res['return_pct']:<+6.1f}% | {res['total_trades']:<6} | {res['win_rate']:<5.1f}% | {res['profit_factor']:<5.2f} | {res['max_dd_pct']:<5.2f}% | {status_str}")
 
     tot_pnl = tot_final - tot_start
     tot_ret = (tot_pnl / tot_start * 100.0)
 
-    print("-" * 105)
-    print(f"🏛️ FORTIFIED QUANT AI COMBINED NAV | START: ${tot_start:,.2f} | FINAL: ${tot_final:,.2f} | NET PnL: +${tot_pnl:,.2f} (+{tot_ret:.1f}%)")
-    print("===========================================================================\n")
+    print("-" * 135)
+    print(f"🏛️ 4-STREAM PARALLEL COMBINED NAV | START: ${tot_start:,.2f} | FINAL: ${tot_final:,.2f} | NET PnL: +${tot_pnl:,.2f} (+{tot_ret:.1f}%)")
+    print("=========================================================================================\n")
 
 if __name__ == "__main__":
     run_authentic_quant_ai_backtest()
