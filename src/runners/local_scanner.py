@@ -900,27 +900,37 @@ class LocalScannerRunner:
                     wick_pct = outlier_event.get('lower_wick_pct', 0) if 'BULL' in outlier_event.get('candle_type', '') else outlier_event.get('upper_wick_pct', 0)
                     if wick_pct >= 60.0:
                         logger.info(f"⚡ Strategy 9: Live Outlier Judas Sweep Detected on {symbol} (Range: {outlier_event['range_atr_mult']:.2f}x | Wick: {wick_pct:.1f}%)")
-                        trade_dir = 'BUY' if 'BULL' in outlier_event['candle_type'] else 'SELL'
+                        is_bull = 'BULL' in outlier_event['candle_type']
+                        trade_dir = 'LONG' if is_bull else 'SHORT'
                         entry_p = float(df_tmp.iloc[-1]['close'])
                         atr_cur = float(self.scanner.calculate_atr(df_tmp).iloc[-1]) if not df_tmp.empty else entry_p * 0.008
                         sl_dist = atr_cur * 2.0
-                        sl_p = entry_p - sl_dist if trade_dir == 'BUY' else entry_p + sl_dist
-                        tp_p = entry_p + (sl_dist * 2.5) if trade_dir == 'BUY' else entry_p - (sl_dist * 2.5)
+                        sl_p = entry_p - sl_dist if is_bull else entry_p + sl_dist
+                        tp_p = entry_p + (sl_dist * 2.5) if is_bull else entry_p - (sl_dist * 2.5)
                         
                         judas_setup = {
                             'symbol': symbol,
-                            'direction': trade_dir,
-                            'entry': entry_p,
-                            'entry_price': entry_p,
-                            'sl': sl_p,
-                            'stop_loss': sl_p,
-                            'tp': tp_p,
-                            'take_profit': tp_p,
                             'pattern': f"Strategy 9 Judas Sweep Reversal ({outlier_event['candle_type']})",
+                            'direction': trade_dir,
+                            'entry': round(entry_p, 2),
+                            'entry_price': round(entry_p, 2),
+                            'sl': round(sl_p, 2),
+                            'stop_loss': round(sl_p, 2),
+                            'tp': round(tp_p, 2),
+                            'take_profit': round(tp_p, 2),
+                            'target': round(tp_p, 2),
+                            'bias': 'Bullish' if is_bull else 'Bearish',
                             'is_judas_inducement': True,
+                            'is_asian_fade': False,
                             'atr': atr_cur,
                             'wick_ratio': wick_pct / 100.0,
-                            'range_atr_mult': outlier_event['range_atr_mult']
+                            'range_atr_mult': outlier_event['range_atr_mult'],
+                            'price_quartiles': {
+                                'Judas Sweep': {'high': float(df_tmp['high'].iloc[-1]), 'low': float(df_tmp['low'].iloc[-1])}
+                            },
+                            'time_quartile': {'num': quartile_data.get('num', 2), 'phase': quartile_data.get('phase', 'Manipulation')},
+                            'smt_strength': market_context.get('DXY', {}).get('change_ltf', 0.0) if market_context else 0.0,
+                            'index_context': f"Strategy 9 Judas Outlier ({outlier_event['range_atr_mult']:.1f}x ATR)",
                         }
                         result = (judas_setup, df_tmp)
 
