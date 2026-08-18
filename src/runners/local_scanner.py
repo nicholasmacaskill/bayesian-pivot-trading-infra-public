@@ -895,15 +895,44 @@ class LocalScannerRunner:
                 is_prime_window = self.scanner.is_asian_fade_window()
                 result = None
                 
-                # ONLY run Reversal scans in Reversal markets
-                if strategy_mode == "REVERSAL":
+                # 1. Strategy 9: Judas Outlier Inducement Sweep Trigger
+                if 'outlier_event' in locals() and outlier_event and outlier_event.get('range_atr_mult', 0) >= 1.8:
+                    wick_pct = outlier_event.get('lower_wick_pct', 0) if 'BULL' in outlier_event.get('candle_type', '') else outlier_event.get('upper_wick_pct', 0)
+                    if wick_pct >= 60.0:
+                        logger.info(f"⚡ Strategy 9: Live Outlier Judas Sweep Detected on {symbol} (Range: {outlier_event['range_atr_mult']:.2f}x | Wick: {wick_pct:.1f}%)")
+                        trade_dir = 'BUY' if 'BULL' in outlier_event['candle_type'] else 'SELL'
+                        entry_p = float(df_tmp.iloc[-1]['close'])
+                        atr_cur = float(self.scanner.calculate_atr(df_tmp).iloc[-1]) if not df_tmp.empty else entry_p * 0.008
+                        sl_dist = atr_cur * 2.0
+                        sl_p = entry_p - sl_dist if trade_dir == 'BUY' else entry_p + sl_dist
+                        tp_p = entry_p + (sl_dist * 2.5) if trade_dir == 'BUY' else entry_p - (sl_dist * 2.5)
+                        
+                        judas_setup = {
+                            'symbol': symbol,
+                            'direction': trade_dir,
+                            'entry': entry_p,
+                            'entry_price': entry_p,
+                            'sl': sl_p,
+                            'stop_loss': sl_p,
+                            'tp': tp_p,
+                            'take_profit': tp_p,
+                            'pattern': f"Strategy 9 Judas Sweep Reversal ({outlier_event['candle_type']})",
+                            'is_judas_inducement': True,
+                            'atr': atr_cur,
+                            'wick_ratio': wick_pct / 100.0,
+                            'range_atr_mult': outlier_event['range_atr_mult']
+                        }
+                        result = (judas_setup, df_tmp)
+
+                # 2. ONLY run Reversal scans in Reversal markets if no outlier found
+                if not result and strategy_mode == "REVERSAL":
                     if is_prime_window:
                         result = self.scanner.scan_asian_fade(symbol)
                     if not result:
                         result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
                 
-                # ONLY run Trend scans in Trending markets
-                elif strategy_mode == "TREND":
+                # 3. ONLY run Trend scans in Trending markets if no outlier found
+                elif not result and strategy_mode == "TREND":
                     result = self.scanner.scan_trend_expansion(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
 
                 if result:
