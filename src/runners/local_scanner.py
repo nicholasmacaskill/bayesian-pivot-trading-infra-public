@@ -937,16 +937,20 @@ class LocalScannerRunner:
                         }
                         result = (judas_setup, df_tmp)
 
-                # 2. ONLY run Reversal scans in Reversal markets if no outlier found
+                # 2. Reversal scans in Reversal markets (with fallback)
                 if not result and strategy_mode == "REVERSAL":
                     if is_prime_window:
                         result = self.scanner.scan_asian_fade(symbol)
                     if not result:
                         result = self.scanner.scan_order_flow(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
+                    if not result:
+                        result = self.scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
                 
-                # 3. ONLY run Trend scans in Trending markets if no outlier found
+                # 3. Trend scans in Trending markets (with fallback)
                 elif not result and strategy_mode == "TREND":
                     result = self.scanner.scan_trend_expansion(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
+                    if not result:
+                        result = self.scanner.scan_pattern(symbol, timeframe=Config.TIMEFRAME, cached_context=cached_ctx)
 
                 if result:
                     setup, df = result

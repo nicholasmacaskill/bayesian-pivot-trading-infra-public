@@ -197,6 +197,7 @@ class Config:
     
     # Edge Optimization
     MIN_SMT_STRENGTH = 0.25
+    MIN_TARGET_PCT = 0.0035  # 0.35% minimum price distance on 5m charts (or >= 2.0R)
     MIN_PRICE_QUARTILE = 0.0
     MAX_PRICE_QUARTILE = 0.75
     MIN_PRICE_QUARTILE_SHORT = 0.25

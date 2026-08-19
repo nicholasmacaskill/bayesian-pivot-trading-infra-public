@@ -1221,7 +1221,8 @@ class SMCScanner:
                 target = min(target or float('inf'), min_target_dynamic)
 
         # Apply MIN_TARGET_PCT floor to target (prevents noise-level weekend ATR targets)
-        min_target_pct = getattr(Config, 'MIN_TARGET_PCT', {}).get(symbol, 0.010)
+        cfg_min_target = getattr(Config, 'MIN_TARGET_PCT', 0.0035)
+        min_target_pct = cfg_min_target.get(symbol, 0.0035) if isinstance(cfg_min_target, dict) else float(cfg_min_target)
         min_target_distance = entry_price * min_target_pct
         
         if direction == 'LONG':
@@ -1697,13 +1698,22 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
 
 
         if setup:
-            # --- Target Floor Implementation <!-- id: 8 -->
-            entry_px = setup['entry']
-            target_px = setup['target']
-            dist_pct = abs(target_px - entry_px) / entry_px
-            if dist_pct < 0.01:
-                logger.warning(f"🚫 Target Floor Breach for {symbol}: {dist_pct:.2%} (Limit: 1.0%). Rejecting.")
-                return None
+            # --- Dynamic Target Floor (Scaled for 5m SMC Scalps & Trends) ---
+            entry_px = setup.get('entry', setup.get('entry_price', 0))
+            target_px = setup.get('target', setup.get('take_profit', 0))
+            sl_px = setup.get('sl', setup.get('stop_loss', 0))
+            
+            if entry_px > 0:
+                dist_pct = abs(target_px - entry_px) / entry_px
+                risk_dist = abs(entry_px - sl_px)
+                reward_dist = abs(target_px - entry_px)
+                rr_ratio = reward_dist / risk_dist if risk_dist > 0 else 0
+                
+                min_target_pct = getattr(Config, 'MIN_TARGET_PCT', 0.0035)
+                # Allow if either target >= 0.35% (e.g. $225+ on BTC) or Risk:Reward >= 2.0R
+                if dist_pct < min_target_pct and rr_ratio < 2.0:
+                    logger.warning(f"🚫 Target Floor Breach for {symbol}: {dist_pct:.2%} (Limit: {min_target_pct:.2%} or >= 2.0R). Rejecting.")
+                    return None
 
             # Stamp cache so this symbol is deduplicated for the next cooldown window
             self._signal_cache[cache_key] = now_ts
