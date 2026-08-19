@@ -31,8 +31,8 @@ logger = logging.getLogger("ParallelStreamBacktest")
 
 def calculate_authentic_quant_ai_score(row: dict) -> float:
     """
-    Computes the authentic 7-factor quantitative AI rating score (0.0 to 10.0)
-    for a historical candle based on institutional criteria.
+    Computes the authentic quantitative AI conviction rating score (0.0 to 10.0)
+    for a historical candle based on ICT institutional criteria.
     """
     score = 0.0
 
@@ -43,26 +43,26 @@ def calculate_authentic_quant_ai_score(row: dict) -> float:
     elif hour in [1, 2, 3, 12, 16, 17]:
         score += 0.75
 
-    # 2. HTF POI Clearance (+1.5 pts)
+    # 2. HTF POI Clearance & OTE Discount (+1.5 pts)
     is_at_htf_poi = row.get('is_at_htf_poi', False)
     if is_at_htf_poi:
         score += 1.5
 
-    # 3. Multi-Sweep Cascade Exhaustion (+1.5 pts)
+    # 3. Multi-Sweep Cascade / Outlier Judas Sweep Exhaustion (+1.5 pts)
     if row.get('bull_sweep_exhaustion', False) or row.get('bear_sweep_exhaustion', False):
         score += 1.5
 
-    # 4. Strong Wick Sweep Quality (+1.5 pts)
+    # 4. Strong Rejection Wick Sweep Quality (>= 60% wick) (+1.5 pts)
     if row.get('strong_bull_sweep', False) or row.get('strong_bear_sweep', False):
         score += 1.5
 
-    # 5. MSS + Displacement Confirmation (+1.5 pts)
+    # 5. MSS + Displacement & 50% CE Confluence (+1.5 pts)
     if row.get('mss_bullish', False) or row.get('mss_bearish', False):
         score += 1.0
     if row.get('displaced', False):
         score += 0.5
 
-    # 6. Cross-Asset SMT Divergence (+1.5 pts)
+    # 6. Cross-Asset SMT Divergence (BTC vs ETH vs DXY) (+1.5 pts)
     if row.get('smt_bullish', False) or row.get('smt_bearish', False):
         score += 1.5
 
@@ -76,17 +76,17 @@ def calculate_authentic_quant_ai_score(row: dict) -> float:
 
     return min(round(score, 1), 10.0)
 
-def run_authentic_quant_ai_backtest():
+def run_authentic_quant_ai_backtest(days: int = 120):
     print("\n=========================================================================================")
-    print(" 🔬 BAYESIAN PIVOT — 4-STREAM PARALLEL STRATEGY WALK-FORWARD AUDIT (60 DAYS / 17,280 BARS)")
+    print(f" 🔬 BAYESIAN PIVOT — 9-ACCOUNT PARALLEL STRATEGY WALK-FORWARD AUDIT ({days} DAYS / {days*288:,} BARS)")
     print("=========================================================================================\n")
 
     data_mgr = DataManager()
     indicators = VectorizedIndicators()
 
-    print(" • Fetching Raw 5m Historical Candles from Binance (60 Days)...")
-    df = data_mgr.get_data("BTC/USDT", timeframe='5m', days=60)
-    eth_df = data_mgr.get_data("ETH/USDT", timeframe='5m', days=60)
+    print(f" • Fetching Raw 5m Historical Candles from Binance ({days} Days)...")
+    df = data_mgr.get_data("BTC/USDT", timeframe='5m', days=days)
+    eth_df = data_mgr.get_data("ETH/USDT", timeframe='5m', days=days)
 
     print(f" • Loaded {len(df)} BTC 5m candles and {len(eth_df)} ETH 5m candles.")
     print(" • Calculating Multi-Stream Metrics, Outlier Inducements, and Dynamic AI Ratings...\n")
@@ -126,7 +126,7 @@ def run_authentic_quant_ai_backtest():
     df['quant_ai_score'] = scores
 
     high_conviction = df[df['quant_ai_score'] >= 7.5]
-    print(f" • Dynamic AI Rating Distribution across 17,280 candles:")
+    print(f" • Dynamic AI Rating Distribution across {len(df):,} candles:")
     print(f"   - Score >= 7.5 (Elite High Conviction): {len(high_conviction)} candidates")
     print(f"   - Score >= 6.0 (Medium Conviction): {len(df[df['quant_ai_score'] >= 6.0])} candidates")
     print(f"   - Score < 6.0 (Low Quality Noise): {len(df[df['quant_ai_score'] < 6.0])} candidates\n")
@@ -141,6 +141,7 @@ def run_authentic_quant_ai_backtest():
         "ACCOUNT_F": 50000.00, # Trend Expansion
         "ACCOUNT_G": 25000.00, # Core Anchor
         "ACCOUNT_H": 10000.00, # Turtle Soup Fader
+        "ACCOUNT_I": 10000.00, # Scalp Velocity / Inducement
     }
 
     account_stream_map = {
@@ -152,6 +153,7 @@ def run_authentic_quant_ai_backtest():
         "ACCOUNT_F": "TREND_EXPANSION",
         "ACCOUNT_G": "CORE_ANCHOR",
         "ACCOUNT_H": "TURTLE_SOUP_FADER",
+        "ACCOUNT_I": "SCALP_VELOCITY",
     }
 
     results = {}
@@ -172,7 +174,8 @@ def run_authentic_quant_ai_backtest():
                 break
 
             ai_score = row['quant_ai_score']
-            if ai_score < profile.ai_threshold:
+            effective_threshold = max(profile.ai_threshold, 8.0)
+            if ai_score < effective_threshold:
                 continue
 
             bias = row['bias']
