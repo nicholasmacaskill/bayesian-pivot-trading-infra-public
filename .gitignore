@@ -80,4 +80,5 @@ src/sovereign_core/
 # Repomix & Codebase Exports
 repomix-output*
 codebase_pack_*
+repomix-*.txt
 
