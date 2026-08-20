@@ -364,8 +364,30 @@ class TradeLockerHelper:
                     return False
 
                 if resp.status_code in [200, 201]:
+                    res_json = resp.json()
                     logger.info(f"✅ Order Executed: {side} {aligned_qty} on {instrument_id}")
-                    return resp.json()
+                    
+                    # Ensure Stop Loss & Take Profit are attached via Position PATCH
+                    if stop_loss or take_profit:
+                        time.sleep(0.5)
+                        try:
+                            open_pos = self.get_open_positions()
+                            if open_pos:
+                                for p in open_pos:
+                                    if str(p.get("symbol", "")).replace("/", "").upper() in ["BTCUSD", "ETHUSD"] or str(p.get("tradableInstrumentId", "")) == str(instrument_id):
+                                        pos_id = p.get("id")
+                                        if pos_id:
+                                            patch_url = f"{self.base_url}/backend-api/trade/positions/{pos_id}"
+                                            patch_payload = {"stopLossType": "absolute", "takeProfitType": "absolute"}
+                                            if stop_loss: patch_payload["stopLoss"] = float(stop_loss)
+                                            if take_profit: patch_payload["takeProfit"] = float(take_profit)
+                                            p_res = requests.patch(patch_url, json=patch_payload, headers=self._get_headers(auth=True), timeout=5)
+                                            logger.info(f"🛡️ Attached SL (${stop_loss}) & TP (${take_profit}) to Position {pos_id}: {p_res.status_code}")
+                                            break
+                        except Exception as bracket_err:
+                            logger.warning(f"⚠️ Bracket attach non-fatal error: {bracket_err}")
+
+                    return res_json
                 elif resp.status_code in [500, 502, 503, 504]:
                     # Server timeout/gateway error: check if order hit book before retrying
                     logger.warning(f"⚠️ Broker server error ({resp.status_code}). Checking for filled open position...")
