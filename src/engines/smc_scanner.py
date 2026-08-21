@@ -432,6 +432,49 @@ class SMCScanner:
         ratio = recent_volume / avg_volume
         return round(ratio, 2)
 
+    def calculate_rvol(self, df, lookback=20):
+        """
+        Calculates Relative Volume (RVol) against 20-period moving average.
+        Returns float ratio (e.g. 2.5 = 250% of normal volume).
+        """
+        if df is None or len(df) < lookback or 'volume' not in df.columns:
+            return 1.0
+        vol = df['volume'].values
+        avg_vol = np.mean(vol[-lookback-1:-1]) if len(vol) > lookback else np.mean(vol)
+        if avg_vol <= 0:
+            return 1.0
+        return float(round(vol[-1] / avg_vol, 2))
+
+    def detect_cvd_exhaustion(self, df, lookback=6):
+        """
+        Detects Cumulative Volume Delta (CVD) exhaustion/absorption.
+        Estimates buying vs selling volume delta across recent candles.
+        Returns dict with delta trend and exhaustion boolean.
+        """
+        if df is None or len(df) < lookback:
+            return {'exhausted': False, 'delta_ratio': 1.0, 'bias': 'NEUTRAL'}
+        
+        recent = df.tail(lookback).copy()
+        # Estimate volume delta using close relative to candle range
+        candle_ranges = (recent['high'] - recent['low']).replace(0, 1e-6)
+        close_positions = (recent['close'] - recent['low']) / candle_ranges
+        # Up-delta if closed in upper half, down-delta if lower half
+        deltas = (close_positions - 0.5) * 2.0 * recent['volume']
+        
+        total_delta = deltas.sum()
+        latest_delta = deltas.iloc[-1]
+        
+        # Exhaustion occurs when price makes an extreme wick but delta flips opposite
+        exhausted = (latest_delta * total_delta < 0) or (abs(latest_delta) < abs(deltas.mean()) * 0.5)
+        bias = 'BULLISH_EXHAUSTION' if total_delta > 0 and latest_delta < 0 else ('BEARISH_EXHAUSTION' if total_delta < 0 and latest_delta > 0 else 'NEUTRAL')
+        
+        return {
+            'exhausted': bool(exhausted),
+            'bias': bias,
+            'total_delta': float(round(total_delta, 2)),
+            'latest_delta': float(round(latest_delta, 2))
+        }
+
     @ensure_data(default_return=(pd.Series(dtype=bool), pd.Series(dtype=bool)))
     def detect_fractals(self, df, window=2):
         """
@@ -1784,17 +1827,19 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             return None
 
         current_price = df['close'].iloc[-1]
-        direction = 'LONG' if is_strong_bull else 'SHORT'
-        
-        # 4. ENTRY TRIGGER: Price currently "sitting" in a POI aligned with the trend
+        # 4. ENTRY TRIGGER: Price currently "sitting" in a POI OR Shallow Retest during High RVol Expansion
+        atr = self.calculate_atr(df).iloc[-1]
+        rvol = self.calculate_rvol(df)
+        rvol_threshold = getattr(Config, 'RVOL_EXPANSION_THRESHOLD', 2.5)
+
         active_poi = None
         for p in pois:
             if direction == 'LONG' and p['type'] == 'FVG_BULLISH':
-                if p['bottom'] <= current_price <= p['top']:
+                if p['bottom'] <= current_price <= p['top'] or (rvol >= rvol_threshold and current_price >= p['bottom'] and current_price <= p['top'] + (atr * 1.5)):
                     active_poi = p
                     break
             if direction == 'SHORT' and p['type'] == 'FVG_BEARISH':
-                if p['bottom'] <= current_price <= p['top']:
+                if p['bottom'] <= current_price <= p['top'] or (rvol >= rvol_threshold and current_price <= p['top'] and current_price >= p['bottom'] - (atr * 1.5)):
                     active_poi = p
                     break
         
@@ -1810,7 +1855,6 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
 
         # 6. Construct Setup
         # TP/SL based on POI and ATR
-        atr = self.calculate_atr(df).iloc[-1]
         if direction == 'LONG':
             entry = current_price
             stop_loss = active_poi['bottom'] - (atr * 0.5)

@@ -195,13 +195,20 @@ class Config:
     KILLZONE_LONDON = (7, 10)
     KILLZONE_NY_CONTINUOUS = (12, 20)
     
-    # Edge Optimization
+    # Edge & Volume-Augmented Optimization
     MIN_SMT_STRENGTH = 0.25
     MIN_TARGET_PCT = 0.0035  # 0.35% minimum price distance on 5m charts (or >= 2.0R)
     MIN_PRICE_QUARTILE = 0.0
     MAX_PRICE_QUARTILE = 0.75
     MIN_PRICE_QUARTILE_SHORT = 0.25
     MAX_PRICE_QUARTILE_SHORT = 1.0
+    
+    # Dynamic Volume-Augmented Substitution Thresholds
+    RVOL_EXPANSION_THRESHOLD = 2.5   # 2.5x volume relative to 20-period SMA
+    CVD_EXHAUSTION_THRESHOLD = 0.70  # 70% delta decay/exhaustion on sweep
+    DYNAMIC_FIB_SHALLOW = 0.382      # Shallow pullback level during high RVol
+    DYNAMIC_FIB_DEEP = 0.705         # Standard ICT deep discount level
+    SHADOW_UNIVERSE = ["BTC/USD", "ETH/USD", "SOL/USD"]
     
     # Database Path (Local vs Modal Volume)
     DB_PATH = "/data/smc_alpha.db" if os.path.isdir("/data") else os.path.join(os.getcwd(), "data", "smc_alpha.db")

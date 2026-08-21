@@ -166,6 +166,7 @@ class LocalScannerRunner:
         self.counterfactual_tracker = CounterfactualTracker()
         self.qa_agent = QAQuantAgent()
         self.inducement_tracker = InducementTracker()
+        self.learned_weights = self._load_learned_weights()
 
 
 
@@ -184,11 +185,22 @@ class LocalScannerRunner:
         self.awaiting_alpha_interview = False
         self.interview_trade_id = None
         self.last_interview_prompt_time = 0
-        self.processed_interviews = set() # Track IDs in-memory to avoid re-prompting
-        self.last_command_time = int(time.time()) - 300 # Look back 5 mins on startup
         self.session_start_time = int(time.time())
         self.last_session_name = None
         # ───────────────────────────────────────────────────────────
+
+    def _load_learned_weights(self):
+        """Loads empirical Bayesian strategy weights calibrated from historical replay."""
+        try:
+            path = "data/learned_strategy_weights.json"
+            if os.path.exists(path):
+                with open(path) as f:
+                    weights = json.load(f)
+                    logger.info(f"🧠 Loaded {len(weights)} Bayesian Strategy Weights from {path}")
+                    return weights
+        except Exception as e:
+            logger.debug(f"Could not load learned weights: {e}")
+        return {}
         # ───────────────────────────────────────────────────────────
 
         # ── Bayesian Pivot Guard (Security Layer) ───────────────────────────
