@@ -13,6 +13,13 @@ from datetime import datetime, timezone, timedelta
 # Fix ModuleNotFoundError: No module named 'src' <!-- id: 16 -->
 sys.path.append(os.getcwd())
 
+# Prevent yfinance SQLite cache locking collisions
+try:
+    import yfinance as yf
+    yf.set_tz_cache_location("/tmp/yfinance_cache")
+except Exception:
+    pass
+
 # Fix macOS Multiprocessing Pickling Error (TypeError: cannot pickle 'weakref.ReferenceType')
 if sys.platform == 'darwin':
     try:
@@ -185,23 +192,10 @@ class LocalScannerRunner:
         self.awaiting_alpha_interview = False
         self.interview_trade_id = None
         self.last_interview_prompt_time = 0
+        self.processed_interviews = set()
+        self.last_command_time = int(time.time()) - 300
         self.session_start_time = int(time.time())
         self.last_session_name = None
-        # ───────────────────────────────────────────────────────────
-
-    def _load_learned_weights(self):
-        """Loads empirical Bayesian strategy weights calibrated from historical replay."""
-        try:
-            path = "data/learned_strategy_weights.json"
-            if os.path.exists(path):
-                with open(path) as f:
-                    weights = json.load(f)
-                    logger.info(f"🧠 Loaded {len(weights)} Bayesian Strategy Weights from {path}")
-                    return weights
-        except Exception as e:
-            logger.debug(f"Could not load learned weights: {e}")
-        return {}
-        # ───────────────────────────────────────────────────────────
 
         # ── Bayesian Pivot Guard (Security Layer) ───────────────────────────
         self.guard = GuardEngine(notifier=self.notifier)
@@ -226,6 +220,19 @@ class LocalScannerRunner:
         # Shutdown handler
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
+
+    def _load_learned_weights(self):
+        """Loads empirical Bayesian strategy weights calibrated from historical replay."""
+        try:
+            path = "data/learned_strategy_weights.json"
+            if os.path.exists(path):
+                with open(path) as f:
+                    weights = json.load(f)
+                    logger.info(f"🧠 Loaded {len(weights)} Bayesian Strategy Weights from {path}")
+                    return weights
+        except Exception as e:
+            logger.debug(f"Could not load learned weights: {e}")
+        return {}
 
     def shutdown(self, signum, frame):
         logger.info("🛑 Shutdown signal received. Cleaning up...")

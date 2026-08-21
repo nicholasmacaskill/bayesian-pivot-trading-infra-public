@@ -15,6 +15,8 @@ from src.core.database import log_system_event
 
 # Prevent yfinance filesystem/locking/FD leak issues by forcing it to use the dummy cache
 try:
+    import yfinance as yf
+    yf.set_tz_cache_location("/tmp/yfinance_cache")
     from yfinance import cache
     cache._TzCacheManager._tz_cache = cache._TzCacheDummy()
 except Exception:

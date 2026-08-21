@@ -3,6 +3,11 @@ import pandas as pd
 import logging
 from src.core.config import Config
 
+try:
+    yf.set_tz_cache_location("/tmp/yfinance_cache")
+except Exception:
+    pass
+
 logger = logging.getLogger(__name__)
 
 class IntermarketEngine:
