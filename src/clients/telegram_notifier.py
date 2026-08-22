@@ -515,6 +515,36 @@ class TelegramNotifier:
                         execute_emergency_kill_switch()
                         self._send_message("✅ <b>EMERGENCY LIQUIDATION COMPLETE.</b> All open positions closed across all 8 account mandates.")
 
+                    elif target_cmd.startswith("scale_"):
+                        logger.info(f"🚀 Telegram Scale-In Command Received: {target_cmd}")
+                        try:
+                            # format: scale_BTCUSD_buy_78648.0_79048.0_77371.0
+                            parts = target_cmd.split("_")
+                            raw_sym = parts[1].upper()
+                            sym = f"{raw_sym[:3]}/{raw_sym[3:]}" if len(raw_sym) == 6 else raw_sym
+                            side = parts[2].lower()
+                            sl = float(parts[4])
+                            tp = float(parts[5])
+                            
+                            self._send_message(f"🚀 <b>DISPATCHING TRANCHE 2 (SCALE-IN):</b> Adding remaining 50% size on {sym} {side.upper()} across all accounts...")
+                            from src.clients.tl_client import TradeLockerClient
+                            from src.core.config import Config
+                            res = TradeLockerClient().execute_trade_across_all_accounts(
+                                symbol=sym,
+                                side=side,
+                                stop_loss=sl,
+                                take_profit=tp,
+                                risk_scale=getattr(Config, 'SCALE_IN_TRANCHE_2_SCALE', 0.50),
+                                tranche_label="TRANCHE_2_SCALE_IN"
+                            )
+                            if res.get('success'):
+                                self._send_message(f"✅ <b>SCALE-IN COMPLETE!</b> Tranche 2 (+50% Size) filled on {res.get('filled_count')}/{res.get('total_accounts')} accounts. Position is now at 100% Full Size! 🚀")
+                            else:
+                                self._send_message("⚠️ <b>SCALE-IN NOTICE:</b> Failed to fill Tranche 2 or accounts rejected order.")
+                        except Exception as scale_err:
+                            logger.error(f"Error executing scale-in from Telegram: {scale_err}")
+                            self._send_message(f"❌ <b>SCALE-IN ERROR:</b> {scale_err}")
+
             return new_offset
 
         except Exception as e:

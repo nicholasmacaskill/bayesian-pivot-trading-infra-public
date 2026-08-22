@@ -9,6 +9,7 @@ from src.clients.telegram_notifier import send_alert
 
 from src.engines.shadow_substitution_engine import ShadowSubstitutionEngine
 from src.engines.counterfactual_tracker import CounterfactualTracker
+from src.clients.tl_client import TradeLockerClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,8 @@ class AlphaSweepScanner(SMCScanner):
         super().__init__()
         self.shadow_engine = ShadowSubstitutionEngine()
         self.counterfactual_tracker = CounterfactualTracker()
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Shadow Substitution & Counterfactual Engine.")
+        self.tl = TradeLockerClient()
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Shadow Substitution, Counterfactual & TradeLocker Fleet Client.")
 
     def is_premium_killzone(self, dt=None):
         """
@@ -317,15 +319,43 @@ class AlphaSweepScanner(SMCScanner):
                 except Exception as shadow_err:
                     logger.warning(f"Failed to register shadow trade: {shadow_err}")
                 
+            # Auto-Execution Tranche 1 Probe (50% scale / ~0.20% fleet risk)
+            exec_result = None
+            if not is_shadow_window and getattr(Config, 'LIVE_AUTO_EXECUTION', False) and ai_score_val >= getattr(Config, 'AUTO_EXECUTION_MIN_SCORE', 8.5):
+                exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
+                logger.info(f"⚡ [PROBE & SCALE] Auto-executing Tranche 1 Probe (50% scale) on {symbol} {exec_side.upper()} @ {entry_price}...")
+                try:
+                    exec_result = self.tl.execute_trade_across_all_accounts(
+                        symbol=symbol,
+                        side=exec_side,
+                        stop_loss=sl_price,
+                        take_profit=tp_price,
+                        risk_scale=getattr(Config, 'AUTO_PROBE_RISK_SCALE', 0.50),
+                        tranche_label="TRANCHE_1_PROBE"
+                    )
+                except Exception as exec_err:
+                    logger.error(f"Error auto-executing Tranche 1: {exec_err}")
+                
             # Send Telegram Alert
             try:
-                alert_phase = "SHADOW_OBSERVATION" if is_shadow_window else "EXECUTION"
+                is_auto_filled = exec_result and exec_result.get('success')
+                alert_phase = "SHADOW_OBSERVATION" if is_shadow_window else ("AUTO_EXECUTED" if is_auto_filled else "EXECUTION")
+                
+                # Interactive Scale-In Button (only for live auto-executed setups)
+                buttons = None
+                if not is_shadow_window and is_auto_filled:
+                    exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
+                    cb_data = f"scale_{symbol.replace('/', '')}_{exec_side}_{entry_price:.1f}_{sl_price:.1f}_{tp_price:.1f}"
+                    buttons = [[{"text": "🚀 SCALE IN 2ND TRANCHE (+0.20% RISK)", "callback_data": cb_data}]]
+                    
+                exec_notice = f"\n\n⚡ <b>AUTO-EXECUTED:</b> Tranche 1 Probe (50% Size) filled across {exec_result.get('filled_count', 0)}/{exec_result.get('total_accounts', 0)} accounts!" if is_auto_filled else ""
+                
                 send_alert(
                     symbol=symbol,
                     timeframe="5m",
                     pattern=f"[👻 SHADOW] {pattern_str}" if is_shadow_window else pattern_str,
                     ai_score=ai_score_val,
-                    reasoning=f"{ai_result['reasoning']} {'(⚠️ ZERO LIVE CAPITAL RISK - Shadow Tracking Only)' if is_shadow_window else ''}",
+                    reasoning=f"{ai_result['reasoning']} {'(⚠️ ZERO LIVE CAPITAL RISK - Shadow Tracking Only)' if is_shadow_window else ''}{exec_notice}",
                     verdict=verdict_str,
                     session_info={"name": killzone, "phase": alert_phase},
                     bias_data={"daily": setup['trend'], "htf": setup['trend'], "dxy_trend": "N/A"},
@@ -333,10 +363,11 @@ class AlphaSweepScanner(SMCScanner):
                     risk_calc={
                         "entry": entry_price,
                         "stop_loss": sl_price,
-                        "position_size": lots,
+                        "position_size": round(lots * (getattr(Config, 'AUTO_PROBE_RISK_SCALE', 0.50) if is_auto_filled else 1.0), 2),
                         "take_profit": tp_price,
                         "position_value": position_value
-                    }
+                    },
+                    buttons=buttons
                 )
             except Exception as e:
                 logger.error(f"Error sending Telegram alert: {e}")

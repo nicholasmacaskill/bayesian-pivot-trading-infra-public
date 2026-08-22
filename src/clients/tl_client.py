@@ -567,3 +567,84 @@ class TradeLockerClient:
             take_profit=take_profit,
             order_type="market"
         )
+
+    def execute_trade_across_all_accounts(
+        self,
+        symbol="BTC/USD",
+        side="buy",
+        stop_loss=None,
+        take_profit=None,
+        risk_scale=0.50,
+        tranche_label="TRANCHE_1_PROBE"
+    ):
+        """
+        Executes a sized order across all configured TradeLocker accounts with 2.5s rate-limit pacing.
+        Automatically scales lot sizes to account balances (e.g. 50k -> 0.12 BTC at 0.50 scale).
+        """
+        import time
+        instrument_id = self.resolve_instrument_id(symbol)
+        
+        if not self.helpers:
+            logger.error("No TradeLocker account helpers configured.")
+            return {"success": False, "filled_count": 0, "total_accounts": 0}
+            
+        results = []
+        logger.info(f"⚡ [PROBE & SCALE] Dispatching {tranche_label} ({risk_scale*100:.0f}% Risk Scale) across {len(self.helpers)} accounts for {symbol} {side.upper()}...")
+        
+        for i, helper in enumerate(self.helpers):
+            if i > 0:
+                time.sleep(2.5)  # 2.5s adaptive pacing to avoid HTTP 429 rate limits
+                
+            try:
+                if not helper.access_token:
+                    helper.login()
+                    
+                # Determine account equity
+                equity = 25000.0  # Safe default baseline
+                try:
+                    state = helper.get_account_state()
+                    if state:
+                        equity = float(state.get('projectedEquity') or state.get('accountBalance', 25000.0))
+                except Exception:
+                    pass
+                    
+                # Tier-scaled lot sizing
+                if equity >= 45000.0:
+                    base_lot = 0.25
+                elif equity >= 20000.0:
+                    base_lot = 0.23
+                else:
+                    base_lot = 0.11
+                    
+                # Scale lot size (e.g., 0.50 for Tranche 1 probe)
+                scaled_lot = round(base_lot * risk_scale, 2)
+                if scaled_lot < 0.01:
+                    scaled_lot = 0.01
+                    
+                success = helper.place_order(
+                    instrument_id=instrument_id,
+                    side=side,
+                    qty=scaled_lot,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    order_type="market"
+                )
+                
+                if success:
+                    logger.info(f"✅ Account {i+1} ({helper.email}) filled {scaled_lot} lots {side.upper()} on {symbol} (SL: {stop_loss}, TP: {take_profit})")
+                    results.append(True)
+                else:
+                    logger.warning(f"⚠️ Account {i+1} ({helper.email}) order placement failed or rejected.")
+                    results.append(False)
+            except Exception as e:
+                logger.error(f"❌ Error dispatching to Account {i+1} ({helper.email}): {e}")
+                results.append(False)
+                
+        filled_count = sum(1 for r in results if r)
+        logger.info(f"📊 [PROBE & SCALE] Execution summary: {filled_count}/{len(self.helpers)} accounts successfully filled.")
+        return {
+            "success": filled_count > 0,
+            "filled_count": filled_count,
+            "total_accounts": len(self.helpers),
+            "tranche_label": tranche_label
+        }
