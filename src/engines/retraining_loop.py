@@ -197,16 +197,16 @@ class RetrainingLoop:
         outcome = record.get('outcome', 'UNKNOWN')
         pnl     = record.get('pnl', 0.0) or 0.0
         is_disc = record.get('is_discretionary', 0)
-        pattern = record.get('pattern', 'SMC Setup')
-        regime  = record.get('shadow_regime', 'Neutral')
-        vol_spike = record.get('volume_spike', 1.0)
-        true_smt = record.get('true_smt', 'N/A')
+        pattern = record.get('pattern') or 'SMC Setup'
+        regime  = record.get('shadow_regime') or 'Neutral'
+        vol_spike = record.get('volume_spike', 1.0) or 1.0
+        true_smt = record.get('true_smt', 'N/A') or 'N/A'
         
         # 1. Classify Strategy Archetype
         archetype = self.classify_trade_archetype(
             pattern=pattern, 
             regime=regime, 
-            hurst=0.58 if "TREND" in regime.upper() else (0.38 if "REVERT" in regime.upper() else 0.50),
+            hurst=0.58 if "TREND" in str(regime).upper() else (0.38 if "REVERT" in str(regime).upper() else 0.50),
             symbol=record.get('symbol', 'BTC/USD'),
             is_disc=bool(is_disc)
         )

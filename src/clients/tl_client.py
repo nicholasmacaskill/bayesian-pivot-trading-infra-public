@@ -342,8 +342,12 @@ class TradeLockerHelper:
         else:
             payload["price"] = 0.0
 
-        if stop_loss: payload["stopLoss"] = float(stop_loss)
-        if take_profit: payload["takeProfit"] = float(take_profit)
+        if stop_loss:
+            payload["stopLoss"] = float(stop_loss)
+            payload["stopLossType"] = "absolute"
+        if take_profit:
+            payload["takeProfit"] = float(take_profit)
+            payload["takeProfitType"] = "absolute"
 
         for attempt in range(2):
             try:
@@ -367,7 +371,7 @@ class TradeLockerHelper:
                     res_json = resp.json()
                     logger.info(f"✅ Order Executed: {side} {aligned_qty} on {instrument_id}")
                     
-                    # Ensure Stop Loss & Take Profit are attached via Position PATCH
+                    # Ensure Stop Loss & Take Profit are verified & attached via Position PATCH fallback
                     if stop_loss or take_profit:
                         time.sleep(0.5)
                         try:
@@ -377,7 +381,7 @@ class TradeLockerHelper:
                                     if str(p.get("symbol", "")).replace("/", "").upper() in ["BTCUSD", "ETHUSD"] or str(p.get("tradableInstrumentId", "")) == str(instrument_id):
                                         pos_id = p.get("id")
                                         if pos_id:
-                                            patch_url = f"{self.base_url}/backend-api/trade/positions/{pos_id}"
+                                            patch_url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions/{pos_id}"
                                             patch_payload = {"stopLossType": "absolute", "takeProfitType": "absolute"}
                                             if stop_loss: patch_payload["stopLoss"] = float(stop_loss)
                                             if take_profit: patch_payload["takeProfit"] = float(take_profit)
@@ -542,7 +546,7 @@ class TradeLockerClient:
         if "BTC" in norm:
             return "19965"
         elif "ETH" in norm:
-            return "19967"
+            return "19957"
         return "19965"
 
     def execute_trade(self, symbol="BTC/USD", side="buy", qty=0.15, stop_loss=None, take_profit=None, account_index=0):
