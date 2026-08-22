@@ -497,17 +497,18 @@ class AIValidator:
             - Confluences: {oracle_rules}
             
             ### STRATEGIC FOCUS:
-            If Hurst < 0.40 (Mean-Reverting), PRIORITIZE 'Institutional Fades' and 'Liq Sweeps'.
+            If Hurst < 0.45 (Mean-Reverting), PRIORITIZE 'Institutional Fades', 'Turtle Soups', and 'Liq Sweeps'.
             If Hurst > 0.55 (Trending), PRIORITIZE 'Trend Pullbacks' and 'Expansion continuations'.
 
             ### DYNAMIC SCORING RUBRIC (0.0 - 10.0 scale):
-            Calculate exact score starting from baseline 6.0:
-            +1.5 for SMT >= 0.5, +0.8 for SMT 0.35-0.49
-            +1.0 for Regime / Hurst alignment
-            +1.0 for Q2 Judas Manipulation window
-            +0.8 for High volume spike (>= 2.0) with clean sweep
+            Calculate exact score starting from baseline 5.5:
+            +1.2 for SMT Strength >= 0.35 (or confirmed cross-asset divergence)
+            +1.3 for Hurst < 0.45 (Fade alignment) OR +1.0 for Hurst > 0.55 (Trend alignment)
+            +1.0 for Prime Asian Fade / London / NY Killzone Window
+            +1.0 for Clean ATR Sweep (0.25-0.50x) with Wick Absorption >= 35% or CVD Divergence
             +0.7 for Deep Discount / Premium zone
-            -1.5 for High impact news or HTF bias conflict
+            -1.5 for High impact news within 30 min
+            -1.5 for HTF bias conflict ONLY IF Hurst > 0.55 (Trend Mode). Do NOT penalize HTF conflict if Hurst < 0.45 (Mean-Reverting Trap).
 
             Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
             """
