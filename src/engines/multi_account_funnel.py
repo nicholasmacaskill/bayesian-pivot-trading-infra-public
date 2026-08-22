@@ -17,7 +17,7 @@ class AccountValidatorProfile:
     hurst_required_mode: Optional[str] = None  # 'TREND_ONLY', 'REVERSAL_ONLY', None
     ai_threshold: float = 7.5
     bypass_ai_gate: bool = False
-    require_smt_divergence: bool = True
+    require_smt_divergence: bool = False
     min_smt_strength: float = 0.15
     calendar_blackout_mins: int = 15
     slippage_atr_max: float = 1.5
@@ -55,7 +55,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode=None,
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=30,
                 slippage_atr_max=1.5,
@@ -73,7 +73,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode="TREND_ONLY",
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=2.0,
@@ -91,7 +91,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode="REVERSAL_ONLY",
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=30,
                 slippage_atr_max=1.5,
@@ -109,7 +109,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode="REVERSAL_ONLY",
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=1.5,
@@ -127,7 +127,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode="REVERSAL_ONLY",
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=2.0,
@@ -145,7 +145,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode="TREND_ONLY",
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=2.0,
@@ -163,7 +163,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode=None,
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=30,
                 slippage_atr_max=1.5,
@@ -181,7 +181,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode="REVERSAL_ONLY",
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=1.5,
@@ -199,7 +199,7 @@ class MultiAccountFunnelManager:
                 hurst_required_mode=None,
                 ai_threshold=7.5,
                 bypass_ai_gate=False,
-                require_smt_divergence=True,
+                require_smt_divergence=False,
                 min_smt_strength=0.15,
                 calendar_blackout_mins=15,
                 slippage_atr_max=2.0,
@@ -239,63 +239,45 @@ class MultiAccountFunnelManager:
         opp_dir = "SELL" if norm_dir == "BUY" else "BUY"
 
         # 1. In-flight intent check
-        with self._intent_lock:
-            now = time.time()
-            stale_keys = [k for k, ts in self._pending_intents.items() if now - ts > 60.0]
-            for k in stale_keys:
-                self._pending_intents.pop(k, None)
+        if account_key:
+            with self._intent_lock:
+                if (norm_symbol, norm_dir, account_key) in self._pending_intents:
+                    return False, f"IN_FLIGHT_ORDER_INTENT_ACTIVE for {account_key}"
 
-            for (p_sym, p_dir, p_acc), _ in self._pending_intents.items():
-                if p_sym == norm_symbol:
-                    if p_dir == opp_dir:
-                        return False, f"ANTI_HEDGE_INTENT_BLOCKED: In-flight {p_dir} on {p_sym}"
-                    if account_key and p_acc == account_key and p_dir == norm_dir:
-                        return False, f"DUPLICATE_INTENT_BLOCKED: Active {p_dir} intent for {account_key}"
-
-        # 2. Existing positions check
+        # 2. Existing position opposite check
         for pos in open_positions:
             pos_sym = str(pos.get("symbol", "")).replace("/", "").replace("_", "").upper()
-            pos_dir = str(pos.get("side", pos.get("direction", ""))).upper()
+            pos_side = str(pos.get("side", "")).upper()
 
-            if pos_sym == norm_symbol and pos_dir == opp_dir:
-                return False, f"ANTI_HEDGE_POSITION_BLOCKED: Open {pos_dir} position on {pos_sym}"
+            if pos_sym == norm_symbol:
+                if pos_side == opp_dir:
+                    return False, f"ANTI_HEDGING_VIOLATION: Existing {pos_side} position active on {norm_symbol}."
+                if pos_side == norm_dir:
+                    return False, f"DUPLICATE_POSITION_EXPOSURE: Existing {pos_side} position already open."
 
         return True, None
 
-    def evaluate_setup_for_account(
+    def evaluate_account_eligibility(
         self,
-        setup: dict,
         account_key: str,
-        hurst: float = 0.58,
-        smt_strength: float = 0.20,
-        slippage_ratio: float = 1.0,
-        cal_safe: bool = True,
-        corr_ok: bool = True,
-        regime_allowed: bool = True,
-        ai_score: float = 8.0,
-        open_positions: Optional[List[dict]] = None
+        setup: dict,
+        hurst: float,
+        smt_strength: float,
+        ai_score: float,
+        slippage_ratio: float,
+        cal_safe: bool,
+        corr_ok: bool,
+        regime_allowed: bool
     ) -> Tuple[bool, List[str]]:
-
         """
-        Evaluates a candidate setup against a specific account's validator profile.
-        Returns:
-            Tuple[bool, List[str]]: (passed, list_of_rejection_reasons)
+        Evaluates a candidate trade against a specific account's validator profile.
+        Returns: (passed: bool, rejection_reasons: List[str])
         """
         profile = self.profiles.get(account_key)
         if not profile:
-            return False, ["UNKNOWN_ACCOUNT_PROFILE"]
+            return False, [f"UNKNOWN_ACCOUNT_KEY ({account_key})"]
 
         rejection_reasons = []
-
-        # 0. Portfolio Anti-Hedging Gate Check
-        anti_hedge_ok, anti_hedge_reason = self.check_anti_hedging_gate(
-            setup_symbol=setup.get('symbol', ''),
-            setup_direction=setup.get('direction', 'BUY'),
-            open_positions=open_positions or [],
-            account_key=account_key
-        )
-        if not anti_hedge_ok:
-            rejection_reasons.append(anti_hedge_reason)
 
         # 1. Hurst Gate Check
         h_low, h_high = profile.hurst_chaos_range
@@ -322,14 +304,65 @@ class MultiAccountFunnelManager:
         if not regime_allowed:
             rejection_reasons.append("REGIME_FILTER_BLOCKED")
 
-        # 6. SMT Divergence Check
-        if profile.require_smt_divergence and smt_strength < profile.min_smt_strength:
+        # 6. SMT Divergence Dynamic Confluence Booster
+        effective_ai_score = ai_score
+        if smt_strength >= profile.min_smt_strength:
+            effective_ai_score = min(10.0, ai_score + 1.0)
+            logger.info(f"✨ SMT Divergence Booster (+1.0) applied for {profile.account_name}: {ai_score:.1f} -> {effective_ai_score:.1f}")
+        elif profile.require_smt_divergence and smt_strength < profile.min_smt_strength:
             rejection_reasons.append(f"INSUFFICIENT_SMT ({smt_strength:.2f} < {profile.min_smt_strength})")
 
         # 7. AI Conviction Score Check
         if not profile.bypass_ai_gate:
-            if ai_score < profile.ai_threshold:
-                rejection_reasons.append(f"AI_SCORE_BELOW_THRESHOLD ({ai_score:.1f} < {profile.ai_threshold})")
+            if effective_ai_score < profile.ai_threshold:
+                rejection_reasons.append(f"AI_SCORE_BELOW_THRESHOLD ({effective_ai_score:.1f} < {profile.ai_threshold})")
 
         passed = len(rejection_reasons) == 0
         return passed, rejection_reasons
+
+    def evaluate_setup_for_account(
+        self,
+        setup: dict,
+        account_key: str,
+        hurst: float = 0.58,
+        smt_strength: float = 0.20,
+        slippage_ratio: float = 1.0,
+        cal_safe: bool = True,
+        corr_ok: bool = True,
+        regime_allowed: bool = True,
+        ai_score: float = 8.0,
+        open_positions: Optional[List[dict]] = None
+    ) -> Tuple[bool, List[str]]:
+        """
+        Evaluates a candidate setup against an account's validator profile, including anti-hedging.
+        """
+        profile = self.profiles.get(account_key)
+        if not profile:
+            return False, ["UNKNOWN_ACCOUNT_PROFILE"]
+
+        rejection_reasons = []
+
+        # 0. Portfolio Anti-Hedging Gate Check
+        anti_hedge_ok, anti_hedge_reason = self.check_anti_hedging_gate(
+            setup_symbol=setup.get('symbol', ''),
+            setup_direction=setup.get('direction', 'BUY'),
+            open_positions=open_positions or [],
+            account_key=account_key
+        )
+        if not anti_hedge_ok:
+            rejection_reasons.append(anti_hedge_reason)
+
+        passed_elig, elig_reasons = self.evaluate_account_eligibility(
+            account_key=account_key,
+            setup=setup,
+            hurst=hurst,
+            smt_strength=smt_strength,
+            ai_score=ai_score,
+            slippage_ratio=slippage_ratio,
+            cal_safe=cal_safe,
+            corr_ok=corr_ok,
+            regime_allowed=regime_allowed
+        )
+        rejection_reasons.extend(elig_reasons)
+
+        return len(rejection_reasons) == 0, rejection_reasons
