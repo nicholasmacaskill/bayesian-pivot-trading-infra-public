@@ -8,6 +8,7 @@ from src.core.database import log_scan, log_system_event
 from src.clients.telegram_notifier import send_alert
 
 from src.engines.shadow_substitution_engine import ShadowSubstitutionEngine
+from src.engines.counterfactual_tracker import CounterfactualTracker
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +16,19 @@ class AlphaSweepScanner(SMCScanner):
     def __init__(self):
         super().__init__()
         self.shadow_engine = ShadowSubstitutionEngine()
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Shadow Substitution Engine.")
+        self.counterfactual_tracker = CounterfactualTracker()
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Shadow Substitution & Counterfactual Engine.")
 
     def is_premium_killzone(self, dt=None):
         """
         Returns the active killzone label, or None if outside premium windows.
-        Premium Killzones:
-        - London Open: 07:00 - 10:00 UTC
-        - NY Open: 12:00 - 15:00 UTC
-        - Asian Fade: 04:00 - 07:00 UTC
+        Premium Live Windows:
+        - London Open: 07:00 - 10:00 UTC (00:00 - 03:00 PST)
+        - NY Open: 12:00 - 15:00 UTC (05:00 - 08:00 PST)
+        - Asian Fade: 04:00 - 07:00 UTC (21:00 - 00:00 PST)
+        
+        Shadow Observation Window:
+        - NY Afternoon Shadow: 15:00 - 20:00 UTC (08:00 - 13:00 PST) [100% Shadow Tracking, Zero Live Risk]
         """
         if dt is None:
             dt = datetime.now(timezone.utc)
@@ -35,6 +40,8 @@ class AlphaSweepScanner(SMCScanner):
             return "NY_OPEN"
         elif 4 <= hour < 7:
             return "ASIAN_FADE"
+        elif 15 <= hour < 20:
+            return "NY_AFTERNOON_SHADOW"
         return None
 
     def find_htf_levels(self, df_1h, window=2):
@@ -257,6 +264,9 @@ class AlphaSweepScanner(SMCScanner):
                 logger.warning(f"Shadow substitution audit error: {shadow_err}")
                 shadow_report = {}
 
+            is_shadow_window = (killzone == "NY_AFTERNOON_SHADOW")
+            verdict_str = "SHADOW_OBSERVATION" if is_shadow_window else "CONFIRMED"
+            
             # Prepare scan payload
             scan_payload = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -264,7 +274,7 @@ class AlphaSweepScanner(SMCScanner):
                 "pattern": pattern_str,
                 "bias": setup['trend'],
                 "direction": setup['direction'],
-                "verdict": "CONFIRMED",
+                "verdict": verdict_str,
                 "shadow_regime": setup['regime'],
                 "shadow_multiplier": 1.0,
                 "session": killzone,
@@ -274,9 +284,10 @@ class AlphaSweepScanner(SMCScanner):
                 "formations": f"Sweep of {setup['level']:.2f} | ShadowScore: {shadow_report.get('shadow_score', 'N/A')}"
             }
             
+            ai_score_val = 8.5 if is_shadow_window else 9.0
             ai_result = {
-                "score": 9.0,
-                "reasoning": f"Turtle Soup Liquidity Sweep of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). Wick Rejection confirmed."
+                "score": ai_score_val,
+                "reasoning": f"[{'👻 SHADOW OBSERVATION' if is_shadow_window else 'LIVE'}] Turtle Soup Liquidity Sweep of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). Wick Rejection confirmed."
             }
             
             # Log to local SQLite & Sync to Supabase
@@ -285,16 +296,38 @@ class AlphaSweepScanner(SMCScanner):
             except Exception as e:
                 logger.error(f"Error logging scan to DB: {e}")
                 
+            # If in NY Afternoon Shadow window, register directly as counterfactual shadow trade
+            if is_shadow_window:
+                setup['is_shadow_only'] = True
+                try:
+                    self.counterfactual_tracker.register_shadow_trade(
+                        setup={
+                            "symbol": symbol,
+                            "direction": setup['direction'],
+                            "pattern": pattern_str,
+                            "price": entry_price,
+                            "stop_loss": sl_price,
+                            "take_profit": tp_price
+                        },
+                        account_key="NY_AFTERNOON_SHADOW_HARVESTER",
+                        strategy_mode="SHADOW_OBSERVATION",
+                        rejection_reasons=["NY_AFTERNOON_SHADOW_WINDOW_NO_LIVE_CAPITAL_RISK"]
+                    )
+                    logger.info(f"👻 NY Afternoon Shadow Trade registered in counterfactual database for {symbol} {setup['direction']}")
+                except Exception as shadow_err:
+                    logger.warning(f"Failed to register shadow trade: {shadow_err}")
+                
             # Send Telegram Alert
             try:
+                alert_phase = "SHADOW_OBSERVATION" if is_shadow_window else "EXECUTION"
                 send_alert(
                     symbol=symbol,
                     timeframe="5m",
-                    pattern=pattern_str,
-                    ai_score=9.0,
-                    reasoning=ai_result['reasoning'],
-                    verdict="CONFIRMED",
-                    session_info={"name": killzone, "phase": "EXECUTION"},
+                    pattern=f"[👻 SHADOW] {pattern_str}" if is_shadow_window else pattern_str,
+                    ai_score=ai_score_val,
+                    reasoning=f"{ai_result['reasoning']} {'(⚠️ ZERO LIVE CAPITAL RISK - Shadow Tracking Only)' if is_shadow_window else ''}",
+                    verdict=verdict_str,
+                    session_info={"name": killzone, "phase": alert_phase},
                     bias_data={"daily": setup['trend'], "htf": setup['trend'], "dxy_trend": "N/A"},
                     liquidity_targets={"target_price": setup['level'], "target_type": "SWING_LEVEL", "distance_pips": setup['sweep_dist']},
                     risk_calc={
