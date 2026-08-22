@@ -7,12 +7,15 @@ from src.engines.smc_scanner import SMCScanner
 from src.core.database import log_scan, log_system_event
 from src.clients.telegram_notifier import send_alert
 
+from src.engines.shadow_substitution_engine import ShadowSubstitutionEngine
+
 logger = logging.getLogger(__name__)
 
 class AlphaSweepScanner(SMCScanner):
     def __init__(self):
         super().__init__()
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized.")
+        self.shadow_engine = ShadowSubstitutionEngine()
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Shadow Substitution Engine.")
 
     def is_premium_killzone(self, dt=None):
         """
@@ -246,6 +249,14 @@ class AlphaSweepScanner(SMCScanner):
                     else:
                         tp_price = entry_price - (max_profit / lots)
             
+            # Run Shadow Substitution Audit (Experimental Confluence Tracking)
+            try:
+                shadow_report = self.shadow_engine.run_shadow_audit(symbol, df_5m, setup['direction'])
+                logger.info(f"👻 Shadow Substitution Score for {symbol}: {shadow_report.get('shadow_score')}/10 | CVD: {shadow_report['cvd_absorption']['details']} | VWAP Z-Score: {shadow_report['session_vwap'].get('z_score', 0):.2f}")
+            except Exception as shadow_err:
+                logger.warning(f"Shadow substitution audit error: {shadow_err}")
+                shadow_report = {}
+
             # Prepare scan payload
             scan_payload = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -260,7 +271,7 @@ class AlphaSweepScanner(SMCScanner):
                 "killzone": killzone,
                 "hurst": setup['hurst'],
                 "smt_strength": 0.0,
-                "formations": f"Sweep of {setup['level']:.2f}"
+                "formations": f"Sweep of {setup['level']:.2f} | ShadowScore: {shadow_report.get('shadow_score', 'N/A')}"
             }
             
             ai_result = {
