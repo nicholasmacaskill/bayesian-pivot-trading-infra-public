@@ -451,6 +451,18 @@ class AlphaSweepScanner(SMCScanner):
             
         if setup:
             pattern_type = setup.get('pattern_type', 'TURTLE_SOUP_LIQUIDITY_SWEEP')
+            
+            # ── DEDUPLICATION & COOLDOWN GATE (60 Mins) ──
+            import time
+            cache_key = (symbol, setup['direction'], pattern_type)
+            now_ts = time.time()
+            if cache_key in self._signal_cache:
+                last_time = self._signal_cache[cache_key]
+                if (now_ts - last_time) < 3600:
+                    logger.info(f"Skipping redundant signal for {symbol} {setup['direction']} ({pattern_type}): Sent {int((now_ts - last_time)/60)}m ago.")
+                    return None
+            self._signal_cache[cache_key] = now_ts
+
             logger.info(f"🏆 BAYESIAN PIVOT ALPHA SETUP DETECTED ({pattern_type}): {symbol} {setup['direction']} at {setup['price']}")
             
             # Format pattern string
@@ -568,19 +580,36 @@ class AlphaSweepScanner(SMCScanner):
             # Auto-Execution Tranche 1 Probe (50% scale / ~0.20% fleet risk)
             exec_result = None
             if not is_shadow_strategy and getattr(Config, 'LIVE_AUTO_EXECUTION', False) and ai_score_val >= getattr(Config, 'AUTO_EXECUTION_MIN_SCORE', 8.5):
-                exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
-                logger.info(f"⚡ [PROBE & SCALE] Auto-executing Tranche 1 Probe (50% scale) on {symbol} {exec_side.upper()} @ {entry_price}...")
+                # Anti-stacking: check for existing open positions across fleet
+                has_active_pos = False
                 try:
-                    exec_result = self.tl.execute_trade_across_all_accounts(
-                        symbol=symbol,
-                        side=exec_side,
-                        stop_loss=sl_price,
-                        take_profit=tp_price,
-                        risk_scale=getattr(Config, 'AUTO_PROBE_RISK_SCALE', 0.50),
-                        tranche_label="TRANCHE_1_PROBE"
+                    open_pos = self.tl.get_open_positions()
+                    pos_list = open_pos if isinstance(open_pos, list) else (open_pos.get("positions", []) if isinstance(open_pos, dict) else [])
+                    inst_id = str(self.tl.resolve_instrument_id(symbol))
+                    sym_clean = symbol.replace("/", "").upper()
+                    has_active_pos = any(
+                        str(p.get("symbol", "")).replace("/", "").upper() == sym_clean or str(p.get("tradableInstrumentId")) == inst_id
+                        for p in pos_list
                     )
-                except Exception as exec_err:
-                    logger.error(f"Error auto-executing Tranche 1: {exec_err}")
+                except Exception:
+                    has_active_pos = False
+
+                if has_active_pos:
+                    logger.info(f"⚡ [PROBE & SCALE] Active position already open for {symbol}. Skipping duplicate auto-execution.")
+                else:
+                    exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
+                    logger.info(f"⚡ [PROBE & SCALE] Auto-executing Tranche 1 Probe (50% scale) on {symbol} {exec_side.upper()} @ {entry_price}...")
+                    try:
+                        exec_result = self.tl.execute_trade_across_all_accounts(
+                            symbol=symbol,
+                            side=exec_side,
+                            stop_loss=sl_price,
+                            take_profit=tp_price,
+                            risk_scale=getattr(Config, 'AUTO_PROBE_RISK_SCALE', 0.50),
+                            tranche_label="TRANCHE_1_PROBE"
+                        )
+                    except Exception as exec_err:
+                        logger.error(f"Error auto-executing Tranche 1: {exec_err}")
                 
             # Send Telegram Alert
             try:

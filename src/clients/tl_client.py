@@ -355,7 +355,7 @@ class TradeLockerHelper:
                 
                 # Dynamic Rate Limiting (HTTP 429)
                 if resp.status_code == 429:
-                    retry_after = float(resp.headers.get("Retry-After", 2.0))
+                    retry_after = max(float(resp.headers.get("Retry-After") or 2.5), 2.5)
                     logger.warning(f"⚠️ Rate limited (HTTP 429). Sleeping {retry_after}s...")
                     time.sleep(retry_after)
                     continue
@@ -610,13 +610,22 @@ class TradeLockerClient:
                 except Exception:
                     pass
                     
-                # Tier-scaled lot sizing
-                if equity >= 45000.0:
-                    base_lot = 0.25
-                elif equity >= 20000.0:
-                    base_lot = 0.23
-                else:
-                    base_lot = 0.11
+                # Asset-aware Tier-scaled lot sizing
+                sym_clean = symbol.replace("/", "").upper()
+                if "ETH" in sym_clean or "XAU" in sym_clean or "GOLD" in sym_clean:
+                    if equity >= 45000.0:
+                        base_lot = 8.00
+                    elif equity >= 20000.0:
+                        base_lot = 4.00
+                    else:
+                        base_lot = 2.00
+                else: # BTC and large assets
+                    if equity >= 45000.0:
+                        base_lot = 0.25
+                    elif equity >= 20000.0:
+                        base_lot = 0.23
+                    else:
+                        base_lot = 0.11
                     
                 # Scale lot size (e.g., 0.50 for Tranche 1 probe)
                 scaled_lot = round(base_lot * risk_scale, 2)
