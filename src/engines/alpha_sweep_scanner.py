@@ -186,12 +186,15 @@ class AlphaSweepScanner(SMCScanner):
                         
         return None
 
-    def check_breaker_block_mitigation(self, symbol, df_5m, df_1h):
+    def check_breaker_block_mitigation(self, symbol, df_5m, df_1h, killzone=None):
         """
         Scans for Breaker Block Mitigations (Trend Continuation Pullback).
-        Only active in Trending Regimes (Hurst > 0.55).
-        Enters when price pulls back into a recently broken HTF swing level.
+        STRICTLY RESTRICTED to High-Volume London Open and NY Open killzones.
+        DISABLED in Asian session and off-hours to prevent chop traps.
         """
+        if killzone not in ["LONDON_OPEN", "NY_OPEN"]:
+            return None
+
         if len(df_5m) < 15 or len(df_1h) < 50:
             return None
 
@@ -207,10 +210,10 @@ class AlphaSweepScanner(SMCScanner):
         c_close = last_candle['close']
         c_range = max(c_high - c_low, 1e-8)
         
-        # Hurst Exponent and Trend check
+        # Hurst Exponent and Trend check (Must be strongly trending)
         closes_1h = df_1h['close'].values
         hurst = self.get_hurst_exponent(closes_1h)
-        if hurst <= 0.55:  # Must be a trending regime
+        if hurst <= 0.58:  # Enforce high-conviction persistent trend regime
             return None
             
         ema50 = df_1h['close'].ewm(span=50).mean().iloc[-1]
@@ -437,9 +440,9 @@ class AlphaSweepScanner(SMCScanner):
         # 1. Primary Hunt: Turtle Soup Liquidity Sweeps
         setup = self.check_turtle_soup(symbol, df_5m, df_1h)
         
-        # 2. Secondary Hunt: Breaker Block Mitigations (Trend Continuation)
+        # 2. Secondary Hunt: Breaker Block Mitigations (Strictly London/NY Only)
         if not setup:
-            setup = self.check_breaker_block_mitigation(symbol, df_5m, df_1h)
+            setup = self.check_breaker_block_mitigation(symbol, df_5m, df_1h, killzone)
             
         # 3. Tertiary Hunt: London Close Silver Bullet (10-11 AM EST Rebalance)
         if not setup:
