@@ -178,11 +178,161 @@ class AlphaSweepScanner(SMCScanner):
                             "hurst": hurst,
                             "trend": trend,
                             "regime": "TRENDING" if is_trending else "MEAN_REVERSION",
+                            "pattern_type": "TURTLE_SOUP_LIQUIDITY_SWEEP",
                             "sweep_dist": sweep_dist,
                             "atr": atr_5m,
                             "price": c_close
                         }
                         
+        return None
+
+    def check_breaker_block_mitigation(self, symbol, df_5m, df_1h):
+        """
+        Scans for Breaker Block Mitigations (Trend Continuation Pullback).
+        Only active in Trending Regimes (Hurst > 0.55).
+        Enters when price pulls back into a recently broken HTF swing level.
+        """
+        if len(df_5m) < 15 or len(df_1h) < 50:
+            return None
+
+        atr_series = self.calculate_atr(df_5m)
+        if len(atr_series) == 0 or pd.isna(atr_series.iloc[-1]):
+            return None
+        atr_5m = atr_series.iloc[-1]
+        
+        last_candle = df_5m.iloc[-2]
+        c_open = last_candle['open']
+        c_high = last_candle['high']
+        c_low = last_candle['low']
+        c_close = last_candle['close']
+        c_range = max(c_high - c_low, 1e-8)
+        
+        # Hurst Exponent and Trend check
+        closes_1h = df_1h['close'].values
+        hurst = self.get_hurst_exponent(closes_1h)
+        if hurst <= 0.55:  # Must be a trending regime
+            return None
+            
+        ema50 = df_1h['close'].ewm(span=50).mean().iloc[-1]
+        trend = "UP" if closes_1h[-1] > ema50 else "DOWN"
+        
+        df_1h_clean = df_1h.iloc[:-1]
+        swing_highs, swing_lows = self.find_htf_levels(df_1h_clean, window=2)
+        
+        # Long Breaker Block: Price broke above swing high, now testing it as support from above
+        if trend == "UP" and swing_highs:
+            recent_high = swing_highs[-1][1]
+            if abs(c_low - recent_high) <= 0.5 * atr_5m and c_close > recent_high:
+                lower_wick = min(c_open, c_close) - c_low
+                if lower_wick / c_range >= 0.25:  # Lower wick proves support defense
+                    return {
+                        "direction": "LONG",
+                        "level": recent_high,
+                        "hurst": hurst,
+                        "trend": trend,
+                        "regime": "TRENDING_EXPANSION",
+                        "pattern_type": "BREAKER_BLOCK_MITIGATION",
+                        "sweep_dist": abs(c_low - recent_high),
+                        "atr": atr_5m,
+                        "price": c_close
+                    }
+                    
+        # Short Breaker Block: Price broke below swing low, now testing it as resistance from below
+        if trend == "DOWN" and swing_lows:
+            recent_low = swing_lows[-1][1]
+            if abs(c_high - recent_low) <= 0.5 * atr_5m and c_close < recent_low:
+                upper_wick = c_high - max(c_open, c_close)
+                if upper_wick / c_range >= 0.25:  # Upper wick proves resistance defense
+                    return {
+                        "direction": "SHORT",
+                        "level": recent_low,
+                        "hurst": hurst,
+                        "trend": trend,
+                        "regime": "TRENDING_EXPANSION",
+                        "pattern_type": "BREAKER_BLOCK_MITIGATION",
+                        "sweep_dist": abs(c_high - recent_low),
+                        "atr": atr_5m,
+                        "price": c_close
+                    }
+                    
+        return None
+
+    def check_london_close_silver_bullet(self, symbol, df_5m, df_1h, killzone):
+        """
+        Scans for London Close Silver Bullet (14:00 - 16:00 UTC / 10:00 - 11:00 AM EST).
+        Only active in Mean-Reverting Regimes (Hurst < 0.45).
+        Enters when price is extended >= 2.0 sigma away from VWAP and sweeps morning extremes.
+        """
+        now_hour = datetime.now(timezone.utc).hour
+        if not (14 <= now_hour <= 16 or killzone == "NY_OPEN"):
+            return None
+            
+        if len(df_5m) < 20 or len(df_1h) < 50:
+            return None
+
+        atr_series = self.calculate_atr(df_5m)
+        if len(atr_series) == 0 or pd.isna(atr_series.iloc[-1]):
+            return None
+        atr_5m = atr_series.iloc[-1]
+        
+        last_candle = df_5m.iloc[-2]
+        c_open = last_candle['open']
+        c_high = last_candle['high']
+        c_low = last_candle['low']
+        c_close = last_candle['close']
+        c_range = max(c_high - c_low, 1e-8)
+        
+        closes_1h = df_1h['close'].values
+        hurst = self.get_hurst_exponent(closes_1h)
+        if hurst >= 0.48:  # Must be mean-reverting or exhausted
+            return None
+            
+        # Calculate Rolling Session VWAP & Dispersion Bands
+        typical_price = (df_5m['high'] + df_5m['low'] + df_5m['close']) / 3.0
+        vol = df_5m['volume'].replace(0, 1.0)
+        cum_vol = vol.rolling(24).sum()
+        cum_pv = (typical_price * vol).rolling(24).sum()
+        vwap = (cum_pv / cum_vol).iloc[-2]
+        rolling_std = df_5m['close'].rolling(24).std().iloc[-2]
+        
+        if pd.isna(vwap) or pd.isna(rolling_std) or rolling_std <= 0:
+            return None
+            
+        upper_band = vwap + (2.0 * rolling_std)
+        lower_band = vwap - (2.0 * rolling_std)
+        
+        # Bearish Silver Bullet: Price pierced above +2.0 sigma band with upper wick rejection
+        if c_high >= upper_band and c_close < upper_band:
+            upper_wick = c_high - max(c_open, c_close)
+            if upper_wick / c_range >= 0.30:
+                return {
+                    "direction": "SHORT",
+                    "level": upper_band,
+                    "hurst": hurst,
+                    "trend": "DOWN_REVERSAL",
+                    "regime": "LONDON_CLOSE_REBALANCE",
+                    "pattern_type": "LONDON_CLOSE_SILVER_BULLET",
+                    "sweep_dist": c_high - upper_band,
+                    "atr": atr_5m,
+                    "price": c_close
+                }
+                
+        # Bullish Silver Bullet: Price pierced below -2.0 sigma band with lower wick rejection
+        if c_low <= lower_band and c_close > lower_band:
+            lower_wick = min(c_open, c_close) - c_low
+            if lower_wick / c_range >= 0.30:
+                return {
+                    "direction": "LONG",
+                    "level": lower_band,
+                    "hurst": hurst,
+                    "trend": "UP_REVERSAL",
+                    "regime": "LONDON_CLOSE_REBALANCE",
+                    "pattern_type": "LONDON_CLOSE_SILVER_BULLET",
+                    "sweep_dist": lower_band - c_low,
+                    "atr": atr_5m,
+                    "price": c_close
+                }
+                
         return None
 
     def scan_symbol(self, symbol):
@@ -204,12 +354,23 @@ class AlphaSweepScanner(SMCScanner):
             logger.warning(f"Failed to fetch data for {symbol}.")
             return None
             
+        # 1. Primary Hunt: Turtle Soup Liquidity Sweeps
         setup = self.check_turtle_soup(symbol, df_5m, df_1h)
+        
+        # 2. Secondary Hunt: Breaker Block Mitigations (Trend Continuation)
+        if not setup:
+            setup = self.check_breaker_block_mitigation(symbol, df_5m, df_1h)
+            
+        # 3. Tertiary Hunt: London Close Silver Bullet (10-11 AM EST Rebalance)
+        if not setup:
+            setup = self.check_london_close_silver_bullet(symbol, df_5m, df_1h, killzone)
+            
         if setup:
-            logger.info(f"🏆 BAYESIAN PIVOT ALPHA SETUP DETECTED: {symbol} {setup['direction']} at {setup['price']}")
+            pattern_type = setup.get('pattern_type', 'TURTLE_SOUP_LIQUIDITY_SWEEP')
+            logger.info(f"🏆 BAYESIAN PIVOT ALPHA SETUP DETECTED ({pattern_type}): {symbol} {setup['direction']} at {setup['price']}")
             
             # Format pattern string
-            pattern_str = f"Bayesian Pivot Turtle Soup {setup['direction']} ({setup['regime']})"
+            pattern_str = f"Bayesian Pivot {pattern_type.replace('_', ' ')} {setup['direction']} ({setup['regime']})"
             
             # Dynamic Risk and Sizing Calculations
             entry_price = setup['price']

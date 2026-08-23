@@ -19,8 +19,7 @@ except Exception:
 
 class Config:
     # Trading Parameters
-    SYMBOLS = ['BTC/USD', 'ETH/USD']  # BTC/USD and ETH/USD active
-
+    SYMBOLS = ['BTC/USD', 'ETH/USD', 'XAU/USD']  # BTC, ETH, and Gold Active
     
     # Tier 2: High Alpha Altcoins (Judas Sweeps Only)
     ALT_SYMBOLS = []
@@ -40,18 +39,21 @@ class Config:
     MIN_STOP_PCT = {
         "BTC/USD": 0.002,   # 0.2% = ~$166 at $83k
         "ETH/USD": 0.002,   # 0.2% = ~$3.60 at $1,800
+        "XAU/USD": 0.002,   # 0.2% = ~$4.80 at $2,400
         "SOL/USD": 0.002,   # 0.2% = ~$0.24 at $120
     }
     # Minimum target distance per asset as % of price (ensures 2.5R+ intraday targets pass)
     MIN_TARGET_PCT = {
         "BTC/USD": 0.005,   # 0.5% = ~$320 at $64k
         "ETH/USD": 0.005,   # 0.5% = ~$17.50 at $3,500
+        "XAU/USD": 0.005,   # 0.5% = ~$12.00 at $2,400
         "SOL/USD": 0.008,   # 0.8% = ~$1.20 at $150
     }
 
     MAX_POSITION_SIZES = {
         "BTC/USD": 0.25,    # Capped at 0.25 BTC
         "ETH/USD": 27.0,    # ~$49k notional at $1,800
+        "XAU/USD": 5.0,     # Capped at 5.0 Lots Gold
         "SOL/USD": 416.0,   # ~$50k notional at $120
     }
     MAX_DRAWDOWN_LIMIT = 0.06  # 6% Total Account Drawdown

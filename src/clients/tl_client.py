@@ -541,12 +541,14 @@ class TradeLockerClient:
         return [] # Placeholder
 
     def resolve_instrument_id(self, symbol="BTC/USD") -> str:
-        """Resolves broker instrument ID for BTC/USD and ETH/USD on TradeLocker (Upcomers)."""
+        """Resolves broker instrument ID for BTC/USD, ETH/USD, and XAU/USD (Gold) on TradeLocker (Upcomers)."""
         norm = symbol.replace("/", "").replace("_", "").upper()
         if "BTC" in norm:
             return "19965"
         elif "ETH" in norm:
             return "19957"
+        elif "XAU" in norm or "GOLD" in norm:
+            return "19973"
         return "19965"
 
     def execute_trade(self, symbol="BTC/USD", side="buy", qty=0.15, stop_loss=None, take_profit=None, account_index=0):
