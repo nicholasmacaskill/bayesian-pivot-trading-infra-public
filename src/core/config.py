@@ -128,7 +128,7 @@ class Config:
     SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "")
     
     # ── TWO-TRANCHE "PROBE & SCALE" AUTO-EXECUTION ENGINE ──
-    LIVE_AUTO_EXECUTION = True                    # Auto-execute Tranche 1 on >= 8.5 setups
+    LIVE_AUTO_EXECUTION = False                   # DISABLED: No automated trade execution
     AUTO_PROBE_RISK_SCALE = 0.50                  # 50% lot size / ~0.20% risk on automatic entry
     SCALE_IN_TRANCHE_2_SCALE = 0.50               # Remaining 50% size triggered via 1-click Telegram button
     AUTO_EXECUTION_MIN_SCORE = 8.5                # Minimum AI conviction score required for auto-execution
