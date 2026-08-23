@@ -335,6 +335,86 @@ class AlphaSweepScanner(SMCScanner):
                 
         return None
 
+    def check_ny_hft_double_sweep_shadow(self, symbol, df_5m, df_1h, killzone):
+        """
+        Scans for NY HFT Predatory Double Sweeps (06:30 - 09:30 AM PST / 13:30 - 16:30 UTC).
+        100% SHADOW ONLY - ZERO LIVE CAPITAL RISK.
+        Detects when both highs and lows are swept within 60 mins to purge retail liquidity.
+        """
+        now_hour = datetime.now(timezone.utc).hour
+        now_min = datetime.now(timezone.utc).minute
+        utc_time_float = now_hour + (now_min / 60.0)
+        
+        # NY Morning Liquidity Purge Window (13:30 - 16:30 UTC / 09:30 AM - 12:30 PM EST)
+        if not (13.5 <= utc_time_float <= 16.5 or killzone == "NY_OPEN"):
+            return None
+
+        if len(df_5m) < 25 or len(df_1h) < 50:
+            return None
+
+        atr_series = self.calculate_atr(df_5m)
+        if len(atr_series) == 0 or pd.isna(atr_series.iloc[-1]):
+            return None
+        atr_5m = atr_series.iloc[-1]
+
+        recent_bars = df_5m.iloc[-14:-2]
+        last_candle = df_5m.iloc[-2]
+        c_open = last_candle['open']
+        c_high = last_candle['high']
+        c_low = last_candle['low']
+        c_close = last_candle['close']
+        c_range = max(c_high - c_low, 1e-8)
+
+        df_1h_clean = df_1h.iloc[:-1]
+        swing_highs, swing_lows = self.find_htf_levels(df_1h_clean, window=2)
+        if not swing_highs or not swing_lows:
+            return None
+
+        recent_high = swing_highs[-1][1]
+        recent_low = swing_lows[-1][1]
+
+        high_was_pierced = any(recent_bars['high'] > recent_high)
+        low_was_pierced = any(recent_bars['low'] < recent_low)
+
+        closes_1h = df_1h['close'].values
+        hurst = self.get_hurst_exponent(closes_1h)
+
+        # Bullish Post-Purge Reversal: High was swept earlier (trapping longs), low swept now (trapping shorts)
+        if high_was_pierced and c_low < recent_low and c_close > recent_low:
+            lower_wick = min(c_open, c_close) - c_low
+            if lower_wick / c_range >= 0.30:
+                return {
+                    "direction": "LONG",
+                    "level": recent_low,
+                    "hurst": hurst,
+                    "trend": "DOUBLE_SWEEP_REVERSAL",
+                    "regime": "NY_HFT_LIQUIDITY_PURGE",
+                    "pattern_type": "NY_HFT_DOUBLE_SWEEP_SHADOW",
+                    "sweep_dist": recent_low - c_low,
+                    "atr": atr_5m,
+                    "price": c_close,
+                    "is_shadow_only": True
+                }
+
+        # Bearish Post-Purge Reversal: Low was swept earlier (trapping shorts), high swept now (trapping longs)
+        if low_was_pierced and c_high > recent_high and c_close < recent_high:
+            upper_wick = c_high - max(c_open, c_close)
+            if upper_wick / c_range >= 0.30:
+                return {
+                    "direction": "SHORT",
+                    "level": recent_high,
+                    "hurst": hurst,
+                    "trend": "DOUBLE_SWEEP_REVERSAL",
+                    "regime": "NY_HFT_LIQUIDITY_PURGE",
+                    "pattern_type": "NY_HFT_DOUBLE_SWEEP_SHADOW",
+                    "sweep_dist": c_high - recent_high,
+                    "atr": atr_5m,
+                    "price": c_close,
+                    "is_shadow_only": True
+                }
+
+        return None
+
     def scan_symbol(self, symbol):
         """
         Runs the Bayesian Pivot Alpha scan on the given symbol.
@@ -364,6 +444,10 @@ class AlphaSweepScanner(SMCScanner):
         # 3. Tertiary Hunt: London Close Silver Bullet (10-11 AM EST Rebalance)
         if not setup:
             setup = self.check_london_close_silver_bullet(symbol, df_5m, df_1h, killzone)
+            
+        # 4. Quaternary Hunt: NY HFT Double-Sweep Purge (100% Zero-Risk Shadow Tracking)
+        if not setup:
+            setup = self.check_ny_hft_double_sweep_shadow(symbol, df_5m, df_1h, killzone)
             
         if setup:
             pattern_type = setup.get('pattern_type', 'TURTLE_SOUP_LIQUIDITY_SWEEP')
@@ -427,8 +511,8 @@ class AlphaSweepScanner(SMCScanner):
                 logger.warning(f"Shadow substitution audit error: {shadow_err}")
                 shadow_report = {}
 
-            is_shadow_window = (killzone == "NY_AFTERNOON_SHADOW")
-            verdict_str = "SHADOW_OBSERVATION" if is_shadow_window else "CONFIRMED"
+            is_shadow_strategy = setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW")
+            verdict_str = "SHADOW_OBSERVATION" if is_shadow_strategy else "CONFIRMED"
             
             # Prepare scan payload
             scan_payload = {
@@ -447,10 +531,10 @@ class AlphaSweepScanner(SMCScanner):
                 "formations": f"Sweep of {setup['level']:.2f} | ShadowScore: {shadow_report.get('shadow_score', 'N/A')}"
             }
             
-            ai_score_val = 8.5 if is_shadow_window else 9.0
+            ai_score_val = 8.5 if is_shadow_strategy else 9.0
             ai_result = {
                 "score": ai_score_val,
-                "reasoning": f"[{'👻 SHADOW OBSERVATION' if is_shadow_window else 'LIVE'}] Turtle Soup Liquidity Sweep of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). Wick Rejection confirmed."
+                "reasoning": f"[{'👻 SHADOW OBSERVATION' if is_shadow_strategy else 'LIVE'}] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']})."
             }
             
             # Log to local SQLite & Sync to Supabase
@@ -459,9 +543,10 @@ class AlphaSweepScanner(SMCScanner):
             except Exception as e:
                 logger.error(f"Error logging scan to DB: {e}")
                 
-            # If in NY Afternoon Shadow window, register directly as counterfactual shadow trade
-            if is_shadow_window:
+            # If in Shadow window or shadow-only strategy, register directly as counterfactual shadow trade
+            if is_shadow_strategy:
                 setup['is_shadow_only'] = True
+                acct_label = "NY_HFT_DOUBLE_SWEEP_SHADOW" if setup.get('pattern_type') == "NY_HFT_DOUBLE_SWEEP_SHADOW" else "NY_AFTERNOON_SHADOW_HARVESTER"
                 try:
                     self.counterfactual_tracker.register_shadow_trade(
                         setup={
@@ -472,17 +557,17 @@ class AlphaSweepScanner(SMCScanner):
                             "stop_loss": sl_price,
                             "take_profit": tp_price
                         },
-                        account_key="NY_AFTERNOON_SHADOW_HARVESTER",
-                        strategy_mode="SHADOW_OBSERVATION",
-                        rejection_reasons=["NY_AFTERNOON_SHADOW_WINDOW_NO_LIVE_CAPITAL_RISK"]
+                        account_key=acct_label,
+                        strategy_mode="SHADOW_HFT_OBSERVATION",
+                        rejection_reasons=["SHADOW_STRATEGY_ZERO_LIVE_CAPITAL_RISK"]
                     )
-                    logger.info(f"👻 NY Afternoon Shadow Trade registered in counterfactual database for {symbol} {setup['direction']}")
+                    logger.info(f"👻 {acct_label} registered in counterfactual database for {symbol} {setup['direction']}")
                 except Exception as shadow_err:
                     logger.warning(f"Failed to register shadow trade: {shadow_err}")
                 
             # Auto-Execution Tranche 1 Probe (50% scale / ~0.20% fleet risk)
             exec_result = None
-            if not is_shadow_window and getattr(Config, 'LIVE_AUTO_EXECUTION', False) and ai_score_val >= getattr(Config, 'AUTO_EXECUTION_MIN_SCORE', 8.5):
+            if not is_shadow_strategy and getattr(Config, 'LIVE_AUTO_EXECUTION', False) and ai_score_val >= getattr(Config, 'AUTO_EXECUTION_MIN_SCORE', 8.5):
                 exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
                 logger.info(f"⚡ [PROBE & SCALE] Auto-executing Tranche 1 Probe (50% scale) on {symbol} {exec_side.upper()} @ {entry_price}...")
                 try:
@@ -500,11 +585,11 @@ class AlphaSweepScanner(SMCScanner):
             # Send Telegram Alert
             try:
                 is_auto_filled = exec_result and exec_result.get('success')
-                alert_phase = "SHADOW_OBSERVATION" if is_shadow_window else ("AUTO_EXECUTED" if is_auto_filled else "EXECUTION")
+                alert_phase = "SHADOW_OBSERVATION" if is_shadow_strategy else ("AUTO_EXECUTED" if is_auto_filled else "EXECUTION")
                 
                 # Interactive Scale-In Button (only for live auto-executed setups)
                 buttons = None
-                if not is_shadow_window and is_auto_filled:
+                if not is_shadow_strategy and is_auto_filled:
                     exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
                     cb_data = f"scale_{symbol.replace('/', '')}_{exec_side}_{entry_price:.1f}_{sl_price:.1f}_{tp_price:.1f}"
                     buttons = [[{"text": "🚀 SCALE IN 2ND TRANCHE (+0.20% RISK)", "callback_data": cb_data}]]
@@ -514,9 +599,9 @@ class AlphaSweepScanner(SMCScanner):
                 send_alert(
                     symbol=symbol,
                     timeframe="5m",
-                    pattern=f"[👻 SHADOW] {pattern_str}" if is_shadow_window else pattern_str,
+                    pattern=f"[👻 SHADOW HFT] {pattern_str}" if setup.get('pattern_type') == "NY_HFT_DOUBLE_SWEEP_SHADOW" else (f"[👻 SHADOW] {pattern_str}" if is_shadow_strategy else pattern_str),
                     ai_score=ai_score_val,
-                    reasoning=f"{ai_result['reasoning']} {'(⚠️ ZERO LIVE CAPITAL RISK - Shadow Tracking Only)' if is_shadow_window else ''}{exec_notice}",
+                    reasoning=f"{ai_result['reasoning']} {'(⚠️ ZERO LIVE CAPITAL RISK - Shadow Tracking Only)' if is_shadow_strategy else ''}{exec_notice}",
                     verdict=verdict_str,
                     session_info={"name": killzone, "phase": alert_phase},
                     bias_data={"daily": setup['trend'], "htf": setup['trend'], "dxy_trend": "N/A"},
