@@ -370,7 +370,7 @@ class AIValidator:
                 return True, "No recent losing trades found"
                 
             cutoff = datetime.utcnow() - timedelta(hours=cooldown_hours)
-            target_side = direction.upper()
+            target_side = str(direction or "BUY").upper()
             
             for r in rows:
                 ts_str, side, pnl = r[0], str(r[1]).upper(), float(r[2] or 0.0)

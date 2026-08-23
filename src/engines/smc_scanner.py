@@ -353,16 +353,21 @@ class SMCScanner:
         try:
             tf_to_seconds = {'1m': 60, '5m': 300, '1h': 3600, '4h': 14400, '1d': 86400}
             
+            # Map Gold to PAXG/USD if using Coinbase for data feeds
+            fetch_symbol = symbol
+            if symbol in ["XAU/USD", "XAUUSD", "GOLD"] and self.exchange.id == 'coinbase':
+                fetch_symbol = "PAXG/USD"
+
             # 1. Fetch Primary Stream
             # Coinbase doesn't natively support 4H in CCXT, so if timeframe is 4h, we fallback to 1h then aggregate
             if timeframe == '4h' and self.exchange.id == 'coinbase':
-                df_raw_main = self.exchange.fetch_ohlcv(symbol, '1h', limit=limit*4)
+                df_raw_main = self.exchange.fetch_ohlcv(fetch_symbol, '1h', limit=limit*4)
                 if not df_raw_main: return None
                 main_df_base = pd.DataFrame(df_raw_main, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 main_df_base['timestamp'] = pd.to_datetime(main_df_base['timestamp'], unit='ms')
                 main_df = self._aggregate_ohlcv(main_df_base, '4h')
             else:
-                df_raw_main = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+                df_raw_main = self.exchange.fetch_ohlcv(fetch_symbol, timeframe, limit=limit)
                 if not df_raw_main: return None
                 main_df = pd.DataFrame(df_raw_main, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 main_df['timestamp'] = pd.to_datetime(main_df['timestamp'], unit='ms')

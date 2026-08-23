@@ -212,15 +212,15 @@ class MultiAccountFunnelManager:
 
     def register_in_flight_intent(self, symbol: str, direction: str, account_key: str):
         """Registers a pending order intent in-flight before HTTP API dispatch."""
-        norm_symbol = symbol.replace("/", "").replace("_", "").upper()
-        norm_dir = direction.upper()
+        norm_symbol = (symbol or "").replace("/", "").replace("_", "").upper()
+        norm_dir = str(direction or "BUY").upper()
         with self._intent_lock:
             self._pending_intents[(norm_symbol, norm_dir, account_key)] = time.time()
 
     def clear_in_flight_intent(self, symbol: str, direction: str, account_key: str):
         """Clears a pending order intent after API completion or failure."""
-        norm_symbol = symbol.replace("/", "").replace("_", "").upper()
-        norm_dir = direction.upper()
+        norm_symbol = (symbol or "").replace("/", "").replace("_", "").upper()
+        norm_dir = str(direction or "BUY").upper()
         with self._intent_lock:
             self._pending_intents.pop((norm_symbol, norm_dir, account_key), None)
 
@@ -234,8 +234,8 @@ class MultiAccountFunnelManager:
         """
         Anti-hedging and duplicate intent protection gate.
         """
-        norm_symbol = setup_symbol.replace("/", "").replace("_", "").upper()
-        norm_dir = setup_direction.upper()
+        norm_symbol = (setup_symbol or "").replace("/", "").replace("_", "").upper()
+        norm_dir = str(setup_direction or "BUY").upper()
         opp_dir = "SELL" if norm_dir == "BUY" else "BUY"
 
         # 1. In-flight intent check

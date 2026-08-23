@@ -1208,7 +1208,8 @@ class LocalScannerRunner:
                         if Config.LIVE_AUTO_EXECUTION and live_score >= threshold:
                             logger.info(f"⚡ LIVE AUTO-EXECUTION ({live_score}/10 Setup): Submitting order to TradeLocker: {direction} {lots} {symbol} SL={_sl} TP={_tp}")
                             try:
-                                exec_side = "buy" if direction.upper() == "LONG" else "sell"
+                                dir_str = str(direction or "BUY").upper()
+                                exec_side = "buy" if dir_str == "LONG" or dir_str == "BUY" else "sell"
                                 trade_success = self.tl.execute_trade(
                                     symbol=symbol,
                                     side=exec_side,

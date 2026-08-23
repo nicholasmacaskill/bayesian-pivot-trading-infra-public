@@ -81,7 +81,8 @@ class ShadowSubstitutionEngine:
         curr_cvd = cvd.iloc[-1]
         prior_cvd = cvd.iloc[-5]
 
-        if direction.upper() in ["SHORT", "SELL"]:
+        dir_clean = str(direction or "LONG").upper()
+        if dir_clean in ["SHORT", "SELL"]:
             # Price pushed up or stayed flat, but CVD was heavily dumped
             price_delta = curr_price - prior_price
             cvd_delta = curr_cvd - prior_cvd

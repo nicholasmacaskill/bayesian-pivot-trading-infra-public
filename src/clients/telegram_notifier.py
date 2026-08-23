@@ -576,7 +576,8 @@ class TelegramNotifier:
           4. Deep Discount (<0.25) or Deep Premium (>0.75)
           5. AI Validator Score >= 8.5
         """
-        is_long = direction.upper() == "LONG"
+        dir_str = str(direction or "LONG").upper()
+        is_long = dir_str == "LONG" or dir_str == "BUY"
         emoji = "🟢" if is_long else "🔴"
         risk_dist = abs(entry - stop_loss)
         reward_dist = abs(target - entry)
@@ -585,7 +586,7 @@ class TelegramNotifier:
 
         msg = (
             f"🏆 <b>GOLDEN CONFLUENCE ALERT (PAYOUT PLAY)</b>\n"
-            f"{emoji} <b>{symbol} {direction.upper()} @ ${entry:,.2f}</b>\n"
+            f"{emoji} <b>{symbol} {dir_str} @ ${entry:,.2f}</b>\n"
             f"🤖 <b>AI Score: {ai_score}/10 (FLOW_GO)</b>\n\n"
             f"🔥 <b>RIGID DATA CONFLUENCE MET:</b>\n"
             f"• 🏁 <b>{session_name}</b> (Killzone Confirmed — 66.7% Win Rate)\n"
@@ -617,9 +618,10 @@ class TelegramNotifier:
             "loss": 1000.0,
             "wr": "30%"
         })
+        dir_display = str(direction or "UNKNOWN").upper()
         msg = (
             f"🛑 <b>HISTORICAL DEAD-ZONE WARNING ({info['ast']} AST)</b>\n"
-            f"⚠️ <b>{symbol} {direction.upper()} Trade Detected</b>\n\n"
+            f"⚠️ <b>{symbol} {dir_display} Trade Detected</b>\n\n"
             f"<i>Database Audit Warning: Trading during {info['ast']} AST (UTC {utc_hour:02d}:00) has generated "
             f"<b>-${info['loss']:,.2f}</b> in historical losses (Win Rate: {info['wr']}).\n\n"
             f"⏳ <b>Dead Zone Ends At:</b> {info['ends_at']}\n"
