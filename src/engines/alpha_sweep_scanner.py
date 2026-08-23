@@ -526,7 +526,10 @@ class AlphaSweepScanner(SMCScanner):
                 logger.warning(f"Shadow substitution audit error: {shadow_err}")
                 shadow_report = {}
 
-            is_shadow_strategy = setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW")
+            # ── 100% DISCIPLINED ARCHETYPE QUARANTINE ──
+            # ONLY Turtle Soup Liquidity Sweeps are LIVE.
+            # Breaker Blocks, Silver Bullet & Double Sweeps are 100% SHADOW LAB ($0.00 Live Risk).
+            is_shadow_strategy = (pattern_type != "TURTLE_SOUP_LIQUIDITY_SWEEP") or setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW")
             verdict_str = "SHADOW_OBSERVATION" if is_shadow_strategy else "CONFIRMED"
             
             # Prepare scan payload
@@ -549,7 +552,7 @@ class AlphaSweepScanner(SMCScanner):
             ai_score_val = 8.5 if is_shadow_strategy else 9.0
             ai_result = {
                 "score": ai_score_val,
-                "reasoning": f"[{'👻 SHADOW OBSERVATION' if is_shadow_strategy else 'LIVE'}] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']})."
+                "reasoning": f"[{'👻 SHADOW LAB ($0 RISK)' if is_shadow_strategy else '👑 LIVE MASTER WEAPON'}] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']})."
             }
             
             # Log to local SQLite & Sync to Supabase
@@ -558,10 +561,10 @@ class AlphaSweepScanner(SMCScanner):
             except Exception as e:
                 logger.error(f"Error logging scan to DB: {e}")
                 
-            # If in Shadow window or shadow-only strategy, register directly as counterfactual shadow trade
+            # Register in Counterfactual Database for 30-Day Shadow Lab Analytics
             if is_shadow_strategy:
                 setup['is_shadow_only'] = True
-                acct_label = "NY_HFT_DOUBLE_SWEEP_SHADOW" if setup.get('pattern_type') == "NY_HFT_DOUBLE_SWEEP_SHADOW" else "NY_AFTERNOON_SHADOW_HARVESTER"
+                acct_label = f"{pattern_type}_SHADOW"
                 try:
                     self.counterfactual_tracker.register_shadow_trade(
                         setup={
@@ -573,10 +576,10 @@ class AlphaSweepScanner(SMCScanner):
                             "take_profit": tp_price
                         },
                         account_key=acct_label,
-                        strategy_mode="SHADOW_HFT_OBSERVATION",
+                        strategy_mode="SHADOW_LAB_QUARANTINE",
                         rejection_reasons=["SHADOW_STRATEGY_ZERO_LIVE_CAPITAL_RISK"]
                     )
-                    logger.info(f"👻 {acct_label} registered in counterfactual database for {symbol} {setup['direction']}")
+                    logger.info(f"👻 {acct_label} registered in counterfactual database for {symbol} {setup['direction']} (ZERO LIVE RISK)")
                 except Exception as shadow_err:
                     logger.warning(f"Failed to register shadow trade: {shadow_err}")
                 
