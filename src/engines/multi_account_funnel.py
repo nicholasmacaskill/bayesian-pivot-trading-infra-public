@@ -251,7 +251,7 @@ class MultiAccountFunnelManager:
 
             if pos_sym == norm_symbol:
                 if pos_side == opp_dir:
-                    return False, f"ANTI_HEDGING_VIOLATION: Existing {pos_side} position active on {norm_symbol}."
+                    return False, f"ANTI_HEDGE_POSITION_BLOCKED (ANTI_HEDGING_VIOLATION): Existing {pos_side} position active on {norm_symbol}."
                 if pos_side == norm_dir:
                     return False, f"DUPLICATE_POSITION_EXPOSURE: Existing {pos_side} position already open."
 
@@ -311,6 +311,18 @@ class MultiAccountFunnelManager:
             logger.info(f"✨ SMT Divergence Booster (+1.0) applied for {profile.account_name}: {ai_score:.1f} -> {effective_ai_score:.1f}")
         elif profile.require_smt_divergence and smt_strength < profile.min_smt_strength:
             rejection_reasons.append(f"INSUFFICIENT_SMT ({smt_strength:.2f} < {profile.min_smt_strength})")
+
+        # 6b. Major Structural Liquidity Sweep Confluence Booster
+        # If the setup has verified structural confluence (equal extremes / deep wick + high volume),
+        # boost effective score by +0.5 to prevent weekend/off-peak baseline penalties from blocking clean sweeps.
+        if setup:
+            swept_type = setup.get('swept_level_type', '')
+            wick_pct = max(setup.get('lower_wick_pct', 0), setup.get('upper_wick_pct', 0), setup.get('wick_pct', 0))
+            vol_mult = setup.get('vol_mult', 1.0)
+            is_struct_sweep = (swept_type in ['EQUAL_LOWS', 'EQUAL_HIGHS', 'SESSION_LOW', 'SESSION_HIGH', 'PDL', 'PDH'] and wick_pct >= 50.0) or (wick_pct >= 60.0 and vol_mult >= 3.0)
+            if is_struct_sweep and not profile.require_smt_divergence:
+                effective_ai_score = min(10.0, effective_ai_score + 0.5)
+                logger.info(f"🏆 Structural Sweep Booster (+0.5) applied for {profile.account_name}: {ai_score:.1f} -> {effective_ai_score:.1f}")
 
         # 7. AI Conviction Score Check
         if not profile.bypass_ai_gate:

@@ -308,6 +308,14 @@ class AIValidator:
         if setup.get('is_discount') or setup.get('is_premium'):
             score += 2
             reasoning_parts.append("Valid Quartile")
+
+        # Major Structural Liquidity Sweep Confluence Bonus
+        swept_type = setup.get('swept_level_type', '')
+        wick_pct = max(setup.get('lower_wick_pct', 0), setup.get('upper_wick_pct', 0), setup.get('wick_pct', 0))
+        vol_mult = setup.get('vol_mult', 1.0)
+        if (swept_type in ['EQUAL_LOWS', 'EQUAL_HIGHS', 'SESSION_LOW', 'SESSION_HIGH', 'PDL', 'PDH'] and wick_pct >= 50.0) or (wick_pct >= 60.0 and vol_mult >= 3.0):
+            score += 2
+            reasoning_parts.append(f"Major Structural Sweep ({swept_type or 'Wick Rejection'}, {wick_pct:.0f}% wick, {vol_mult:.1f}x vol)")
         
         # --- Sovereign Score Normalization (Global Mode) ---
         # If markets are closed (cross_asset == 0), normalize score to 10-base
@@ -506,6 +514,7 @@ class AIValidator:
             +1.3 for Hurst < 0.45 (Fade alignment) OR +1.0 for Hurst > 0.55 (Trend alignment)
             +1.0 for Prime Asian Fade / London / NY Killzone Window
             +1.0 for Clean ATR Sweep (0.25-0.50x) with Wick Absorption >= 35% or CVD Divergence
+            +0.6 for Major Structural Liquidity Sweep (Equal Highs/Lows, Session Extremes, PDL/PDH) with Rejection Wick >= 60% and Volume Spike >= 3.0x
             +0.7 for Deep Discount / Premium zone
             -1.5 for High impact news within 30 min
             -1.5 for HTF bias conflict ONLY IF Hurst > 0.55 (Trend Mode). Do NOT penalize HTF conflict if Hurst < 0.45 (Mean-Reverting Trap).

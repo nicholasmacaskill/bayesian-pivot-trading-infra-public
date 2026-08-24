@@ -1088,6 +1088,14 @@ class LocalScannerRunner:
                     else:
                         threshold = Config.AI_THRESHOLD_LONG if direction == 'LONG' else Config.AI_THRESHOLD_SHORT
 
+                    # ── 100% DISCIPLINED ARCHETYPE QUARANTINE ──
+                    # ONLY Turtle Soup Liquidity Sweeps / Judas Sweeps are LIVE.
+                    # Trend Pullbacks, Order Blocks, and Standard FVGs are 100% Shadow Lab ($0.00 Live Risk / $0 Telegram noise).
+                    is_sweep_strategy = any(k in base_pattern.upper() for k in ["TURTLE", "SWEEP", "JUDAS", "ASIAN FADE"])
+                    if not is_sweep_strategy:
+                        logger.info(f"👻 Non-sweep pattern quarantined to Shadow Lab (No Live Alert): {enriched_pattern}")
+                        continue
+
                     if live_score >= threshold:
 
                         setups_found += 1

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import json
+import html
 import logging
 import requests
 from datetime import datetime, timezone
@@ -28,7 +29,8 @@ def _format_time_ago(minutes):
 
 def _teal(text: any) -> str:
     """Formats text with Telegram sleek teal link accent (clean, zero code pills)."""
-    return f'<a href="https://t.me/bayesianpivot_bot">{text}</a>'
+    clean_val = html.escape(str(text))
+    return f'<a href="https://t.me/bayesianpivot_bot">{clean_val}</a>'
 
 
 class TelegramNotifier:
@@ -107,10 +109,11 @@ class TelegramNotifier:
         )
 
         # ── 4. THE HUNT ───────────────────────────────────────────────────────
+        safe_reasoning = html.escape(str(reasoning or ''))
         hunt = (
             f"🦅 <b>THE HUNT</b>\n"
             f"• Active Strategy: {_teal(pattern)} (<b>{ai_score}/10</b>)\n"
-            f"• Hunt Logic: <i>{reasoning}</i>"
+            f"• Hunt Logic: <i>{safe_reasoning}</i>"
         )
 
         # ── 5. SYSTEM STATE ───────────────────────────────────────────────────
@@ -393,21 +396,31 @@ class TelegramNotifier:
     def _send_message(self, text, buttons=None):
         if not self.bot_token or not self.chat_id:
             return
+        payload = {
+            "chat_id": self.chat_id,
+            "text": text if text else "",
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+        if buttons:
+            payload["reply_markup"] = {"inline_keyboard": buttons}
         try:
-            safe_text = text if text else ""
-            payload = {
-                "chat_id": self.chat_id,
-                "text": safe_text,
-                "parse_mode": "HTML",
-                "disable_web_page_preview": True,
-            }
-            if buttons:
-                payload["reply_markup"] = {"inline_keyboard": buttons}
             r = requests.post(f"{self.base_url}/sendMessage", json=payload, timeout=5)
             logger.info(f"📤 TG ({r.status_code}): {r.text[:80]}")
             r.raise_for_status()
         except Exception as e:
             logger.error(f"❌ Telegram send failed: {e}")
+            # Robust fallback: If HTML entity parsing fails, strip tags and deliver plaintext
+            try:
+                import re
+                plain_text = re.sub(r'<[^>]+>', '', text or '')
+                payload["text"] = plain_text
+                payload.pop("parse_mode", None)
+                r_fb = requests.post(f"{self.base_url}/sendMessage", json=payload, timeout=5)
+                r_fb.raise_for_status()
+                logger.info(f"📤 TG Fallback Plaintext ({r_fb.status_code}): Delivered successfully.")
+            except Exception as fb_err:
+                logger.error(f"❌ Telegram fallback plaintext also failed: {fb_err}")
 
     def get_latest_message(self, since_timestamp=None):
         try:

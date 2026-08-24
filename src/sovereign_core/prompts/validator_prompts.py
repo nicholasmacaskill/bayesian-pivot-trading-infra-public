@@ -47,6 +47,7 @@ Calculate an exact score (1 decimal place) by building up from a baseline score 
 
 4. Order Flow & Liquidity Print (Shadow Confluences):
    - Clean ATR Sweep (0.25 - 0.50x ATR) with Wick Absorption >= 35%: +1.0
+   - Major Structural Liquidity Sweep (Equal Highs/Lows, Session Extremes, PDL/PDH) with Rejection Wick >= 60% and Volume Spike >= 3.0x: +0.6
    - CVD Absorption Divergence OR Session VWAP +/- 2.0σ Band Extreme: +0.8
    - Standard FVG tap with moderate volume: +0.4
 
