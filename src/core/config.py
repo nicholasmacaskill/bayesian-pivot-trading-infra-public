@@ -20,6 +20,8 @@ except Exception:
 class Config:
     # Trading Parameters
     SYMBOLS = ['BTC/USD', 'ETH/USD', 'XAU/USD']  # BTC, ETH, and Gold Active
+
+
     
     # Tier 2: High Alpha Altcoins (Judas Sweeps Only)
     ALT_SYMBOLS = []
@@ -56,10 +58,22 @@ class Config:
         "XAU/USD": 5.0,     # Capped at 5.0 Lots Gold
         "SOL/USD": 416.0,   # ~$50k notional at $120
     }
-    MAX_DRAWDOWN_LIMIT = 0.06  # 6% Total Account Drawdown
+    MAX_DRAWDOWN_LIMIT = 0.05  # 5.0% Total Account Drawdown Lockout (Strict Hard Ceiling)
     DAILY_DRAWDOWN_LIMIT = 0.025 # 2.5% Daily Drawdown
+
     DAILY_TRADE_LIMIT = 2
     TARGET_RR = 3.0
+
+    # ── Strategy 9: Judas Inducement Hunter (Fast-Lane Execution) ───────
+    STRATEGY_9_ENABLED = True
+    STRATEGY_9_MIN_WICK_PCT = 70.0      # 70% Minimum Rejection Wick
+    STRATEGY_9_MIN_ATR_MULT = 1.8       # 1.8x - 2.0x 20-period ATR Range
+    STRATEGY_9_MIN_VOL_MULT = 1.8       # 1.8x 20-period Average Volume
+    STRATEGY_9_TARGET_RR = 3.0          # 3.0R Fixed Asymmetric Target
+    STRATEGY_9_RISK_USD = 75.0          # Fixed dollar risk per trade ($75)
+    STRATEGY_9_BYPASS_GENERIC_AI = True # Fast-lane execution (no 8.5 LLM choke)
+    STRATEGY_9_AUTO_EXECUTE = True      # Auto-execute directly on TradeLocker
+
     
     # Prop Firm Execution Profiles
     ACTIVE_FIRM = "UPCOMERS"

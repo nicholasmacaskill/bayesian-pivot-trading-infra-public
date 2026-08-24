@@ -53,6 +53,7 @@ from src.engines.multi_account_funnel import MultiAccountFunnelManager
 from src.engines.counterfactual_tracker import CounterfactualTracker
 from src.engines.qa_quant_agent import QAQuantAgent
 from src.engines.inducement_tracker import InducementTracker
+from src.engines.judas_inducement_engine import JudasInducementEngine
 
 
 
@@ -173,6 +174,7 @@ class LocalScannerRunner:
         self.counterfactual_tracker = CounterfactualTracker()
         self.qa_agent = QAQuantAgent()
         self.inducement_tracker = InducementTracker()
+        self.judas_engine = JudasInducementEngine()
         self.learned_weights = self._load_learned_weights()
 
 
@@ -917,44 +919,46 @@ class LocalScannerRunner:
                 is_prime_window = self.scanner.is_asian_fade_window()
                 result = None
                 
-                # 1. Strategy 9: Judas Outlier Inducement Sweep Trigger
-                if 'outlier_event' in locals() and outlier_event and outlier_event.get('range_atr_mult', 0) >= 1.8:
-                    wick_pct = outlier_event.get('lower_wick_pct', 0) if 'BULL' in outlier_event.get('candle_type', '') else outlier_event.get('upper_wick_pct', 0)
-                    if wick_pct >= 60.0:
-                        logger.info(f"⚡ Strategy 9: Live Outlier Judas Sweep Detected on {symbol} (Range: {outlier_event['range_atr_mult']:.2f}x | Wick: {wick_pct:.1f}%)")
-                        is_bull = 'BULL' in outlier_event['candle_type']
-                        trade_dir = 'LONG' if is_bull else 'SHORT'
-                        entry_p = float(df_tmp.iloc[-1]['close'])
-                        atr_cur = float(self.scanner.calculate_atr(df_tmp).iloc[-1]) if not df_tmp.empty else entry_p * 0.008
-                        sl_dist = atr_cur * 2.0
-                        sl_p = entry_p - sl_dist if is_bull else entry_p + sl_dist
-                        tp_p = entry_p + (sl_dist * 2.5) if is_bull else entry_p - (sl_dist * 2.5)
-                        
-                        judas_setup = {
-                            'symbol': symbol,
-                            'pattern': f"Strategy 9 Judas Sweep Reversal ({outlier_event['candle_type']})",
-                            'direction': trade_dir,
-                            'entry': round(entry_p, 2),
-                            'entry_price': round(entry_p, 2),
-                            'sl': round(sl_p, 2),
-                            'stop_loss': round(sl_p, 2),
-                            'tp': round(tp_p, 2),
-                            'take_profit': round(tp_p, 2),
-                            'target': round(tp_p, 2),
-                            'bias': 'Bullish' if is_bull else 'Bearish',
-                            'is_judas_inducement': True,
-                            'is_asian_fade': False,
-                            'atr': atr_cur,
-                            'wick_ratio': wick_pct / 100.0,
-                            'range_atr_mult': outlier_event['range_atr_mult'],
-                            'price_quartiles': {
-                                'Judas Sweep': {'high': float(df_tmp['high'].iloc[-1]), 'low': float(df_tmp['low'].iloc[-1])}
-                            },
-                            'time_quartile': {'num': quartile_data.get('num', 2), 'phase': quartile_data.get('phase', 'Manipulation')},
-                            'smt_strength': market_context.get('DXY', {}).get('change_ltf', 0.0) if market_context else 0.0,
-                            'index_context': f"Strategy 9 Judas Outlier ({outlier_event['range_atr_mult']:.1f}x ATR)",
-                        }
-                        result = (judas_setup, df_tmp)
+                # 1. Strategy 9: Judas Outlier Inducement Hunter (Unbottlenecked Fast-Lane)
+                if getattr(Config, 'STRATEGY_9_ENABLED', True):
+                    strat9_setup = self.judas_engine.evaluate_dataframe(df_tmp, symbol=symbol)
+                    if strat9_setup:
+                        logger.info(f"⚡ [STRATEGY 9 FAST-LANE] Executing Judas Inducement on {symbol} ({strat9_setup['direction']})")
+                        _entry = strat9_setup['entry_price']
+                        _sl = strat9_setup['stop_loss']
+                        _tp = strat9_setup['take_profit']
+                        lots = strat9_setup['calculated_lots']
+                        direction = strat9_setup['direction']
+                        exec_side = "buy" if direction == "LONG" else "sell"
+
+                        # Send dedicated Telegram Alert
+                        self.notifier._send_message(self.judas_engine.format_telegram_alert(strat9_setup))
+
+                        # Execute Live on TradeLocker if auto-execution enabled
+                        if getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', True) and getattr(Config, 'LIVE_AUTO_EXECUTION', True):
+                            try:
+                                trade_success = self.tl.execute_trade(
+                                    symbol=symbol,
+                                    side=exec_side,
+                                    qty=lots,
+                                    stop_loss=_sl,
+                                    take_profit=_tp
+                                )
+                                if trade_success:
+                                    logger.info(f"✅ Strategy 9 Trade placed on TradeLocker: {exec_side.upper()} {lots} lots of {symbol} (SL: ${_sl:,.2f}, TP: ${_tp:,.2f})")
+                                    self.notifier._send_message(f"⚡ <b>STRATEGY 9 AUTO-EXECUTION SUCCESS:</b> Placed <a href='https://t.me/bayesianpivot_bot'>{exec_side.upper()} {lots} lots</a> of {symbol} (SL: <b>${_sl:,.2f}</b>, TP: <b>${_tp:,.2f}</b>)")
+                                else:
+                                    logger.error(f"❌ Strategy 9 Trade rejected by TradeLocker broker client.")
+                            except Exception as exec_err:
+                                logger.error(f"❌ Strategy 9 execution error: {exec_err}", exc_info=True)
+
+                        # Sign and log to ledger
+                        if self.ledger:
+                            self.ledger.sign_signal(strat9_setup, strat9_setup['confidence_score'])
+
+                        # Proceed directly to next symbol to preserve execution priority
+                        continue
+
 
                 # 2. Reversal scans in Reversal markets (with fallback)
                 if not result and strategy_mode == "REVERSAL":
