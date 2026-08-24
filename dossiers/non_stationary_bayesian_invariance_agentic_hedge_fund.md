@@ -6,7 +6,10 @@
 **Core Technology Stack:**  
 `ShadowChartMemory` ⇌ `Episodic Multi-Modal RAG` ⇌ `ChampionChallengerLab` ⇌ `Online Beta-Binomial Conjugate Updating` ⇌ `Recursive Kalman State Filters` ⇌ `Gemini 2.5 Flash Vision` ⇌ `Dimensionless Session VWAP Normalization` ⇌ `Prop Guardian`
 
+> **Abstract:** collapses market non-stationarity into dimensionless volatility manifolds and zero-lag kalman state estimation. updates bayesian strategy weights in <0.5ms via a genetic champion/challenger shadow lab.
+
 ---
+
 
 ## 1. Executive Summary & Problem Formulation
 
