@@ -146,12 +146,101 @@ class CounterfactualTracker:
                     )
                     logger.info(f"🏁 Counterfactual Trade #{t_id} [{t['account_key']}] Resolved: {outcome} (${pnl:+.2f}, {r_mult:+.1f}R)")
 
+                    # ── Real-Time Continuous Bayesian Retraining & Tournament Recording ──
+                    if outcome in ["HIT_TP", "HIT_SL"]:
+                        self._update_bayesian_weight_realtime(t.get("pattern", ""), outcome, r_mult)
+                        try:
+                            from src.engines.champion_challenger_lab import ChampionChallengerLab
+                            var_id = self._map_pattern_to_variant_id(t.get("pattern", ""))
+                            if var_id:
+                                ChampionChallengerLab().record_tournament_outcome(var_id, is_win=(outcome == "HIT_TP"), r_mult=r_mult)
+                        except Exception as _tourn_err:
+                            logger.debug(f"Tournament record error: {_tourn_err}")
+
+
             conn.commit()
             conn.close()
             return resolved_count
         except Exception as e:
             logger.error(f"Error evaluating open shadow trades: {e}")
             return 0
+
+    def _update_bayesian_weight_realtime(self, pattern: str, outcome: str, r_mult: float):
+        """Instant per-trade Bayesian posterior weight update."""
+        try:
+            weights_path = os.path.join(os.getcwd(), "data", "learned_strategy_weights.json")
+            if not os.path.exists(weights_path):
+                return
+
+            strat_key = self._map_pattern_to_strategy_key(pattern)
+            with open(weights_path, "r") as f:
+                data = json.load(f)
+
+            if strat_key not in data:
+                data[strat_key] = {
+                    "samples": 0, "wins": 0, "losses": 0, "win_rate": 50.0,
+                    "posterior_win_rate": 0.5, "expectancy_r": 0.0, "bayes_weight": 0.5
+                }
+
+            rec = data[strat_key]
+            rec["samples"] += 1
+            if outcome == "HIT_TP":
+                rec["wins"] += 1
+            elif outcome == "HIT_SL":
+                rec["losses"] += 1
+
+            total = rec["wins"] + rec["losses"]
+            if total > 0:
+                rec["win_rate"] = round((rec["wins"] / total) * 100.0, 1)
+                # Bayesian Beta-Binomial conjugate update with Beta(2, 2) uninformative prior
+                alpha_prior = 2.0
+                beta_prior = 2.0
+                rec["posterior_win_rate"] = round((rec["wins"] + alpha_prior) / (total + alpha_prior + beta_prior), 3)
+                rec["bayes_weight"] = round(min(max(rec["posterior_win_rate"], 0.1), 1.5), 3)
+
+            rec["last_calibrated"] = datetime.now(timezone.utc).isoformat()
+
+            with open(weights_path, "w") as f:
+                json.dump(data, f, indent=2)
+
+            logger.info(f"📈 [REAL-TIME RETRAINING] {strat_key}: Samples={rec['samples']} | WinRate={rec.get('win_rate', 50.0)}% | BayesWeight={rec['bayes_weight']}")
+        except Exception as err:
+            logger.debug(f"Real-time weight update error: {err}")
+
+    @staticmethod
+    def _map_pattern_to_strategy_key(pattern: str) -> str:
+        """Maps free-text pattern string to canonical strategy enum key."""
+        p = (pattern or "").upper()
+        if "JUDAS" in p or "INDUCEMENT" in p:
+            return "STRATEGY_9_JUDAS_INDUCEMENT"
+        elif "ASIAN" in p or "FADE" in p:
+            return "STRATEGY_1_ASIAN_FADE"
+        elif "TREND" in p or "EXPANSION" in p:
+            return "STRATEGY_2_TREND_EXPANSION"
+        elif "TURTLE" in p or "SOUP" in p or "SWEEP" in p:
+            return "STRATEGY_8_TURTLE_SOUP_SWEEP"
+        elif "SMT" in p:
+            return "STRATEGY_3_SMT_DIVERGENCE"
+        elif "BREAKER" in p:
+            return "STRATEGY_4_BREAKER_BLOCK"
+        elif "50%" in p or "EQUILIBRIUM" in p:
+            return "STRATEGY_5_50PCT_CE_MT"
+        else:
+            return "STRATEGY_2_TREND_EXPANSION"
+
+    @staticmethod
+    def _map_pattern_to_variant_id(pattern: str) -> Optional[str]:
+        """Maps free-text pattern string to tournament variant ID."""
+        p = (pattern or "").upper()
+        if "JUDAS" in p or "INDUCEMENT" in p:
+            return "STRAT_9_CHALLENGER"
+        elif "ASIAN" in p or "FADE" in p:
+            return "STRAT_1_CHALLENGER"
+        elif "TURTLE" in p or "SOUP" in p or "SWEEP" in p:
+            return "STRAT_8_CHALLENGER"
+        return None
+
+
 
     @staticmethod
     def get_counterfactual_summary() -> dict:
