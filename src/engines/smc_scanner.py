@@ -22,6 +22,8 @@ try:
 except Exception:
     pass
 
+from src.engines.shadow_substitution_engine import KalmanStateFilter, ShadowSubstitutionEngine
+
 logger = logging.getLogger(__name__)
 
 def ensure_data(default_return=None):
@@ -77,6 +79,8 @@ class SMCScanner:
             
         self.intermarket = IntermarketEngine()
         self.news = NewsFilter()
+        self.kalman_filter = KalmanStateFilter()
+        self.shadow_sub = ShadowSubstitutionEngine()
         self.order_book_enabled = True  # Can be disabled if exchange doesn't support
         # Deduplication cache: prevents firing the same signal multiple times per candle window
         # Key: (symbol, pattern_type) | Value: timestamp of last signal
@@ -382,13 +386,13 @@ class SMCScanner:
             for tf in timeframes_to_check:
                 if tf == '4h':
                     # Native aggregation for 4H
-                    df_base_raw = self.exchange.fetch_ohlcv(symbol, '1h', limit=limit*4)
+                    df_base_raw = self.exchange.fetch_ohlcv(fetch_symbol, '1h', limit=limit*4)
                     if not df_base_raw: continue
                     df_base = pd.DataFrame(df_base_raw, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     df_base['timestamp'] = pd.to_datetime(df_base['timestamp'], unit='ms')
                     df_tf = self._aggregate_ohlcv(df_base, '4h')
                 else:
-                    df_raw = self.exchange.fetch_ohlcv(symbol, tf, limit=10)
+                    df_raw = self.exchange.fetch_ohlcv(fetch_symbol, tf, limit=10)
                     if not df_raw: continue
                     df_tf = pd.DataFrame(df_raw, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     df_tf['timestamp'] = pd.to_datetime(df_tf['timestamp'], unit='ms')
@@ -948,8 +952,20 @@ class SMCScanner:
     
     def detect_mss(self, df):
         """
-        Market Structure Shift: Price breaks the most recent swing fractal.
+        Market Structure Shift: 
+        Evaluates classical fractal break OR Zero-Lag Kalman Velocity Inflection.
         """
+        # 1. Zero-Lag Kalman State-Space Inflection Check
+        try:
+            k_shift, k_mag = self.shadow_sub.evaluate_kalman_mss(df)
+            if k_shift == "BULLISH_SHIFT" and k_mag > 0:
+                return 'BULLISH'
+            elif k_shift == "BEARISH_SHIFT" and k_mag > 0:
+                return 'BEARISH'
+        except Exception as _k_err:
+            logger.debug(f"Kalman MSS error: {_k_err}")
+
+        # 2. Classical Fractal Break Fallback
         is_high, is_low = self.detect_fractals(df)
         
         # Get most recent confirmed swing high/low
@@ -971,6 +987,11 @@ class SMCScanner:
         if mss_bullish: return 'BULLISH'
         if mss_bearish: return 'BEARISH'
         return None
+
+
+    def get_session_vwap_bands(self, df: pd.DataFrame) -> dict:
+        """Computes live Session VWAP +/- 2.0 Sigma dispersion bands."""
+        return self.shadow_sub.calculate_session_vwap_bands(df)
 
     def is_displaced_move(self, df, direction, smt_strength=0.0):
         """
