@@ -27,42 +27,30 @@ Analyze the following trade setup with rigorous quantitative evaluation.
 
 [ORACLE_RULES_PLACEHOLDER]
 
-### DYNAMIC SCORING RUBRIC (0.0 - 10.0 scale):
-Calculate an exact score (1 decimal place) by building up from a baseline score of 5.5:
+### STRATEGY-AWARE EVALUATION DIRECTIVE:
+Evaluate this setup according to its specific Strategy Archetype:
 
-1. SMT Sponsorship & Cross-Asset Divergence:
-   - SMT Strength >= 0.35 or confirmed Cross-Asset divergence: +1.2
-   - SMT Strength 0.15 - 0.34: +0.6
-   - SMT Strength < 0.15 (Symmetric Double Sweep): +0.0 (Neutral, no penalty)
+1. ARCHETYPE: LIQUIDITY SWEEP & JUDAS FADE (Strategy 9, Turtle Soup, Asian Fade)
+   - Edge: Trapping retail breakout traders at key highs/lows.
+   - Core Criteria: Rejection wick absorbing liquidity, volume flush, clean mean-reverting exhaustion.
+   - Do NOT penalize for counter-trend entries or lack of HTF trend alignment.
 
-2. Market Regime & Fractal Physics (Hurst):
-   - Hurst < 0.45 and Mean-Reversion / Turtle Soup / Asian Fade Sweep: +1.3
-   - Hurst > 0.55 and Trend Pullback / Expansion setup: +1.0
-   - Neutral Hurst (0.45 - 0.55): -1.0 (Caution: Gaussian Random Walk noise)
+2. ARCHETYPE: TREND EXPANSION & DISPLACEMENT (Strategy 2, Order Blocks)
+   - Edge: Institutional accumulation and directional trend continuation.
+   - Core Criteria: Strong SMT divergence, displacement body (>1.5x ATR), aligned HTF bias.
+   - Penalize heavily if entering against HTF trend or if SMT divergence is absent.
 
-3. Session Window & Killzone Phase:
-   - Asian Fade (04:00-07:00 UTC) or Prime London/NY Killzone: +1.0
-   - Q2 Judas Manipulation Window (90-min cycle): +0.8
-   - Off-hours / Low Volume: +0.0
+### FORENSIC AUDIT OBJECTIVES:
+1. Structural Flaw Check: Is this a genuine institutional entry or an obvious retail trap?
+2. News / Hazard Check: Are there high-impact news catalysts (CPI, FOMC, NFP) within 30 minutes?
+3. Visual & Order Book Confluence: Verify clean liquidity clearance, CVD absorption, and minimal slippage.
 
-4. Order Flow & Liquidity Print (Shadow Confluences):
-   - Clean ATR Sweep (0.25 - 0.50x ATR) with Wick Absorption >= 35%: +1.0
-   - Major Structural Liquidity Sweep (Equal Highs/Lows, Session Extremes, PDL/PDH) with Rejection Wick >= 60% and Volume Spike >= 3.0x: +0.6
-   - CVD Absorption Divergence OR Session VWAP +/- 2.0σ Band Extreme: +0.8
-   - Standard FVG tap with moderate volume: +0.4
+### SCORING DIRECTIVE (0.0 - 10.0 Continuous Probability Scale):
+- 9.0 - 10.0 (Institutional Grade): Flawless structural setup, clean liquidity sweep/displacement, strong confluence, clear news runway.
+- 8.0 - 8.9 (A-Tier Setup): Solid setup with minor friction (e.g. slight slippage or off-killzone), but edge intact.
+- 6.0 - 7.9 (B-Tier / Marginal): Mixed signals, weak SMT in trend mode, or choppy order flow.
+- 0.0 - 5.9 (Toxic / Retail Inducement): Obvious retail trap, high-impact news imminent, or entering into major unmitigated supply/demand.
 
-5. Pricing Position:
-   - Deep Discount for Longs / Deep Premium for Shorts: +0.7
-   - Equilibrium: +0.2
-
-Deductions & Conditional Constraints:
-- High Impact News within 30 min: -1.5
-- Poor Orderbook Depth / High Slippage (>0.15%): -0.8
-- Conflicting HTF Bias:
-  * If Hurst > 0.55 (Trending Mode): -1.5 (Respect the trend)
-  * If Hurst < 0.45 (Mean-Reverting Exhaustion Trap): -0.0 (Do not penalize traps for fading HTF exhaustion)
-
-CRITICAL: Calculate the score dynamically using the rubric above. Do NOT output a static or arbitrary score like 8.2 or 8.5 unless the exact rubric arithmetic sums to that value.
 """
 
 SOVEREIGN_VISION_PROMPT = """

@@ -458,18 +458,20 @@ class AIValidator:
         # DUAL-TRACK PROMPT CONSTRUCTION
         if self.sovereign_prompt:
             # Full Sovereign Version (Master Theory active)
-            if not memory_context:
-                try:
-                    from src.engines.retraining_loop import RetrainingLoop
-                    cand_archetype = RetrainingLoop.classify_trade_archetype(
-                        pattern=setup.get('pattern', ''),
-                        regime=regime,
-                        hurst=hurst_exponent if hurst_exponent is not None else 0.50,
-                        symbol=setup.get('symbol', 'BTC/USD')
-                    )
-                    memory_context = RetrainingLoop().get_few_shot_context(target_archetype=cand_archetype)
-                except Exception as e:
-                    pass
+            memory_context = None
+            try:
+                from src.engines.shadow_chart_memory import ShadowChartMemory
+                shadow_mem = ShadowChartMemory()
+                cases = shadow_mem.retrieve_similar_cases(
+                    pattern=setup.get('pattern', ''),
+                    symbol=setup.get('symbol', 'BTC/USD'),
+                    direction=setup.get('direction', 'LONG'),
+                    limit=2
+                )
+                memory_context = shadow_mem.format_memory_for_prompt(cases)
+            except Exception as _mem_err:
+                logger.debug(f"Shadow memory retrieval error: {_mem_err}")
+
             safe_memory = memory_context if memory_context else "No highly similar historical setups found for reference."
             
             prompt = self.sovereign_prompt.format(
@@ -504,22 +506,23 @@ class AIValidator:
             - Regime: {regime_detail}
             - Confluences: {oracle_rules}
             
-            ### STRATEGIC FOCUS:
-            If Hurst < 0.45 (Mean-Reverting), PRIORITIZE 'Institutional Fades', 'Turtle Soups', and 'Liq Sweeps'.
-            If Hurst > 0.55 (Trending), PRIORITIZE 'Trend Pullbacks' and 'Expansion continuations'.
+            ### STRATEGY-AWARE EVALUATION DIRECTIVE:
+            1. LIQUIDITY SWEEP & JUDAS FADE: Focus on wick absorption, volume spike, and trapping breakout retail. Do NOT penalize for counter-trend entry.
+            2. TREND EXPANSION & DISPLACEMENT: Focus on strong SMT divergence, displacement body (>1.5x ATR), and HTF alignment. Penalize counter-trend entries.
 
-            ### DYNAMIC SCORING RUBRIC (0.0 - 10.0 scale):
-            Calculate exact score starting from baseline 5.5:
-            +1.2 for SMT Strength >= 0.35 (or confirmed cross-asset divergence)
-            +1.3 for Hurst < 0.45 (Fade alignment) OR +1.0 for Hurst > 0.55 (Trend alignment)
-            +1.0 for Prime Asian Fade / London / NY Killzone Window
-            +1.0 for Clean ATR Sweep (0.25-0.50x) with Wick Absorption >= 35% or CVD Divergence
-            +0.6 for Major Structural Liquidity Sweep (Equal Highs/Lows, Session Extremes, PDL/PDH) with Rejection Wick >= 60% and Volume Spike >= 3.0x
-            +0.7 for Deep Discount / Premium zone
-            -1.5 for High impact news within 30 min
-            -1.5 for HTF bias conflict ONLY IF Hurst > 0.55 (Trend Mode). Do NOT penalize HTF conflict if Hurst < 0.45 (Mean-Reverting Trap).
+            ### FORENSIC AUDIT OBJECTIVES:
+            1. Structural Flaw Check: Is this a genuine institutional entry or retail trap?
+            2. News Check: Are high-impact news catalysts (CPI, FOMC, NFP) within 30 min?
+            3. Order Book Check: Verify clean clearance and minimal slippage.
+
+            ### SCORING DIRECTIVE (0.0 - 10.0 Continuous Probability Scale):
+            - 9.0 - 10.0: Institutional Grade setup with flawless confluence.
+            - 8.0 - 8.9: Strong A-Tier setup with solid edge.
+            - 6.0 - 7.9: Marginal / B-Tier setup.
+            - 0.0 - 5.9: Toxic / Retail trap.
 
             Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
+
             """
 
         if image_path:
