@@ -5,14 +5,14 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-SETUP_SCORING_PROMPT = """You are a professional ICT (Inner Circle Trader) algorithmic trading analyst.
+SETUP_SCORING_PROMPT = """You are Bayesian Pivot, an elite institutional quantitative trading AI validator.
 Analyze this trade setup and return a JSON object with exactly these fields:
-{
+{{
   "score": <float 0-10, precision 1 decimal>,
-  "verdict": "<EXECUTE|WATCH|SKIP>",
+  "verdict": "<FLOW_GO|SHADOW_OBSERVATION|REJECTED>",
   "reasoning": "<max 2 sentences, why this setup does or doesn't qualify>",
   "risk_level": "<LOW|MEDIUM|HIGH>"
-}
+}}
 
 Scoring rubric:
 - 8.5-10: Unicorn setup — all confluence aligned, killzone confirmed, HTF POI as draw on liquidity
@@ -41,7 +41,7 @@ class LocalLLMHandler:
     Ensures analysis uptime even if all cloud APIs are unreachable.
     Provides full structured scoring at zero API cost.
     """
-    def __init__(self, model: str = "llama3", url: str = "http://localhost:11434/api/generate"):
+    def __init__(self, model: str = "bayesian-pivot", url: str = "http://localhost:11434/api/generate"):
         self.model = model
         self.url = url
         self._timeout = 30
@@ -105,6 +105,7 @@ class LocalLLMHandler:
             "prompt": prompt,
             "stream": False,
             "format": "json",
+            "keep_alive": "30s",  # Automatically unload from RAM after 30 seconds
             "options": {
                 "temperature": 0.1,   # Low temp for structured/consistent scoring
                 "num_predict": 256,   # Cap tokens to keep RAM/latency tight

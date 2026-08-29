@@ -1,8 +1,13 @@
+import os
+import sys
 import ccxt
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import json
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from src.core.config import Config
 from src.engines.smc_scanner import SMCScanner
 
@@ -89,10 +94,8 @@ class ScannerBacktest:
     
     def resample_data(self, df, timeframe):
         """Resamples 5m data to higher timeframes."""
-        # map '4h' -> '4H', '1d' -> '1D'
-        rule = timeframe.upper().replace('M', 'T') # generic mapper if needed, but we know inputs
-        if timeframe == '4h': rule = '4H'
-        if timeframe == '1d': rule = '1D'
+        rule = timeframe.lower()
+        if rule == '1d': rule = '1D'
         
         # Aggregation rules
         agg_dict = {
@@ -319,8 +322,8 @@ class ScannerBacktest:
 if __name__ == "__main__":
     engine = ScannerBacktest(
         symbol='BTC/USDT',
-        start_date='2025-11-01',
-        end_date='2025-11-04'
+        start_date='2026-06-25',
+        end_date='2026-08-24'
     )
     
     results = engine.run_backtest()

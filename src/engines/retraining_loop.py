@@ -107,63 +107,94 @@ class RetrainingLoop:
 
     def _fetch_recent_outcomes(self, days_back: int = 365) -> list[dict]:
         """
-        Queries signed_ledger for closed bot trades AND journal for all closed execution trades.
+        Queries signed_ledger, counterfactuals, and alpha journal for outcomes.
         """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         all_data = []
 
         try:
-            if days_back > 0:
-                cutoff = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
-                # 1. Fetch System Signals (Bot Trades)
-                rows = conn.execute("""
-                    SELECT timestamp, symbol, direction, pattern, ai_score, outcome, pnl, signal_id, 
-                           volume_spike, true_smt, shadow_regime, 0 as is_discretionary
-                    FROM signed_ledger
-                    WHERE outcome NOT IN ('PENDING', 'UNKNOWN')
-                      AND timestamp >= ?
-                    ORDER BY timestamp DESC
-                """, (cutoff,)).fetchall()
-                all_data.extend([dict(r) for r in rows])
+            # 1. Fetch Verified Signed Ledger Trades (Tier 1 Wins & Audited System Losses)
+            rows = conn.execute("""
+                SELECT timestamp, 
+                       CASE WHEN symbol LIKE '%BTC%' THEN 'BTC/USD' WHEN symbol LIKE '%ETH%' THEN 'ETH/USD' ELSE COALESCE(symbol, 'BTC/USD') END as symbol,
+                       CASE WHEN direction IN ('BUY', 'LONG') THEN 'LONG' ELSE 'SHORT' END as direction,
+                       pattern, ai_score, outcome, pnl, signal_id, 
+                       volume_spike, true_smt, shadow_regime, 0 as is_discretionary,
+                       'LIVE_PRODUCTION' as source_era
+                FROM signed_ledger
+                WHERE outcome NOT IN ('PENDING', 'UNKNOWN', 'ROGUE') AND is_rogue = 0
+                ORDER BY timestamp DESC
+            """).fetchall()
+            all_data.extend([dict(r) for r in rows])
 
-                # 2. Fetch High-Conviction Journal Trades (ALPHA & SYSTEM post-June 2026)
-                rogue_rows = conn.execute("""
-                    SELECT timestamp, symbol, side as direction, COALESCE(deviations, strategy) as pattern, ai_grade as ai_score, 
-                           CASE WHEN pnl > 0 THEN 'WIN' WHEN pnl < 0 THEN 'LOSS' ELSE 'BREAKEVEN' END as outcome,
-                           pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt, 
-                           notes as shadow_regime, CASE WHEN strategy = 'ALPHA' THEN 1 ELSE 0 END as is_discretionary
-                    FROM journal
-                    WHERE status = 'CLOSED'
-                      AND strategy IN ('ALPHA', 'SYSTEM')
-                      AND timestamp >= '2026-06-01'
-                    ORDER BY timestamp DESC
-                """).fetchall()
-                all_data.extend([dict(r) for r in rogue_rows])
-            else:
-                rows = conn.execute("""
-                    SELECT timestamp, symbol, direction, pattern, ai_score, outcome, pnl, signal_id, 
-                           volume_spike, true_smt, shadow_regime, 0 as is_discretionary
-                    FROM signed_ledger
-                    WHERE outcome NOT IN ('PENDING', 'UNKNOWN')
-                    ORDER BY timestamp DESC
-                """).fetchall()
-                all_data.extend([dict(r) for r in rows])
+            # 2. Fetch Modern Counterfactual Shadow Trades (Tier 2 Shadow Wins & Tier 3 Avoided Traps)
+            cf_rows = conn.execute("""
+                SELECT timestamp, 
+                       CASE WHEN symbol LIKE '%BTC%' THEN 'BTC/USD' WHEN symbol LIKE '%ETH%' THEN 'ETH/USD' ELSE COALESCE(symbol, 'BTC/USD') END as symbol,
+                       CASE WHEN direction IN ('BUY', 'LONG') THEN 'LONG' ELSE 'SHORT' END as direction,
+                       pattern, 7.5 as ai_score,
+                       CASE WHEN outcome = 'HIT_TP' THEN 'WIN' ELSE 'LOSS' END as outcome,
+                       simulated_pnl as pnl, id as signal_id,
+                       1.5 as volume_spike, 'CONFIRMED' as true_smt,
+                       strategy_mode as shadow_regime, 0 as is_discretionary,
+                       'MODERN_SHADOW' as source_era
+                FROM counterfactual_trades
+                WHERE outcome IN ('HIT_TP', 'HIT_SL')
+                ORDER BY timestamp DESC
+            """).fetchall()
+            all_data.extend([dict(r) for r in cf_rows])
 
-                rogue_rows = conn.execute("""
-                    SELECT timestamp, symbol, side as direction, COALESCE(deviations, strategy) as pattern, ai_grade as ai_score, 
-                           CASE WHEN pnl > 0 THEN 'WIN' WHEN pnl < 0 THEN 'LOSS' ELSE 'BREAKEVEN' END as outcome,
-                           pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt, 
-                           notes as shadow_regime, CASE WHEN strategy = 'ALPHA' THEN 1 ELSE 0 END as is_discretionary
-                    FROM journal
-                    WHERE status = 'CLOSED'
-                      AND strategy IN ('ALPHA', 'SYSTEM')
-                      AND timestamp >= '2026-06-01'
-                    ORDER BY timestamp DESC
-                """).fetchall()
-                all_data.extend([dict(r) for r in rogue_rows])
+            # 3. Fetch Discretionary Human Alpha Trades (Tier 4 Masterclasses)
+            alpha_rows = conn.execute("""
+                SELECT timestamp, 
+                       CASE WHEN symbol LIKE '%BTC%' THEN 'BTC/USD' WHEN symbol LIKE '%ETH%' THEN 'ETH/USD' ELSE 'BTC/USD' END as symbol,
+                       CASE WHEN side IN ('BUY', 'LONG') THEN 'LONG' ELSE 'SHORT' END as direction,
+                       COALESCE(deviations, 'Human Discretionary Wick Sweep') as pattern, 
+                       COALESCE(ai_grade, 8.5) as ai_score, 
+                       CASE WHEN pnl > 0 THEN 'WIN' ELSE 'LOSS' END as outcome,
+                       pnl, trade_id as signal_id, 1.8 as volume_spike, 'N/A' as true_smt, 
+                       COALESCE(notes, 'Discretionary Entry') as shadow_regime, 1 as is_discretionary,
+                       'HUMAN_ALPHA' as source_era
+                FROM journal
+                WHERE strategy = 'ALPHA' AND status = 'CLOSED'
+                ORDER BY timestamp DESC
+            """).fetchall()
+            all_data.extend([dict(r) for r in alpha_rows])
 
+            # 4. Fetch Legacy System Trades (Historical 6-Month Baseline)
+            legacy_sys_rows = conn.execute("""
+                SELECT timestamp,
+                       CASE WHEN symbol LIKE '%BTC%' THEN 'BTC/USD' WHEN symbol LIKE '%ETH%' THEN 'ETH/USD' ELSE 'BTC/USD' END as symbol,
+                       CASE WHEN side IN ('BUY', 'LONG') THEN 'LONG' ELSE 'SHORT' END as direction,
+                       COALESCE(deviations, 'Legacy SMC System Trade') as pattern,
+                       COALESCE(ai_grade, 7.0) as ai_score,
+                       CASE WHEN pnl > 0 THEN 'WIN' ELSE 'LOSS' END as outcome,
+                       pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt,
+                       COALESCE(notes, 'Legacy v1.0 System') as shadow_regime, 0 as is_discretionary,
+                       'LEGACY_v1_SYSTEM' as source_era
+                FROM journal
+                WHERE strategy = 'SYSTEM' AND status = 'CLOSED'
+                ORDER BY timestamp DESC
+            """).fetchall()
+            all_data.extend([dict(r) for r in legacy_sys_rows])
 
+            # 5. Fetch Legacy Rogue / Desync Trades (Anti-Patterns / Failure Lessons)
+            rogue_journal_rows = conn.execute("""
+                SELECT timestamp,
+                       CASE WHEN symbol LIKE '%BTC%' THEN 'BTC/USD' WHEN symbol LIKE '%ETH%' THEN 'ETH/USD' ELSE 'BTC/USD' END as symbol,
+                       CASE WHEN side IN ('BUY', 'LONG') THEN 'LONG' ELSE 'SHORT' END as direction,
+                       COALESCE(deviations, 'Legacy Rogue / Anti-Pattern Entry') as pattern,
+                       0.0 as ai_score,
+                       CASE WHEN pnl > 0 THEN 'WIN' ELSE 'LOSS' END as outcome,
+                       pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt,
+                       COALESCE(notes, 'Legacy Out-of-Band Trade') as shadow_regime, 0 as is_discretionary,
+                       'LEGACY_v1_ROGUE_ANTI_PATTERN' as source_era
+                FROM journal
+                WHERE strategy = 'ROGUE' AND status = 'CLOSED'
+                ORDER BY timestamp DESC
+            """).fetchall()
+            all_data.extend([dict(r) for r in rogue_journal_rows])
             
             return all_data
         except Exception as e:
@@ -222,17 +253,36 @@ class RetrainingLoop:
             mae_r = 0.50
             mfe_r = 1.50  # Hit TP1 and trailed to breakeven
 
+        source_era = record.get('source_era', 'LIVE_PRODUCTION')
+
         # 3. Formulate Causal Rule Alignment / Exception Delta
-        if is_disc:
+        if source_era == 'HUMAN_ALPHA':
             reasoning = record.get('shadow_regime') or pattern
             if outcome == 'WIN':
                 rule_delta = f"Human Intuition Alpha: Discretionary ICT timing successfully capitalized on {reasoning}."
             else:
                 rule_delta = f"Human Error Trap: Discretionary entry lacked HTF SMT backing; whipsawed into stop."
             prompt = (
-                f"SITUATION: Discretionary 'Human Alpha' trade | Archetype: {archetype} | "
+                f"SITUATION: Discretionary 'Human Alpha' trade | Provenance: [{source_era}] | Archetype: {archetype} | "
                 f"Symbol: {record['symbol']} | Direction: {record['direction']} | "
                 f"Analyst Reasoning: {reasoning} | AI Auditor Score: {record['ai_score']}/10"
+            )
+        elif source_era == 'LEGACY_v1_ROGUE_ANTI_PATTERN':
+            rule_delta = f"Anti-Pattern Warning: Legacy out-of-band trade taken without modern quantitative gates. Prohibited under Bayesian Pivot v2.0."
+            prompt = (
+                f"SITUATION: Legacy Rogue Anti-Pattern | Provenance: [{source_era}] | Archetype: {archetype} | "
+                f"Symbol: {record['symbol']} | Direction: {record['direction']} | Pattern: {pattern} | "
+                f"Lesson: Lack of CVD/VWAP confirmation produced unhedged drawdown."
+            )
+        elif source_era == 'LEGACY_v1_SYSTEM':
+            if outcome == 'WIN':
+                rule_delta = f"Legacy Precedent Win: Historical SMC pattern expanded cleanly during early 2026 macro regime."
+            else:
+                rule_delta = f"Legacy Precedent Loss: Trade entered under early v1.0 rules before CVD absorption was integrated."
+            prompt = (
+                f"SITUATION: Legacy System Trade | Provenance: [{source_era}] | Archetype: {archetype} | "
+                f"Symbol: {record['symbol']} | Direction: {record['direction']} | Pattern: {pattern} | "
+                f"AI Score: {record['ai_score']}/10 | Regime: {regime}"
             )
         else:
             if outcome == 'WIN':
@@ -240,7 +290,7 @@ class RetrainingLoop:
             else:
                 rule_delta = f"Market Trap: Low SMT divergence or intra-candle friction breached entry zone before expansion."
             prompt = (
-                f"SITUATION: System Signal | Archetype: {archetype} | Symbol: {record['symbol']} | "
+                f"SITUATION: Modern Sovereign Signal | Provenance: [{source_era}] | Archetype: {archetype} | Symbol: {record['symbol']} | "
                 f"Direction: {record['direction']} | Pattern: {pattern} | "
                 f"AI Score: {record['ai_score']}/10 | Regime: {regime} | SMT: {true_smt}"
             )
