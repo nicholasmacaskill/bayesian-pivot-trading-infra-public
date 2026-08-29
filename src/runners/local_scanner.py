@@ -937,16 +937,18 @@ class LocalScannerRunner:
                         # Execute Live on TradeLocker if auto-execution enabled
                         if getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', True) and getattr(Config, 'LIVE_AUTO_EXECUTION', True):
                             try:
-                                trade_success = self.tl.execute_trade(
+                                exec_res = self.tl.execute_trade_across_all_accounts(
                                     symbol=symbol,
                                     side=exec_side,
-                                    qty=lots,
                                     stop_loss=_sl,
-                                    take_profit=_tp
+                                    take_profit=_tp,
+                                    risk_scale=1.00,
+                                    tranche_label="STRATEGY_9_JUDAS"
                                 )
+                                trade_success = exec_res.get("success", False)
                                 if trade_success:
-                                    logger.info(f"✅ Strategy 9 Trade placed on TradeLocker: {exec_side.upper()} {lots} lots of {symbol} (SL: ${_sl:,.2f}, TP: ${_tp:,.2f})")
-                                    self.notifier._send_message(f"⚡ <b>STRATEGY 9 AUTO-EXECUTION SUCCESS:</b> Placed <a href='https://t.me/bayesianpivot_bot'>{exec_side.upper()} {lots} lots</a> of {symbol} (SL: <b>${_sl:,.2f}</b>, TP: <b>${_tp:,.2f}</b>)")
+                                    logger.info(f"✅ Strategy 9 Trade placed across {exec_res.get('filled_count', 0)} accounts on TradeLocker: {exec_side.upper()} on {symbol} (SL: ${_sl:,.2f}, TP: ${_tp:,.2f})")
+                                    self.notifier._send_message(f"⚡ <b>STRATEGY 9 AUTO-EXECUTION SUCCESS:</b> Placed <a href='https://t.me/bayesianpivot_bot'>{exec_side.upper()}</a> on {symbol} across {exec_res.get('filled_count', 0)} accounts (SL: <b>${_sl:,.2f}</b>, TP: <b>${_tp:,.2f}</b>)")
                                 else:
                                     logger.error(f"❌ Strategy 9 Trade rejected by TradeLocker broker client.")
                             except Exception as exec_err:
@@ -1222,16 +1224,18 @@ class LocalScannerRunner:
                             try:
                                 dir_str = str(direction or "BUY").upper()
                                 exec_side = "buy" if dir_str == "LONG" or dir_str == "BUY" else "sell"
-                                trade_success = self.tl.execute_trade(
+                                exec_res = self.tl.execute_trade_across_all_accounts(
                                     symbol=symbol,
                                     side=exec_side,
-                                    qty=lots,
                                     stop_loss=_sl,
-                                    take_profit=_tp
+                                    take_profit=_tp,
+                                    risk_scale=1.00,
+                                    tranche_label="FULL_SIZE_ENTRY"
                                 )
+                                trade_success = exec_res.get("success", False)
                                 if trade_success:
-                                    logger.info(f"✅ Trade executed successfully on TradeLocker.")
-                                    self.notifier._send_message(f"⚡ <b>AUTO-EXECUTION SUCCESS:</b> Placed <a href='https://t.me/bayesianpivot_bot'>{exec_side.upper()} {lots} lots</a> of {symbol} (SL: <b>${_sl:,.2f}</b>, TP: <b>${_tp:,.2f}</b>)")
+                                    logger.info(f"✅ Trade executed successfully across {exec_res.get('filled_count', 0)} accounts on TradeLocker.")
+                                    self.notifier._send_message(f"⚡ <b>AUTO-EXECUTION SUCCESS:</b> Placed <a href='https://t.me/bayesianpivot_bot'>{exec_side.upper()}</a> on {symbol} across {exec_res.get('filled_count', 0)} accounts (SL: <b>${_sl:,.2f}</b>, TP: <b>${_tp:,.2f}</b>)")
                                 else:
                                     logger.error(f"❌ Trade execution rejected by TradeLocker broker client.")
                                     self.notifier._send_message(f"⚠️ <b>AUTO-EXECUTION FAILURE:</b> Broker rejected order request for {symbol}.")
