@@ -10,6 +10,7 @@ from src.clients.telegram_notifier import send_alert
 from src.engines.shadow_substitution_engine import ShadowSubstitutionEngine
 from src.engines.counterfactual_tracker import CounterfactualTracker
 from src.engines.liquidity_heatmap_engine import LiquidityHeatmapEngine
+from src.engines.retail_trap_engine import RetailStopTrapEngine
 from src.clients.tl_client import TradeLockerClient
 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,9 @@ class AlphaSweepScanner(SMCScanner):
         self.shadow_engine = ShadowSubstitutionEngine()
         self.counterfactual_tracker = CounterfactualTracker()
         self.heatmap_engine = LiquidityHeatmapEngine()
+        self.retail_trap_engine = RetailStopTrapEngine()
         self.tl = TradeLockerClient()
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Liquidity Heatmap, Shadow Substitution & TradeLocker Fleet Client.")
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Liquidity Heatmap, Retail Trap Shadow Engine & TradeLocker Fleet Client.")
 
     def is_premium_killzone(self, dt=None):
         """
@@ -446,6 +448,36 @@ class AlphaSweepScanner(SMCScanner):
 
         return None
 
+    def check_retail_trap_shadow(self, symbol, df_5m, df_1h, killzone):
+        """
+        Scans for Retail LuxAlgo BOS/CHoCH Trap Fades.
+        100% SHADOW LAB ONLY - ZERO LIVE CAPITAL RISK.
+        """
+        trap = self.retail_trap_engine.detect_retail_trap(df_5m, df_1h)
+        if not trap:
+            return None
+            
+        atr_series = self.calculate_atr(df_5m)
+        atr_5m = atr_series.iloc[-1] if len(atr_series) > 0 and not pd.isna(atr_series.iloc[-1]) else 15.0
+        
+        closes_1h = df_1h['close'].values
+        hurst = self.get_hurst_exponent(closes_1h)
+        
+        return {
+            "direction": trap["direction"],
+            "level": trap["breakout_level"],
+            "hurst": hurst,
+            "trend": "RETAIL_TRAP_FADE",
+            "regime": "RETAIL_INDUCEMENT_PURGE",
+            "pattern_type": "RETAIL_LUXALGO_TRAP_SHADOW",
+            "sweep_dist": abs(trap["price"] - trap["breakout_level"]),
+            "atr": atr_5m,
+            "price": trap["price"],
+            "is_shadow_only": True,
+            "retail_reasoning": trap["reasoning"],
+            "target_stop_pool": trap["target_stop_pool"]
+        }
+
     def scan_symbol(self, symbol):
         """
         Runs the Bayesian Pivot Alpha scan on the given symbol.
@@ -479,6 +511,10 @@ class AlphaSweepScanner(SMCScanner):
         # 4. Quaternary Hunt: NY HFT Double-Sweep Purge (100% Zero-Risk Shadow Tracking)
         if not setup:
             setup = self.check_ny_hft_double_sweep_shadow(symbol, df_5m, df_1h, killzone)
+            
+        # 5. Quinary Hunt: Retail LuxAlgo Trap Fade (100% Zero-Risk Shadow Tracking)
+        if not setup:
+            setup = self.check_retail_trap_shadow(symbol, df_5m, df_1h, killzone)
             
         if setup:
             pattern_type = setup.get('pattern_type', 'TURTLE_SOUP_LIQUIDITY_SWEEP')
