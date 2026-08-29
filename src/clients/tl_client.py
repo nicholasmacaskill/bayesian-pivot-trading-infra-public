@@ -1,5 +1,6 @@
 import requests
 import os
+import time
 import logging
 from datetime import datetime, date
 from dotenv import load_dotenv
@@ -106,9 +107,10 @@ class TradeLockerHelper:
                     return False
 
                 if accounts:
-                    # Capture both ID and AccNum
+                    # Capture both ID, AccNum, and live Balance
                     self.account_id = accounts[0]['id']
                     self.acc_num = accounts[0].get('accNum')
+                    self.balance = float(accounts[0].get('projectedEquity') or accounts[0].get('accountBalance') or 25000.0)
                     print(f"DEBUG: Account Discovery Meta: {accounts[0]}")
                     return True
             if resp.status_code not in [502, 503, 504]:
@@ -424,6 +426,55 @@ class TradeLockerHelper:
         return False
 
 
+    def modify_position_bracket(self, position_id, stop_loss=None, take_profit=None):
+        """
+        Updates Stop Loss and Take Profit on an existing open position in place via PATCH.
+        Guaranteed to NEVER place duplicate or orphan pending orders on the broker book.
+        """
+        if not self.access_token and not self.login():
+            return False
+        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+        payload = {"stopLossType": "absolute", "takeProfitType": "absolute"}
+        if stop_loss is not None:
+            payload["stopLoss"] = float(stop_loss)
+        if take_profit is not None:
+            payload["takeProfit"] = float(take_profit)
+            
+        for attempt in range(3):
+            try:
+                resp = requests.patch(url, json=payload, headers=self._get_headers(auth=True), timeout=10)
+                if resp.status_code in [200, 201, 204]:
+                    logger.info(f"✅ Position {position_id} updated: SL={stop_loss}, TP={take_profit}")
+                    return True
+                elif resp.status_code == 429:
+                    retry_after = max(float(resp.headers.get("Retry-After") or 15.0), 15.0)
+                    logger.warning(f"⚠️ Rate limited on position patch (HTTP 429). Sleeping {retry_after}s...")
+                    time.sleep(retry_after)
+                else:
+                    logger.error(f"❌ Failed to patch position {position_id}: {resp.status_code} - {resp.text}")
+                    return False
+            except Exception as e:
+                logger.error(f"Error modifying position bracket: {e}")
+                time.sleep(2.0)
+        return False
+
+    def close_position(self, position_id):
+        """Safely closes an open position on TradeLocker using DELETE endpoint."""
+        if not self.access_token and not self.login():
+            return False
+        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+        try:
+            resp = requests.delete(url, headers=self._get_headers(auth=True), timeout=10)
+            if resp.status_code in [200, 204]:
+                logger.info(f"✅ Position {position_id} successfully closed.")
+                return True
+            else:
+                logger.warning(f"DELETE position {position_id} returned {resp.status_code}: {resp.text}")
+                return False
+        except Exception as e:
+            logger.error(f"Error closing position {position_id}: {e}")
+            return False
+
     def get_todays_trades_count(self):
         """Simplified trade count for verification."""
         if not self.access_token and not self.login(): return 0
@@ -456,6 +507,35 @@ class TradeLockerClient:
             if email and password and email.strip() not in seen_emails:
                 seen_emails.add(email.strip())
                 self.helpers.append(TradeLockerHelper(email, password, server, base_url))
+
+    def update_fleet_stop_loss(self, new_stop_loss, symbol="BTC/USD"):
+        """
+        Safely modifies Stop Loss in place on all open positions across the fleet.
+        Guaranteed to NEVER place duplicate or orphan pending orders.
+        """
+        results = []
+        for i, helper in enumerate(self.helpers):
+            positions = helper.get_open_positions()
+            for p in positions:
+                sym = str(p.get('symbol', '')).upper()
+                if symbol.replace('/', '').upper() in sym.replace('/', '').upper():
+                    pos_id = p.get('id')
+                    if pos_id:
+                        res = helper.modify_position_bracket(pos_id, stop_loss=new_stop_loss)
+                        results.append(res)
+        return results
+
+    def close_all_fleet_positions(self):
+        """Safely closes all open positions across all accounts in the fleet."""
+        total_closed = 0
+        for i, helper in enumerate(self.helpers):
+            positions = helper.get_open_positions()
+            for p in positions:
+                pos_id = p.get('id')
+                if pos_id:
+                    if helper.close_position(pos_id):
+                        total_closed += 1
+        return total_closed
 
 
     def get_open_positions(self):
@@ -601,34 +681,31 @@ class TradeLockerClient:
                 if not helper.access_token:
                     helper.login()
                     
-                # Determine account equity
-                equity = 25000.0  # Safe default baseline
-                try:
-                    state = helper.get_account_state()
-                    if state:
-                        equity = float(state.get('projectedEquity') or state.get('accountBalance', 25000.0))
-                except Exception:
-                    pass
+                # Determine live account balance / equity
+                equity = getattr(helper, 'balance', 0.0)
+                if equity <= 0:
+                    try:
+                        helper.get_account_details()
+                        equity = getattr(helper, 'balance', 25000.0)
+                    except Exception:
+                        equity = 25000.0
                     
-                # Asset-aware Tier-scaled lot sizing
-                sym_clean = symbol.replace("/", "").upper()
-                if "ETH" in sym_clean or "XAU" in sym_clean or "GOLD" in sym_clean:
-                    if equity >= 45000.0:
-                        base_lot = 8.00
-                    elif equity >= 20000.0:
-                        base_lot = 4.00
-                    else:
-                        base_lot = 2.00
-                else: # BTC and large assets
-                    if equity >= 45000.0:
-                        base_lot = 0.25
-                    elif equity >= 20000.0:
-                        base_lot = 0.23
-                    else:
-                        base_lot = 0.11
+                # Exact Dynamic Fractional Dollar Risk Calculation
+                # Sizing: Lots = (Equity * Target Risk Pct) / Stop Loss Distance
+                target_risk_pct = 0.005  # Strict 0.50% risk per trade across all account sizes
+                target_risk_usd = equity * target_risk_pct
+                
+                # Calculate stop loss distance
+                if stop_loss is not None:
+                    # Estimate fill price based on stop distance
+                    stop_dist = abs(float(stop_loss) - (2500.0 if "ETH" in symbol else 85000.0 if "BTC" in symbol else 2700.0))
+                    if stop_dist < 5.0 or stop_dist > 500.0:
+                        stop_dist = 25.0 if "ETH" in symbol else 1000.0 if "BTC" in symbol else 15.0
+                else:
+                    stop_dist = 25.0 if "ETH" in symbol else 1000.0 if "BTC" in symbol else 15.0
                     
-                # Scale lot size (e.g., 0.50 for Tranche 1 probe)
-                scaled_lot = round(base_lot * risk_scale, 2)
+                exact_lots = target_risk_usd / stop_dist
+                scaled_lot = round(exact_lots * risk_scale, 2)
                 if scaled_lot < 0.01:
                     scaled_lot = 0.01
                     

@@ -142,10 +142,10 @@ class Config:
     SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "")
     
     # ── TWO-TRANCHE "PROBE & SCALE" AUTO-EXECUTION ENGINE ──
-    LIVE_AUTO_EXECUTION = False                   # DISABLED: No automated trade execution
-    AUTO_PROBE_RISK_SCALE = 0.50                  # 50% lot size / ~0.20% risk on automatic entry
-    SCALE_IN_TRANCHE_2_SCALE = 0.50               # Remaining 50% size triggered via 1-click Telegram button
-    AUTO_EXECUTION_MIN_SCORE = 8.5                # Minimum AI conviction score required for auto-execution
+    LIVE_AUTO_EXECUTION = True                    # ENABLED: Automated trade execution on high-conviction setups
+    AUTO_PROBE_RISK_SCALE = 1.00                  # 100% full lot size entry with structural stop width
+    SCALE_IN_TRANCHE_2_SCALE = 0.00               # Scale-outs used instead of scale-ins
+    AUTO_EXECUTION_MIN_SCORE = 8.0                # Minimum AI conviction score required for auto-execution
 
     # Sovereign Light Simplification Toggles (Defaults to simplified mode)
     BYPASS_AI_GATE = False        # Set to True to execute setups purely on Gates 1-5
@@ -194,8 +194,8 @@ class Config:
     
     # ── AI Risk Logic ──────────────────────────────────────────
     ROI_OPTIMIZATION_ENABLED = True
-    TP1_RATIO = 0.5                    # 50% scale out
-    BE_TRIGGER_R = 1.5                 # Move SL to entry at 1.5R
+    TP1_RATIO = 0.5                    # 50% scale out at TP1
+    BE_TRIGGER_R = 1.0                 # Move SL to entry (Break-Even) at +1.0R
     AI_MIN_SMT_CONVERGENCE = 0.7       # Threshold for "Institutional Convergence"
     
     # ── Tiered Risk Scaling (Final 98% Standard) ──────────────
@@ -205,8 +205,8 @@ class Config:
     # ──────────────────────────────────────────────────────────
     
     # Exit Parameters (Scalp Optimized)
-    TP1_R_MULTIPLE = 2.5
-    TP2_R_MULTIPLE = 4.0
+    TP1_R_MULTIPLE = 1.0               # First scale out at +1.0R
+    TP2_R_MULTIPLE = 2.5               # Runner target at +2.5R
     STOP_LOSS_ATR_MULTIPLIER = 2.5
     ENTRY_OFFSET_ATR_MULTIPLIER = 0.5
     
