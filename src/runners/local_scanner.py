@@ -60,10 +60,10 @@ from src.engines.judas_inducement_engine import JudasInducementEngine
 
 # ── ICT Killzone Definitions (UTC hours) ─────────────────────────────────────
 ICT_KILLZONES = [
-    {'name': 'Asian',  'open': 0,  'close': 4},
-    {'name': 'London', 'open': 7,  'close': 10},
-    {'name': 'NY AM',  'open': 12, 'close': 15},
-    {'name': 'NY PM',  'open': 18, 'close': 20},
+    {'name': 'Asian & Judas',         'open': 0,  'close': 6},
+    {'name': 'London',                'open': 7,  'close': 10},
+    {'name': 'London Close / NY AM',  'open': 13, 'close': 16},
+    {'name': 'NY PM (Shadow Only)',   'open': 16, 'close': 20},
 ]
 
 def _get_active_killzone(utc_hour: int) -> dict | None:

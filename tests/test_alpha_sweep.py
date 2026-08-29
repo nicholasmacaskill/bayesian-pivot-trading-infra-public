@@ -90,5 +90,56 @@ class TestAlphaSweepScanner(unittest.TestCase):
             self.assertEqual(result['direction'], 'LONG')
             self.assertEqual(result['level'], 90.0)
 
+    def test_ai_validator_gating_and_deduplication(self):
+        # Build mock 1H and 5m data
+        timestamps_1h = [int(datetime.now(timezone.utc).timestamp() * 1000) - (3600000 * i) for i in range(100)]
+        timestamps_1h.reverse()
+        df_1h = pd.DataFrame({
+            'timestamp': timestamps_1h,
+            'open': [97.0] * 100,
+            'high': [100.0] * 100,
+            'low': [95.0] * 100,
+            'close': [97.0] * 100,
+            'volume': [1000.0] * 100
+        })
+        df_1h.loc[50, 'low'] = 90.0
+
+        timestamps_5m = [int(datetime.now(timezone.utc).timestamp() * 1000) - (300000 * i) for i in range(100)]
+        timestamps_5m.reverse()
+        df_5m = pd.DataFrame({
+            'timestamp': timestamps_5m,
+            'open': [97.0] * 100,
+            'high': [98.0] * 100,
+            'low': [96.0] * 100,
+            'close': [97.0] * 100,
+            'volume': [1000.0] * 100
+        })
+        # Set up a Turtle Soup long on candle 98
+        df_5m.loc[98, 'open'] = 92.0
+        df_5m.loc[98, 'high'] = 92.5
+        df_5m.loc[98, 'low'] = 89.5
+        df_5m.loc[98, 'close'] = 91.0
+
+        # Mock fetch_data and shadow_engine
+        self.scanner.fetch_data = lambda sym, tf, limit=100, synchronized=False: df_1h if tf == '1h' else df_5m
+        self.scanner.is_premium_killzone = lambda: "LONDON_OPEN"
+        
+        # Test low score (< 7.5) -> must be tagged as shadow trade failing AI validator
+        self.scanner.shadow_engine.run_shadow_audit = lambda sym, df, dir: {
+            "shadow_score": 5.0,
+            "cvd_absorption": {"active": False, "details": "No CVD Divergence"},
+            "session_vwap": {"z_score": -0.65},
+            "kalman_mss": {"state": "BULLISH_SHIFT"}
+        }
+
+        # First scan
+        setup1 = self.scanner.scan_symbol('BTC/USD')
+        self.assertIsNotNone(setup1)
+
+        # Second scan on identical candle timestamp -> must return None (deduplicated)
+        setup2 = self.scanner.scan_symbol('BTC/USD')
+        self.assertIsNone(setup2, "Second scan on the same candle timestamp should be deduplicated")
+
 if __name__ == '__main__':
     unittest.main()
+

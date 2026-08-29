@@ -9,6 +9,7 @@ from src.clients.telegram_notifier import send_alert
 
 from src.engines.shadow_substitution_engine import ShadowSubstitutionEngine
 from src.engines.counterfactual_tracker import CounterfactualTracker
+from src.engines.liquidity_heatmap_engine import LiquidityHeatmapEngine
 from src.clients.tl_client import TradeLockerClient
 
 logger = logging.getLogger(__name__)
@@ -18,33 +19,60 @@ class AlphaSweepScanner(SMCScanner):
         super().__init__()
         self.shadow_engine = ShadowSubstitutionEngine()
         self.counterfactual_tracker = CounterfactualTracker()
+        self.heatmap_engine = LiquidityHeatmapEngine()
         self.tl = TradeLockerClient()
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Shadow Substitution, Counterfactual & TradeLocker Fleet Client.")
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Liquidity Heatmap, Shadow Substitution & TradeLocker Fleet Client.")
 
     def is_premium_killzone(self, dt=None):
         """
-        Returns the active killzone label, or None if outside premium windows.
-        Premium Live Windows:
+        Returns the active killzone label, or None if outside active windows.
+        Active Live Windows:
+        - Asian Session & Judas Sweep: 00:00 - 06:00 UTC (17:00 - 23:00 PST)
         - London Open: 07:00 - 10:00 UTC (00:00 - 03:00 PST)
-        - NY Open: 12:00 - 15:00 UTC (05:00 - 08:00 PST)
-        - Asian Fade: 04:00 - 07:00 UTC (21:00 - 00:00 PST)
+        - London Close / NY Morning: 13:30 - 16:00 UTC (06:30 - 09:00 PST)
         
         Shadow Observation Window:
-        - NY Afternoon Shadow: 15:00 - 20:00 UTC (08:00 - 13:00 PST) [100% Shadow Tracking, Zero Live Risk]
+        - NY Afternoon Shadow: 16:00 - 20:00 UTC (09:00 - 13:00 PST) [100% Shadow Tracking, Zero Live Risk]
+        
+        Dead Zone (Sleep / 0% Risk):
+        - Post-NY Inter-Session Lull: 20:00 - 23:30 UTC (13:00 - 16:30 PST) -> None
         """
         if dt is None:
             dt = datetime.now(timezone.utc)
-        hour = dt.hour
+        utc_float = dt.hour + (dt.minute / 60.0)
         
-        if 7 <= hour < 10:
+        if 0.0 <= utc_float < 6.0:
+            return "ASIAN_SESSION_JUDAS"
+        elif 7.0 <= utc_float < 10.0:
             return "LONDON_OPEN"
-        elif 12 <= hour < 15:
-            return "NY_OPEN"
-        elif 4 <= hour < 7:
-            return "ASIAN_FADE"
-        elif 15 <= hour < 20:
+        elif 13.5 <= utc_float <= 17.0:
+            return "LONDON_CLOSE_NY_MORNING"
+        elif 17.0 < utc_float < 20.0:
             return "NY_AFTERNOON_SHADOW"
         return None
+
+    def get_relative_strength_leader(self) -> str:
+        """
+        Calculates the dynamic relative strength leader between BTC and ETH.
+        Returns:
+            'BTC_LEADER' if BTC is outperforming (BTC Dominance: BTC Longs & ETH Shorts aligned)
+            'ETH_LEADER' if ETH is outperforming (Altseason: ETH Longs & BTC Shorts aligned)
+        """
+        try:
+            df_btc = self.fetch_data('BTC/USD', '1h', limit=30, synchronized=False)
+            df_eth = self.fetch_data('ETH/USD', '1h', limit=30, synchronized=False)
+            if df_btc is not None and df_eth is not None and len(df_btc) >= 20 and len(df_eth) >= 20:
+                min_len = min(len(df_btc), len(df_eth))
+                ratio = df_eth['close'].iloc[-min_len:].values / df_btc['close'].iloc[-min_len:].values
+                sma20 = pd.Series(ratio).rolling(20).mean().iloc[-1]
+                current_ratio = ratio[-1]
+                if current_ratio >= sma20:
+                    return 'ETH_LEADER'
+                else:
+                    return 'BTC_LEADER'
+        except Exception as e:
+            logger.debug(f"Relative strength calculation fallback: {e}")
+        return 'BTC_LEADER'
 
     def find_htf_levels(self, df_1h, window=2):
         """
@@ -455,21 +483,21 @@ class AlphaSweepScanner(SMCScanner):
         if setup:
             pattern_type = setup.get('pattern_type', 'TURTLE_SOUP_LIQUIDITY_SWEEP')
             
-            # ── DEDUPLICATION & COOLDOWN GATE (60 Mins) ──
+            # ── DEDUPLICATION & COOLDOWN GATE (Candle Timestamp & 60 Mins) ──
             import time
-            cache_key = (symbol, setup['direction'], pattern_type)
+            raw_ts = df_5m.iloc[-2]['timestamp'] if 'timestamp' in df_5m.columns else time.time()
+            candle_ts = int(pd.Timestamp(raw_ts).timestamp()) if isinstance(raw_ts, (pd.Timestamp, datetime)) else int(float(raw_ts))
+            cache_key = (symbol, setup['direction'], pattern_type, candle_ts)
             now_ts = time.time()
             if cache_key in self._signal_cache:
-                last_time = self._signal_cache[cache_key]
-                if (now_ts - last_time) < 3600:
-                    logger.info(f"Skipping redundant signal for {symbol} {setup['direction']} ({pattern_type}): Sent {int((now_ts - last_time)/60)}m ago.")
-                    return None
+                logger.info(f"Skipping redundant signal for {symbol} {setup['direction']} ({pattern_type}) on candle {candle_ts}: Already processed.")
+                return None
             self._signal_cache[cache_key] = now_ts
 
             logger.info(f"🏆 BAYESIAN PIVOT ALPHA SETUP DETECTED ({pattern_type}): {symbol} {setup['direction']} at {setup['price']}")
             
-            # Format pattern string
-            pattern_str = f"Bayesian Pivot {pattern_type.replace('_', ' ')} {setup['direction']} ({setup['regime']})"
+            # Format base pattern string
+            base_pattern_str = f"Bayesian Pivot {pattern_type.replace('_', ' ')} {setup['direction']} ({setup['regime']})"
             
             # Dynamic Risk and Sizing Calculations
             entry_price = setup['price']
@@ -518,19 +546,88 @@ class AlphaSweepScanner(SMCScanner):
                     else:
                         tp_price = entry_price - (max_profit / lots)
             
-            # Run Shadow Substitution Audit (Experimental Confluence Tracking)
+            # Run Shadow Substitution Audit (Quantitative AI Confluence Tracking)
             try:
                 shadow_report = self.shadow_engine.run_shadow_audit(symbol, df_5m, setup['direction'])
-                logger.info(f"👻 Shadow Substitution Score for {symbol}: {shadow_report.get('shadow_score')}/10 | CVD: {shadow_report['cvd_absorption']['details']} | VWAP Z-Score: {shadow_report['session_vwap'].get('z_score', 0):.2f}")
+                shadow_score = float(shadow_report.get('shadow_score', 5.0))
+                logger.info(f"👻 Shadow Substitution Score for {symbol}: {shadow_score}/10 | CVD: {shadow_report.get('cvd_absorption', {}).get('details', 'N/A')} | VWAP Z-Score: {shadow_report.get('session_vwap', {}).get('z_score', 0):.2f}")
             except Exception as shadow_err:
                 logger.warning(f"Shadow substitution audit error: {shadow_err}")
                 shadow_report = {}
+                shadow_score = 5.0
 
-            # ── 100% DISCIPLINED ARCHETYPE QUARANTINE ──
-            # ONLY Turtle Soup Liquidity Sweeps are LIVE.
-            # Breaker Blocks, Silver Bullet & Double Sweeps are 100% SHADOW LAB ($0.00 Live Risk).
-            is_shadow_strategy = (pattern_type != "TURTLE_SOUP_LIQUIDITY_SWEEP") or setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW")
+            # ── INSTITUTIONAL LIQUIDITY HEATMAP AUDIT (HIGHEST WEIGHT CRITERIA) ──
+            try:
+                is_dense_liq, liq_density, liq_msg, dynamic_tp = self.heatmap_engine.audit_sweep_against_heatmap(
+                    sweep_price=setup['level'],
+                    direction=setup['direction'],
+                    df_5m=df_5m,
+                    df_1h=df_1h
+                )
+                logger.info(f"🎯 [LIQUIDITY HEATMAP] {symbol} {setup['direction']}: {liq_msg}")
+
+                # Dynamic TP Magnet Snapping (if opposing stop cluster offers >= 2.0R distance)
+                if dynamic_tp is not None:
+                    dyn_dist = abs(dynamic_tp - entry_price)
+                    if dyn_dist >= stop_distance * 2.0:
+                        tp_price = dynamic_tp
+                        logger.info(f"🧲 [MAGNET TARGET] Snapped Take Profit to opposing stop cluster @ ${tp_price:.2f} ({dyn_dist/stop_distance:.2f}R)")
+
+                # Weight Liquidity Density as Primary Confluence (Highest Weight)
+                if is_dense_liq:
+                    # +2.0 boost for dense stop clusters (PDH/PDL, EQL/EQH, Asian extremes)
+                    shadow_score = min(shadow_score + (liq_density * 0.25), 10.0)
+                else:
+                    # Penalize sweeps of random / isolated noise levels
+                    shadow_score = max(shadow_score - 1.5, 3.0)
+            except Exception as liq_err:
+                logger.warning(f"Liquidity heatmap audit error: {liq_err}")
+
+            # ── DYNAMIC ASYMMETRIC SMT & RELATIVE STRENGTH GATE ──
+            # Measures live ETH/BTC ratio vs 20-period SMA to determine whether BTC is leading or ETH is leading.
+            rs_leader = self.get_relative_strength_leader()
+            if rs_leader == 'BTC_LEADER':
+                # BTC Dominance: BTC is leader, ETH is laggard.
+                is_counter_regime = (symbol == "ETH/USD" and setup['direction'] == "LONG") or (symbol == "BTC/USD" and setup['direction'] == "SHORT")
+                regime_msg = "BTC Dominance"
+            else:
+                # Altseason: ETH is leader, BTC is laggard.
+                is_counter_regime = (symbol == "BTC/USD" and setup['direction'] == "LONG") or (symbol == "ETH/USD" and setup['direction'] == "SHORT")
+                regime_msg = "Altseason (ETH Lead)"
+
+            ai_validator_threshold = 9.0 if is_counter_regime else getattr(Config, 'AI_VALIDATOR_MIN_SCORE', 7.5)
+            
+            if is_counter_regime:
+                lots = round(lots * 0.5, 4) # Throttle to 50% probe size if taking counter-regime setup
+            
+            passed_ai_validator = shadow_score >= ai_validator_threshold
+            
+            is_archetype_shadow = (pattern_type not in ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"]) or setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW")
+            is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator)
+            
+            ai_score_val = shadow_score
             verdict_str = "SHADOW_OBSERVATION" if is_shadow_strategy else "CONFIRMED"
+            
+            if not passed_ai_validator:
+                if is_counter_regime:
+                    tag_label = "shadow trade, counter-regime smt quarantine"
+                    pattern_str = f"[👻 SHADOW - COUNTER-REGIME SMT] {base_pattern_str}"
+                    ai_reasoning = f"[👻 SHADOW LAB (COUNTER-REGIME SMT)] {symbol} {setup['direction']} requires Unicorn score >= 9.0/10 during {regime_msg} (Score: {shadow_score:.1f}/10). Quarantined to $0 risk."
+                else:
+                    tag_label = "shadow trade, didn't pass ai validator"
+                    pattern_str = f"[👻 SHADOW - DIDN'T PASS AI VALIDATOR] {base_pattern_str}"
+                    cvd_detail = shadow_report.get('cvd_absorption', {}).get('details', 'No CVD')
+                    vwap_z = shadow_report.get('session_vwap', {}).get('z_score', 0)
+                    kalman_st = shadow_report.get('kalman_mss', {}).get('state', 'NEUTRAL')
+                    ai_reasoning = f"[👻 SHADOW TRADE - DIDN'T PASS AI VALIDATOR (Score: {shadow_score:.1f}/10 < {ai_validator_threshold})] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Failed confluences: CVD={cvd_detail}, VWAP_Z={vwap_z:.2f}, Kalman={kalman_st}."
+            elif is_archetype_shadow:
+                tag_label = "shadow archetype quarantine"
+                pattern_str = f"[👻 SHADOW LAB] {base_pattern_str}"
+                ai_reasoning = f"[👻 SHADOW LAB ($0 RISK)] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10."
+            else:
+                tag_label = "live master weapon"
+                pattern_str = base_pattern_str
+                ai_reasoning = f"[👑 LIVE MASTER WEAPON] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10."
             
             # Prepare scan payload
             scan_payload = {
@@ -546,13 +643,12 @@ class AlphaSweepScanner(SMCScanner):
                 "killzone": killzone,
                 "hurst": setup['hurst'],
                 "smt_strength": 0.0,
-                "formations": f"Sweep of {setup['level']:.2f} | ShadowScore: {shadow_report.get('shadow_score', 'N/A')}"
+                "formations": f"Sweep of {setup['level']:.2f} | AI Score: {shadow_score:.1f}/10 | {tag_label}"
             }
             
-            ai_score_val = 8.5 if is_shadow_strategy else 9.0
             ai_result = {
                 "score": ai_score_val,
-                "reasoning": f"[{'👻 SHADOW LAB ($0 RISK)' if is_shadow_strategy else '👑 LIVE MASTER WEAPON'}] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']})."
+                "reasoning": ai_reasoning
             }
             
             # Log to local SQLite & Sync to Supabase
@@ -565,6 +661,7 @@ class AlphaSweepScanner(SMCScanner):
             if is_shadow_strategy:
                 setup['is_shadow_only'] = True
                 acct_label = f"{pattern_type}_SHADOW"
+                rejection_reasons = ["SHADOW_TRADE_DIDNT_PASS_AI_VALIDATOR"] if not passed_ai_validator else ["SHADOW_STRATEGY_ZERO_LIVE_CAPITAL_RISK"]
                 try:
                     self.counterfactual_tracker.register_shadow_trade(
                         setup={
@@ -577,7 +674,7 @@ class AlphaSweepScanner(SMCScanner):
                         },
                         account_key=acct_label,
                         strategy_mode="SHADOW_LAB_QUARANTINE",
-                        rejection_reasons=["SHADOW_STRATEGY_ZERO_LIVE_CAPITAL_RISK"]
+                        rejection_reasons=rejection_reasons
                     )
                     logger.info(f"👻 {acct_label} registered in counterfactual database for {symbol} {setup['direction']} (ZERO LIVE RISK)")
                 except Exception as shadow_err:
@@ -604,47 +701,41 @@ class AlphaSweepScanner(SMCScanner):
                     logger.info(f"⚡ [PROBE & SCALE] Active position already open for {symbol}. Skipping duplicate auto-execution.")
                 else:
                     exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
-                    logger.info(f"⚡ [PROBE & SCALE] Auto-executing Tranche 1 Probe (50% scale) on {symbol} {exec_side.upper()} @ {entry_price}...")
+                    logger.info(f"⚡ [AUTO-EXECUTION] Auto-executing 100% Full Sized Trade on {symbol} {exec_side.upper()} @ {entry_price}...")
                     try:
                         exec_result = self.tl.execute_trade_across_all_accounts(
                             symbol=symbol,
                             side=exec_side,
                             stop_loss=sl_price,
                             take_profit=tp_price,
-                            risk_scale=getattr(Config, 'AUTO_PROBE_RISK_SCALE', 0.50),
-                            tranche_label="TRANCHE_1_PROBE"
+                            risk_scale=getattr(Config, 'AUTO_PROBE_RISK_SCALE', 1.00),
+                            tranche_label="FULL_SIZE_ENTRY"
                         )
                     except Exception as exec_err:
-                        logger.error(f"Error auto-executing Tranche 1: {exec_err}")
+                        logger.error(f"Error auto-executing trade: {exec_err}")
                 
             # Send Telegram Alert
             try:
                 is_auto_filled = exec_result and exec_result.get('success')
                 alert_phase = "SHADOW_OBSERVATION" if is_shadow_strategy else ("AUTO_EXECUTED" if is_auto_filled else "EXECUTION")
-                
-                # Interactive Scale-In Button (only for live auto-executed setups)
                 buttons = None
-                if not is_shadow_strategy and is_auto_filled:
-                    exec_side = "buy" if setup['direction'].upper() == "LONG" else "sell"
-                    cb_data = f"scale_{symbol.replace('/', '')}_{exec_side}_{entry_price:.1f}_{sl_price:.1f}_{tp_price:.1f}"
-                    buttons = [[{"text": "🚀 SCALE IN 2ND TRANCHE (+0.20% RISK)", "callback_data": cb_data}]]
                     
-                exec_notice = f"\n\n⚡ <b>AUTO-EXECUTED:</b> Tranche 1 Probe (50% Size) filled across {exec_result.get('filled_count', 0)}/{exec_result.get('total_accounts', 0)} accounts!" if is_auto_filled else ""
+                exec_notice = f"\n\n⚡ <b>AUTO-EXECUTED:</b> 100% Position filled across {exec_result.get('filled_count', 0)}/{exec_result.get('total_accounts', 0)} accounts with SL & TP attached!" if is_auto_filled else ""
                 
                 send_alert(
                     symbol=symbol,
                     timeframe="5m",
-                    pattern=f"[👻 SHADOW HFT] {pattern_str}" if setup.get('pattern_type') == "NY_HFT_DOUBLE_SWEEP_SHADOW" else (f"[👻 SHADOW] {pattern_str}" if is_shadow_strategy else pattern_str),
+                    pattern=pattern_str,
                     ai_score=ai_score_val,
-                    reasoning=f"{ai_result['reasoning']} {'(⚠️ ZERO LIVE CAPITAL RISK - Shadow Tracking Only)' if is_shadow_strategy else ''}{exec_notice}",
+                    reasoning=f"{ai_result['reasoning']}\n🎯 <b>Liquidity Context:</b> {liq_msg if 'liq_msg' in locals() else 'Standard SMC Level'}{' (⚠️ ZERO LIVE CAPITAL RISK - Shadow Tracking Only)' if is_shadow_strategy else ''}{exec_notice}",
                     verdict=verdict_str,
                     session_info={"name": killzone, "phase": alert_phase},
                     bias_data={"daily": setup['trend'], "htf": setup['trend'], "dxy_trend": "N/A"},
-                    liquidity_targets={"target_price": setup['level'], "target_type": "SWING_LEVEL", "distance_pips": setup['sweep_dist']},
+                    liquidity_targets={"target_price": tp_price, "target_type": "DENSE_STOP_CLUSTER", "distance_pips": setup['sweep_dist']},
                     risk_calc={
                         "entry": entry_price,
                         "stop_loss": sl_price,
-                        "position_size": round(lots * (getattr(Config, 'AUTO_PROBE_RISK_SCALE', 0.50) if is_auto_filled else 1.0), 2),
+                        "position_size": round(lots * (getattr(Config, 'AUTO_PROBE_RISK_SCALE', 1.00) if is_auto_filled else 1.0), 2),
                         "take_profit": tp_price,
                         "position_value": position_value
                     },
@@ -656,3 +747,73 @@ class AlphaSweepScanner(SMCScanner):
             return setup
             
         return None
+
+    def check_and_trail_positions(self):
+        """
+        Active Risk Watchdog:
+        Monitors open fleet positions every cycle.
+        When a trade reaches +1.0R (Config.BE_TRIGGER_R) in floating profit:
+          1. Automatically moves Stop Loss to Entry Price (Break-Even) via in-place PATCH.
+          2. Dispatches a Telegram alert confirming the trade is now 100% risk-free.
+        """
+        try:
+            open_pos = self.tl.get_open_positions()
+            if not open_pos:
+                return
+
+            if not hasattr(self, '_trailed_positions'):
+                self._trailed_positions = set()
+
+            for p in open_pos:
+                pos_id = str(p.get("id", ""))
+                if not pos_id or pos_id in self._trailed_positions:
+                    continue
+
+                symbol = p.get("symbol", "")
+                side = str(p.get("side", "")).lower()
+                entry_price = float(p.get("price") or p.get("avgPrice") or 0.0)
+                current_sl = float(p.get("stopLoss") or 0.0)
+
+                if entry_price <= 0 or current_sl <= 0:
+                    continue
+
+                # Check if stop is already at or better than entry
+                if (side == "buy" and current_sl >= entry_price) or (side == "sell" and current_sl <= entry_price):
+                    self._trailed_positions.add(pos_id)
+                    continue
+
+                initial_r_dist = abs(entry_price - current_sl)
+                if initial_r_dist <= 0:
+                    continue
+
+                # Fetch live mark price
+                df_tick = self.fetch_data(symbol, '5m', limit=2, synchronized=False)
+                if df_tick is None or len(df_tick) == 0:
+                    continue
+                current_price = float(df_tick.iloc[-1]['close'])
+
+                # Calculate floating R
+                floating_gain = (current_price - entry_price) if side == "buy" else (entry_price - current_price)
+                current_r = floating_gain / initial_r_dist
+                be_trigger_r = getattr(Config, 'BE_TRIGGER_R', 1.0)
+
+                if current_r >= be_trigger_r:
+                    logger.info(f"🛡️ [BREAK-EVEN WATCHDOG] {symbol} {side.upper()} reached +{current_r:.2f}R (>= {be_trigger_r}R). Trailing Stop Loss to Entry (${entry_price:.2f})...")
+                    self.tl.update_fleet_stop_loss(new_stop_loss=entry_price, symbol=symbol)
+                    self._trailed_positions.add(pos_id)
+
+                    try:
+                        from src.clients.telegram_notifier import TelegramNotifier
+                        tn = TelegramNotifier()
+                        tn._send_message(
+                            f"🛡️ <b>BREAK-EVEN LOCK ACTIVATED!</b>\n\n"
+                            f"Asset: <b>{symbol}</b> ({side.upper()})\n"
+                            f"Current Profit: <b>+{current_r:.2f}R</b> (${current_price:.2f})\n"
+                            f"Stop Loss: Trailed to Entry <b>${entry_price:.2f}</b>\n\n"
+                            f"✅ <b>Status:</b> Position is now <b>100% RISK-FREE</b>! Runner tracking to +{getattr(Config, 'TP2_R_MULTIPLE', 2.5)}R target. 🚀"
+                        )
+                    except Exception as tg_err:
+                        logger.warning(f"Error sending BE alert to Telegram: {tg_err}")
+        except Exception as e:
+            logger.error(f"Error in check_and_trail_positions watchdog: {e}")
+
