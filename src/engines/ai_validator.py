@@ -309,11 +309,16 @@ class AIValidator:
             score += 2
             reasoning_parts.append("Valid Quartile")
 
-        # Major Structural Liquidity Sweep Confluence Bonus
+        # Major Structural Liquidity Sweep & Heatmap Density Confluence Bonus
         swept_type = setup.get('swept_level_type', '')
         wick_pct = max(setup.get('lower_wick_pct', 0), setup.get('upper_wick_pct', 0), setup.get('wick_pct', 0))
         vol_mult = setup.get('vol_mult', 1.0)
-        if (swept_type in ['EQUAL_LOWS', 'EQUAL_HIGHS', 'SESSION_LOW', 'SESSION_HIGH', 'PDL', 'PDH'] and wick_pct >= 50.0) or (wick_pct >= 60.0 and vol_mult >= 3.0):
+        liq_density = setup.get('liq_density', 0.0)
+        
+        if liq_density >= 6.0:
+            score += min(liq_density * 0.3, 3.0)
+            reasoning_parts.append(f"Dense Stop Cluster (Score: {liq_density:.1f}/10)")
+        elif (swept_type in ['EQUAL_LOWS', 'EQUAL_HIGHS', 'SESSION_LOW', 'SESSION_HIGH', 'PDL', 'PDH'] and wick_pct >= 50.0) or (wick_pct >= 60.0 and vol_mult >= 3.0):
             score += 2
             reasoning_parts.append(f"Major Structural Sweep ({swept_type or 'Wick Rejection'}, {wick_pct:.0f}% wick, {vol_mult:.1f}x vol)")
         
