@@ -934,8 +934,12 @@ class LocalScannerRunner:
                         # Send dedicated Telegram Alert
                         self.notifier._send_message(self.judas_engine.format_telegram_alert(strat9_setup))
 
-                        # Execute Live on TradeLocker if auto-execution enabled
-                        if getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', True) and getattr(Config, 'LIVE_AUTO_EXECUTION', True):
+                        # Execute Live on TradeLocker if auto-execution enabled and inside valid weekday killzone
+                        now_utc = datetime.now(timezone.utc)
+                        is_weekend = now_utc.weekday() in [5, 6]  # Saturday (5), Sunday (6)
+                        if is_weekend:
+                            logger.info(f"🚫 [WEEKEND CHOP LOCK] Strategy 9 on {symbol} quarantined to $0 Shadow tracking (Zero Live Risk on Weekends).")
+                        elif getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', True) and getattr(Config, 'LIVE_AUTO_EXECUTION', True):
                             try:
                                 exec_res = self.tl.execute_trade_across_all_accounts(
                                     symbol=symbol,
@@ -1218,8 +1222,12 @@ class LocalScannerRunner:
                             direction=direction
                         )
 
-                        # ── LIVE AUTO-EXECUTION ──
-                        if Config.LIVE_AUTO_EXECUTION and live_score >= threshold:
+                        # ── LIVE AUTO-EXECUTION (Strict Weekday Killzone Gated) ──
+                        now_utc = datetime.now(timezone.utc)
+                        is_weekend = now_utc.weekday() in [5, 6]
+                        if is_weekend:
+                            logger.info(f"🚫 [WEEKEND CHOP LOCK] {symbol} setup quarantined to $0 Shadow tracking (Zero Live Risk on Weekends).")
+                        elif Config.LIVE_AUTO_EXECUTION and live_score >= threshold:
                             logger.info(f"⚡ LIVE AUTO-EXECUTION ({live_score}/10 Setup): Submitting order to TradeLocker: {direction} {lots} {symbol} SL={_sl} TP={_tp}")
                             try:
                                 dir_str = str(direction or "BUY").upper()
