@@ -657,13 +657,32 @@ class TradeLockerClient:
         stop_loss=None,
         take_profit=None,
         risk_scale=0.50,
-        tranche_label="TRANCHE_1_PROBE"
+        tranche_label="TRANCHE_1_PROBE",
+        ai_score=8.5,
+        is_htf_confirmed=True,
+        bypass_firewall=False
     ):
         """
         Executes a sized order across all configured TradeLocker accounts with 2.5s rate-limit pacing.
-        Automatically scales lot sizes to account balances (e.g. 50k -> 0.12 BTC at 0.50 scale).
+        Protected by the Sovereign ExecutionFirewall.
         """
         import time
+        from src.core.execution_firewall import ExecutionFirewall
+
+        # ── SOVEREIGN EXECUTION FIREWALL AIRGAP GATE ──
+        if not bypass_firewall:
+            is_approved, rejection_reason = ExecutionFirewall.audit_trade_request(
+                symbol=symbol,
+                side=side,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                ai_score=ai_score,
+                is_htf_confirmed=is_htf_confirmed
+            )
+            if not is_approved:
+                logger.critical(f"🛡️ [EXECUTION FIREWALL INTERCEPTED] Blocked un-gated order on {symbol} {side.upper()}: {rejection_reason}")
+                return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if self.helpers else 0, "firewall_rejection": rejection_reason}
+
         instrument_id = self.resolve_instrument_id(symbol)
         
         if not self.helpers:
