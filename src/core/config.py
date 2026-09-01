@@ -64,15 +64,15 @@ class Config:
     DAILY_TRADE_LIMIT = 2
     TARGET_RR = 3.0
 
-    # ── Strategy 9: Judas Inducement Hunter (Fast-Lane Execution) ───────
+    # ── Strategy 9: Judas Inducement Hunter (Quarantined to Shadow Lab) ───────
     STRATEGY_9_ENABLED = True
     STRATEGY_9_MIN_WICK_PCT = 70.0      # 70% Minimum Rejection Wick
     STRATEGY_9_MIN_ATR_MULT = 1.8       # 1.8x - 2.0x 20-period ATR Range
     STRATEGY_9_MIN_VOL_MULT = 1.8       # 1.8x 20-period Average Volume
     STRATEGY_9_TARGET_RR = 3.0          # 3.0R Fixed Asymmetric Target
     STRATEGY_9_RISK_USD = 75.0          # Fixed dollar risk per trade ($75)
-    STRATEGY_9_BYPASS_GENERIC_AI = True # Fast-lane execution (no 8.5 LLM choke)
-    STRATEGY_9_AUTO_EXECUTE = True      # Auto-execute directly on TradeLocker
+    STRATEGY_9_BYPASS_GENERIC_AI = False # Requires full 8.0+ AI Validator gate
+    STRATEGY_9_AUTO_EXECUTE = False     # $0 Real Risk — Shadow Observation Only
 
     
     # Prop Firm Execution Profiles

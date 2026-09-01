@@ -939,7 +939,7 @@ class LocalScannerRunner:
                         is_weekend = now_utc.weekday() in [5, 6]  # Saturday (5), Sunday (6)
                         if is_weekend:
                             logger.info(f"🚫 [WEEKEND CHOP LOCK] Strategy 9 on {symbol} quarantined to $0 Shadow tracking (Zero Live Risk on Weekends).")
-                        elif getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', True) and getattr(Config, 'LIVE_AUTO_EXECUTION', True):
+                        elif getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', False) and getattr(Config, 'LIVE_AUTO_EXECUTION', False):
                             try:
                                 exec_res = self.tl.execute_trade_across_all_accounts(
                                     symbol=symbol,
