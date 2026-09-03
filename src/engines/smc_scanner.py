@@ -412,7 +412,8 @@ class SMCScanner:
                 allowed_drift = Config.get('SYNC_LATENCY_SEC_MAX', 120) + tf_sec
                 
                 if drift > allowed_drift:
-                    logger.error(f"🚨 DATA_DESYNC: Stream {tf} drift is {drift:.1f}s (Limit: {allowed_drift}s). Pausing execution.")
+                    logger.warning(f"🚨 DATA_DESYNC: Stream {tf} drift is {drift:.1f}s (Limit: {allowed_drift}s). Pausing 10s for stream sync...")
+                    time.sleep(10)
                     return None # Triggers "HOLD" state in runner
 
             # 3. Double-Source Check (CCXT vs yFinance)

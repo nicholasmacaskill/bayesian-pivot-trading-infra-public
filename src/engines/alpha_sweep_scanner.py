@@ -639,10 +639,23 @@ class AlphaSweepScanner(SMCScanner):
 
             ai_validator_threshold = 9.0 if is_counter_regime else getattr(Config, 'AI_VALIDATOR_MIN_SCORE', 7.5)
             
+            # ── PRE-COMPUTED ZERO-LATENCY AI RAG CONFLUENCE GATE ──
+            try:
+                from src.engines.ai_permission_map import AIPermissionMap
+                ai_approved, dynamic_risk_mult, perm_msg = AIPermissionMap.evaluate_confluence(symbol, setup['direction'], pattern_type)
+                logger.info(f"🧠 [AI Permission Gate] {symbol} {setup['direction']}: {perm_msg} (Risk Mult: {dynamic_risk_mult}x)")
+                if not ai_approved:
+                    shadow_score = min(shadow_score, 6.0) # Suppress score below live threshold
+                else:
+                    lots = round(lots * dynamic_risk_mult, 4)
+            except Exception as perm_eval_err:
+                logger.debug(f"AI Permission Map lookup error: {perm_eval_err}")
+                ai_approved = True
+
             if is_counter_regime:
                 lots = round(lots * 0.5, 4) # Throttle to 50% probe size if taking counter-regime setup
             
-            passed_ai_validator = shadow_score >= ai_validator_threshold
+            passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved
             
             is_archetype_shadow = (pattern_type not in ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"]) or setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW")
             is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator)

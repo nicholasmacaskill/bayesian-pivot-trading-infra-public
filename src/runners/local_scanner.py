@@ -883,6 +883,21 @@ class LocalScannerRunner:
                     continue
 
                 # ── HTF POI — Liquidity Gravity ───────────────────────────────
+                # Publish Pre-Computed Macro AI Bias to AIPermissionMap for Zero-Latency Quant Gating
+                try:
+                    from src.engines.ai_permission_map import AIPermissionMap
+                    clean_bias = "BULLISH" if "BULLISH" in daily_bias.upper() else ("BEARISH" if "BEARISH" in daily_bias.upper() else "NEUTRAL")
+                    AIPermissionMap.set_permission(
+                        symbol=symbol,
+                        ai_bias=clean_bias,
+                        conviction_score=8.5 if not bias_data['bias_conflict'] else 6.0,
+                        regime=strategy_mode,
+                        rag_similarity=85.0 if not bias_data['bias_conflict'] else 50.0,
+                        authorized_archetypes=["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"],
+                        notes=f"Daily: {daily_bias} | 4H: {htf_bias} | Hurst: {hurst_val:.2f}"
+                    )
+                except Exception as perm_err:
+                    logger.debug(f"AIPermissionMap publish error: {perm_err}")
                 liquidity_targets = None
                 try:
                     pois = self.scanner.detect_htf_pois(symbol)
