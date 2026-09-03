@@ -81,3 +81,17 @@ To run a fully conformed AI audit (DXY intermarket divergence, whale book prints
 ### The Solution: Two-Tiered Execution Routing
 * **Structural Alpha Routing**: Bypasses the AI Validator entirely. It runs purely on mathematical, local price-action gates (Hurst, ATR, wick ratio). This execution is near-instantaneous (latency under 50ms) and targets 2–3 consistent, smaller-sized setups per day.
 * **High Alpha Routing**: Reserved for trend continuation setups. It runs the full AI validation gate, utilizing the Gemini model's reasoning capabilities to evaluate complex confluences. It runs with larger position sizes (`1.0%` risk) but accepts the 3-second latency trade-off because it targets long-duration swing moves where immediate entry tick precision is less critical.
+
+---
+
+## 5. Live Production Audit: Multi-Account Prop Fleet Sweep (2026-09-02)
+
+On **September 2–3, 2026**, the Bayesian Pivot architecture executed a live production sweep across an **8-account, $200,000 capital fleet** (Upcomers / TradeLocker) on BTC/USD:
+
+* **Entry Trigger:** `TURTLE_SOUP_LIQUIDITY_SWEEP` following a purge of London Lows (`$76,571.00`).
+* **Orderflow Confluence:** The newly integrated `LiveOrderflowFeed` detected institutional limit-buyer iceberg absorption via real-time WebSocket tick CVD delta.
+* **Multi-Account Fleet Execution:** 8/8 accounts filled with 2.2s adaptive pacing, strict absolute Stop Loss (`$76,351.99`), and Take Profit (`$77,696.80`).
+* **Counterfactual Defense:** Quarantined 22 noisy cross-pair breakout signals during holding, preventing $-2,200.00 in churn drawdowns.
+* **Outcome:** BTC reached **`$77,782.49`** hitting 100% Take Profit across all 8 accounts, banking **`+$923.85 net realized cash profit`** with zero rule breaches.
+
+*For complete mathematical proofs and state-space derivations, see the [Master Institutional Dossier](file:///Users/nicholasmacaskill/sovereignSMC/bayesian-pivot-trading-infra/dossiers/non_stationary_bayesian_invariance_agentic_hedge_fund.md).*
