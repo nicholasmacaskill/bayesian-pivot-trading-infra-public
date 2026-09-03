@@ -23,7 +23,13 @@ class AlphaSweepScanner(SMCScanner):
         self.heatmap_engine = LiquidityHeatmapEngine()
         self.retail_trap_engine = RetailStopTrapEngine()
         self.tl = TradeLockerClient()
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Liquidity Heatmap, Retail Trap Shadow Engine & TradeLocker Fleet Client.")
+        try:
+            from src.engines.live_orderflow_feed import LiveOrderflowFeed
+            self.live_orderflow = LiveOrderflowFeed()
+            self.live_orderflow.start()
+        except Exception as of_err:
+            logger.debug(f"LiveOrderflowFeed auto-start skipped: {of_err}")
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Live Orderflow Feed, Liquidity Heatmap, Retail Trap Shadow Engine & TradeLocker Fleet Client.")
 
     def is_premium_killzone(self, dt=None):
         """

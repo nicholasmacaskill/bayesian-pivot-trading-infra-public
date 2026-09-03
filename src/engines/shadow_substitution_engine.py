@@ -64,12 +64,36 @@ class ShadowSubstitutionEngine:
         cvd = bar_delta.cumsum()
         return cvd
 
-    def evaluate_cvd_divergence(self, df: pd.DataFrame, direction: str) -> Tuple[bool, float, str]:
+    def evaluate_cvd_divergence(self, df: pd.DataFrame, direction: str, symbol: Optional[str] = None) -> Tuple[bool, float, str]:
         """
         Checks for CVD Absorption Divergence:
-        - SHORT: Price makes higher/equal high, but CVD prints lower high (heavy sell absorption).
-        - LONG: Price makes lower/equal low, but CVD prints higher low (heavy buy absorption).
+        1. Queries LiveOrderflowFeed (WebSocket aggregated trades) if available & healthy.
+        2. Seamlessly falls back to OHLCV proxy calculation if WebSocket is offline.
         """
+        # 1. Check Live Orderflow Feed (Tick-Level Iceberg Absorption)
+        if symbol:
+            try:
+                from src.engines.live_orderflow_feed import LiveOrderflowFeed
+                feed = LiveOrderflowFeed()
+                if len(df) >= 2:
+                    c_now = float(df['close'].iloc[-1])
+                    c_prev = float(df['close'].iloc[-2])
+                    price_chg = ((c_now - c_prev) / (c_prev + 1e-6)) * 100.0
+                else:
+                    price_chg = 0.0
+
+                live_active, live_str, live_msg = feed.evaluate_iceberg_absorption(
+                    symbol=symbol,
+                    direction=direction,
+                    window_seconds=180,
+                    price_change_pct=price_chg
+                )
+                if live_active:
+                    return True, live_str, live_msg
+            except Exception as e:
+                logger.debug(f"Live CVD check fallback to proxy: {e}")
+
+        # 2. Robust OHLCV Bar Proxy Fallback
         if len(df) < 10:
             return False, 0.0, "Insufficient data"
 
@@ -199,7 +223,7 @@ class ShadowSubstitutionEngine:
         """
         Evaluates all 4 shadow substitution indicators on the latest market data.
         """
-        cvd_active, cvd_str, cvd_msg = self.evaluate_cvd_divergence(df_5m, candidate_direction)
+        cvd_active, cvd_str, cvd_msg = self.evaluate_cvd_divergence(df_5m, candidate_direction, symbol=symbol)
         vwap_data = self.calculate_session_vwap_bands(df_5m)
         liq_active, liq_ratio, liq_msg = self.evaluate_liquidation_flush(df_5m)
         kalman_shift, kalman_slope = self.evaluate_kalman_mss(df_5m)
