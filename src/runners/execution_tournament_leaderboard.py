@@ -1,0 +1,40 @@
+import sys
+import os
+sys.path.insert(0, os.getcwd())
+
+from src.engines.execution_shadow_engine import ExecutionShadowEngine
+
+def print_leaderboard():
+    data = ExecutionShadowEngine.get_leaderboard()
+    print("\n" + "="*70)
+    print("⚔️  EXECUTION STRATEGY SHADOW TOURNAMENT (A/B FORWARD EXPERIMENT)")
+    print("="*70)
+    
+    total = data.get("total_trades", 0)
+    print(f"Total Completed Trades Analyzed: {total}\n")
+    
+    if total == 0:
+        print("No completed execution tournament trades yet. Live tracking in progress...")
+        print("="*70 + "\n")
+        return
+
+    live = data.get("live_ratchet", {})
+    shadow = data.get("shadow_partial", {})
+    binary = data.get("shadow_binary", {})
+    edge = data.get("alpha_edge_usd", 0.0)
+
+    print(f"{'Strategy Variant':<30} | {'Win Rate':<10} | {'Total R':<10} | {'Net PnL ($)':<12}")
+    print("-"*70)
+    print(f"{'1. LIVE TRAILING RATCHET (Prod)':<30} | {live.get('win_rate', 0.0):>8.1f}% | {live.get('total_r', 0.0):>+8.2f}R | ${live.get('total_pnl', 0.0):>+10.2f}")
+    print(f"{'2. SHADOW PARTIAL SCALE-OUT':<30} | {shadow.get('win_rate', 0.0):>8.1f}% | {shadow.get('total_r', 0.0):>+8.2f}R | ${shadow.get('total_pnl', 0.0):>+10.2f}")
+    print(f"{'3. SHADOW PURE BINARY (Baseline)':<30} | {binary.get('win_rate', 0.0):>8.1f}% | {binary.get('total_r', 0.0):>+8.2f}R | ${binary.get('total_pnl', 0.0):>+10.2f}")
+    print("-"*70)
+    
+    if edge >= 0:
+        print(f"🏆 Active Edge: Live Trailing Ratchet is OUTPERFORMING Partial Scale-Out by +${edge:,.2f}")
+    else:
+        print(f"💡 Active Edge: Partial Scale-Out is OUTPERFORMING Live Trailing Ratchet by +${abs(edge):,.2f}")
+    print("="*70 + "\n")
+
+if __name__ == "__main__":
+    print_leaderboard()
