@@ -2,7 +2,7 @@
 
 **Subtitle:** *Asynchronous Neural State Matrix Compilation, Mach Memory Governance & Sub-Millisecond Execution*  
 **System:** `BayesianPivot` ⇌ `Sovereign SMC`  
-**Discipline:** `Deep Systems Architecture, Darwin Kernel Governance & Real-Time Multi-Modal AI Agents`  
+**Discipline:** `Cognitive AI & Multi-Agent Swarms`  
 **Author:** Nicholas Alexander MacAskill (`Flocano Labs`)  
 **Core Technology Stack:**  
 `AIPermissionMap` ⇌ `Asynchronous Neural State Compilation` ⇌ `Darwin libdispatch Memory Pressure` ⇌ `Hybrid E-Core Affinity Sandboxing (taskpolicy)` ⇌ `Supabase Vector RAG (pgvector)` ⇌ `Spotlight / fseventsd Anti-Contention` ⇌ `TradeLocker Multi-Account Fleet` ⇌ `Champion vs. Challenger Shadow Lab`
