@@ -23,6 +23,14 @@ class AlphaSweepScanner(SMCScanner):
         self.heatmap_engine = LiquidityHeatmapEngine()
         self.retail_trap_engine = RetailStopTrapEngine()
         self.tl = TradeLockerClient()
+        self._active_trade_brackets = {}
+        self._position_tiers = {}
+        try:
+            from src.engines.execution_shadow_engine import ExecutionShadowEngine
+            self.exec_shadow_engine = ExecutionShadowEngine()
+            self.exec_shadow_engine.init_db()
+        except Exception as se_err:
+            logger.debug(f"ExecutionShadowEngine init error: {se_err}")
         try:
             from src.engines.live_orderflow_feed import LiveOrderflowFeed
             self.live_orderflow = LiveOrderflowFeed()
@@ -761,11 +769,41 @@ class AlphaSweepScanner(SMCScanner):
                         exec_result = self.tl.execute_trade_across_all_accounts(
                             symbol=symbol,
                             side=exec_side,
+                            entry_price=entry_price,
                             stop_loss=sl_price,
                             take_profit=tp_price,
                             risk_scale=getattr(Config, 'AUTO_PROBE_RISK_SCALE', 1.00),
-                            tranche_label="FULL_SIZE_ENTRY"
+                            tranche_label="FULL_SIZE_ENTRY",
+                            ai_score=ai_score_val,
+                            has_smt=bool(setup.get('smt_strength', 0.0) > 0 or setup.get('has_smt_divergence', False)),
+                            session=killzone,
+                            hurst_exponent=float(setup.get('hurst', setup.get('hurst_exponent', 0.58)))
                         )
+                        # Record in active trade brackets cache
+                        if not hasattr(self, '_active_trade_brackets'):
+                            self._active_trade_brackets = {}
+                        sym_key = symbol.replace("/", "").upper()
+                        self._active_trade_brackets[sym_key] = {
+                            'symbol': symbol,
+                            'side': exec_side,
+                            'entry_price': float(entry_price),
+                            'stop_loss': float(sl_price),
+                            'take_profit': float(tp_price),
+                            'initial_r_dist': abs(float(entry_price) - float(sl_price)),
+                            'session': killzone,
+                            'entry_time': datetime.now(timezone.utc),
+                            'tier': 0
+                        }
+                        # Register in Execution Strategy Shadow Tournament
+                        if hasattr(self, 'exec_shadow_engine'):
+                            self.exec_shadow_engine.register_trade(
+                                symbol=symbol,
+                                direction=exec_side,
+                                entry_price=float(entry_price),
+                                stop_loss=float(sl_price),
+                                take_profit=float(tp_price),
+                                risk_usd=129.0
+                            )
                     except Exception as exec_err:
                         logger.error(f"Error auto-executing trade: {exec_err}")
                 
@@ -805,57 +843,121 @@ class AlphaSweepScanner(SMCScanner):
 
     def check_and_trail_positions(self):
         """
-        Active Risk Watchdog:
+        Active Risk Watchdog with Tiered Profit Protection & Session Transition Lock:
         Monitors open fleet positions every cycle.
-        When a trade reaches +1.0R (Config.BE_TRIGGER_R) in floating profit:
-          1. Automatically moves Stop Loss to Entry Price (Break-Even) via in-place PATCH.
-          2. Dispatches a Telegram alert confirming the trade is now 100% risk-free.
+        
+        Tier 1 (+1.5R):
+          Automatically moves Stop Loss to Entry Price (Break-Even) via in-place PATCH.
+          Dispatches Telegram alert confirming trade is 100% risk-free.
+          
+        Tier 2 (+2.5R or >= 80% TP distance):
+          Automatically trails Stop Loss to +1.0R in profit (Guaranteed Green).
+          Dispatches Telegram alert confirming profit lock.
+          
+        Session Transition Lock:
+          When holding a trade from Asian session into the London Open transition,
+          if floating profit >= +1.0R, proactively moves SL to Break-Even.
         """
         try:
             open_pos = self.tl.get_open_positions()
             if not open_pos:
                 return
 
-            if not hasattr(self, '_trailed_positions'):
-                self._trailed_positions = set()
+            if not hasattr(self, '_active_trade_brackets'):
+                self._active_trade_brackets = {}
+            if not hasattr(self, '_position_tiers'):
+                self._position_tiers = {}
+
+            now_utc = datetime.now(timezone.utc)
+            utc_float = now_utc.hour + (now_utc.minute / 60.0)
+            is_london_transition = (6.75 <= utc_float <= 7.25) or (now_utc.hour == 7 and now_utc.minute <= 15)
+
+            be_trigger_r = getattr(Config, 'BE_TRIGGER_R', 1.5)
+            tier2_trigger_r = getattr(Config, 'TIER2_LOCK_TRIGGER_R', 2.5)
+            tier2_locked_r = getattr(Config, 'TIER2_LOCK_LOCKED_R', 1.0)
+            tier2_tp_pct = getattr(Config, 'TIER2_TP_PCT_TRIGGER', 0.80)
+            session_protect = getattr(Config, 'SESSION_TRANSITION_PROTECT_ENABLED', True)
+            session_min_r = getattr(Config, 'SESSION_TRANSITION_MIN_R', 1.0)
 
             for p in open_pos:
                 pos_id = str(p.get("id", ""))
-                if not pos_id or pos_id in self._trailed_positions:
+                if not pos_id:
                     continue
 
                 symbol = p.get("symbol", "")
+                sym_clean = symbol.replace("/", "").upper()
                 side = str(p.get("side", "")).lower()
                 entry_price = float(p.get("price") or p.get("avgPrice") or 0.0)
-                current_sl = float(p.get("stopLoss") or 0.0)
 
-                if entry_price <= 0 or current_sl <= 0:
+                # Recover bracket metadata if available
+                bracket_info = self._active_trade_brackets.get(sym_clean, {})
+                cached_sl = bracket_info.get('stop_loss', 0.0)
+                cached_tp = bracket_info.get('take_profit', 0.0)
+                cached_r_dist = bracket_info.get('initial_r_dist', 0.0)
+                cached_session = bracket_info.get('session', '')
+
+                current_sl = float(p.get("stopLoss") or cached_sl or 0.0)
+                target_tp = float(p.get("takeProfit") or cached_tp or 0.0)
+
+                if entry_price <= 0:
                     continue
 
-                # Check if stop is already at or better than entry
-                if (side == "buy" and current_sl >= entry_price) or (side == "sell" and current_sl <= entry_price):
-                    self._trailed_positions.add(pos_id)
-                    continue
-
-                initial_r_dist = abs(entry_price - current_sl)
+                initial_r_dist = cached_r_dist if cached_r_dist > 0 else abs(entry_price - current_sl)
                 if initial_r_dist <= 0:
-                    continue
+                    # Fallback estimate based on typical 0.25% stop if uninitialized
+                    initial_r_dist = entry_price * 0.0025
 
                 # Fetch live mark price
                 df_tick = self.fetch_data(symbol, '5m', limit=2, synchronized=False)
                 if df_tick is None or len(df_tick) == 0:
                     continue
                 current_price = float(df_tick.iloc[-1]['close'])
+                if hasattr(self, 'exec_shadow_engine'):
+                    self.exec_shadow_engine.update_price(symbol, current_price)
 
-                # Calculate floating R
+                # Calculate floating gain and R-multiple
                 floating_gain = (current_price - entry_price) if side == "buy" else (entry_price - current_price)
                 current_r = floating_gain / initial_r_dist
-                be_trigger_r = getattr(Config, 'BE_TRIGGER_R', 1.0)
 
-                if current_r >= be_trigger_r:
+                # Calculate progress to TP if TP is known
+                tp_dist = abs(entry_price - target_tp) if target_tp > 0 else (initial_r_dist * 3.0)
+                progress_to_tp = (floating_gain / tp_dist) if tp_dist > 0 else 0.0
+
+                current_tier = self._position_tiers.get(pos_id, 0)
+
+                # ── Tier 2 Check: +2.5R or >= 80% TP Progress ─────────────
+                if (current_r >= tier2_trigger_r or progress_to_tp >= tier2_tp_pct) and current_tier < 2:
+                    locked_price = entry_price + (tier2_locked_r * initial_r_dist) if side == "buy" else entry_price - (tier2_locked_r * initial_r_dist)
+                    logger.info(f"💰 [TIER 2 PROFIT LOCK] {symbol} {side.upper()} reached +{current_r:.2f}R ({progress_to_tp*100:.1f}% to TP). Trailing Stop Loss to +{tier2_locked_r:.1f}R in profit (${locked_price:.2f})...")
+                    
+                    self.tl.update_fleet_stop_loss(new_stop_loss=locked_price, symbol=symbol)
+                    self._position_tiers[pos_id] = 2
+                    if sym_clean in self._active_trade_brackets:
+                        self._active_trade_brackets[sym_clean]['tier'] = 2
+
+                    try:
+                        from src.clients.telegram_notifier import TelegramNotifier
+                        tn = TelegramNotifier()
+                        tn._send_message(
+                            f"💰 <b>TIER 2 PROFIT LOCK ACTIVATED!</b>\n\n"
+                            f"Asset: <b>{symbol}</b> ({side.upper()})\n"
+                            f"Current Profit: <b>+{current_r:.2f}R</b> (${current_price:.2f})\n"
+                            f"Progress to TP: <b>{progress_to_tp*100:.1f}%</b>\n"
+                            f"Stop Loss Trailed: <b>+1.0R in profit (${locked_price:.2f})</b>\n\n"
+                            f"🔒 <b>Status:</b> Position is locked in the green! Runner continuing to full TP. 🚀"
+                        )
+                    except Exception as tg_err:
+                        logger.warning(f"Error sending Tier 2 alert to Telegram: {tg_err}")
+                    continue
+
+                # ── Tier 1 Check: +1.5R Break-Even Lock ───────────────────
+                elif current_r >= be_trigger_r and current_tier < 1:
                     logger.info(f"🛡️ [BREAK-EVEN WATCHDOG] {symbol} {side.upper()} reached +{current_r:.2f}R (>= {be_trigger_r}R). Trailing Stop Loss to Entry (${entry_price:.2f})...")
+                    
                     self.tl.update_fleet_stop_loss(new_stop_loss=entry_price, symbol=symbol)
-                    self._trailed_positions.add(pos_id)
+                    self._position_tiers[pos_id] = 1
+                    if sym_clean in self._active_trade_brackets:
+                        self._active_trade_brackets[sym_clean]['tier'] = 1
 
                     try:
                         from src.clients.telegram_notifier import TelegramNotifier
@@ -865,10 +967,36 @@ class AlphaSweepScanner(SMCScanner):
                             f"Asset: <b>{symbol}</b> ({side.upper()})\n"
                             f"Current Profit: <b>+{current_r:.2f}R</b> (${current_price:.2f})\n"
                             f"Stop Loss: Trailed to Entry <b>${entry_price:.2f}</b>\n\n"
-                            f"✅ <b>Status:</b> Position is now <b>100% RISK-FREE</b>! Runner tracking to +{getattr(Config, 'TP2_R_MULTIPLE', 2.5)}R target. 🚀"
+                            f"✅ <b>Status:</b> Position is now <b>100% RISK-FREE</b>! Runner tracking to full TP. 🚀"
                         )
                     except Exception as tg_err:
                         logger.warning(f"Error sending BE alert to Telegram: {tg_err}")
+                    continue
+
+                # ── Session Transition Check: Asian position into London Open ───
+                elif session_protect and is_london_transition and current_r >= session_min_r and current_tier == 0:
+                    if "ASIA" in cached_session.upper() or cached_session == "ASIAN_SESSION_JUDAS":
+                        logger.info(f"⏰ [SESSION TRANSITION LOCK] {symbol} {side.upper()} floating +{current_r:.2f}R entering London Open. Moving Stop Loss to Break-Even (${entry_price:.2f})...")
+                        
+                        self.tl.update_fleet_stop_loss(new_stop_loss=entry_price, symbol=symbol)
+                        self._position_tiers[pos_id] = 1
+                        if sym_clean in self._active_trade_brackets:
+                            self._active_trade_brackets[sym_clean]['tier'] = 1
+
+                        try:
+                            from src.clients.telegram_notifier import TelegramNotifier
+                            tn = TelegramNotifier()
+                            tn._send_message(
+                                f"⏰ <b>SESSION TRANSITION PROTECTION!</b>\n\n"
+                                f"Asset: <b>{symbol}</b> ({side.upper()})\n"
+                                f"Current Profit: <b>+{current_r:.2f}R</b> (${current_price:.2f})\n"
+                                f"Reason: <b>London Open Volatility Transition</b>\n"
+                                f"Stop Loss: Locked at Entry <b>${entry_price:.2f}</b>\n\n"
+                                f"🛡️ <b>Status:</b> Asian position shielded from London opening volatility! 🚀"
+                            )
+                        except Exception as tg_err:
+                            logger.warning(f"Error sending session transition alert: {tg_err}")
+                        continue
         except Exception as e:
             logger.error(f"Error in check_and_trail_positions watchdog: {e}")
 

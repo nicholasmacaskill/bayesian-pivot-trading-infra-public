@@ -959,10 +959,15 @@ class LocalScannerRunner:
                                 exec_res = self.tl.execute_trade_across_all_accounts(
                                     symbol=symbol,
                                     side=exec_side,
+                                    entry_price=_entry,
                                     stop_loss=_sl,
                                     take_profit=_tp,
                                     risk_scale=1.00,
-                                    tranche_label="STRATEGY_9_JUDAS"
+                                    tranche_label="STRATEGY_9_JUDAS",
+                                    ai_score=strat9_setup.get('ai_score', 9.2),
+                                    has_smt=True,
+                                    session="LONDON_KILLZONE" if now_utc.hour in range(7, 10) else "NY_KILLZONE",
+                                    hurst_exponent=0.60
                                 )
                                 trade_success = exec_res.get("success", False)
                                 if trade_success:
@@ -1250,10 +1255,15 @@ class LocalScannerRunner:
                                 exec_res = self.tl.execute_trade_across_all_accounts(
                                     symbol=symbol,
                                     side=exec_side,
+                                    entry_price=_entry,
                                     stop_loss=_sl,
                                     take_profit=_tp,
                                     risk_scale=1.00,
-                                    tranche_label="FULL_SIZE_ENTRY"
+                                    tranche_label="FULL_SIZE_ENTRY",
+                                    ai_score=live_score,
+                                    has_smt=bool(getattr(regime_result, 'smt_active', False) or (isinstance(session_info, dict) and session_info.get('smt_divergence', False))),
+                                    session=session_info.get('session', '') if isinstance(session_info, dict) else str(session_info),
+                                    hurst_exponent=float(getattr(regime_result, 'hurst', 0.58))
                                 )
                                 trade_success = exec_res.get("success", False)
                                 if trade_success:

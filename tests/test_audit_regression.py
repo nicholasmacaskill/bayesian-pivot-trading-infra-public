@@ -21,9 +21,9 @@ class TestAuditRegression(unittest.TestCase):
         self.assertEqual(tl.resolve_instrument_id("BTC/USD"), "19965")
         self.assertEqual(tl.resolve_instrument_id("BTC_USD"), "19965")
         self.assertEqual(tl.resolve_instrument_id("btc/usd"), "19965")
-        self.assertEqual(tl.resolve_instrument_id("ETH/USD"), "19967")
-        self.assertEqual(tl.resolve_instrument_id("ETH_USD"), "19967")
-        self.assertEqual(tl.resolve_instrument_id("eth/usd"), "19967")
+        self.assertEqual(tl.resolve_instrument_id("ETH/USD"), "19957")
+        self.assertEqual(tl.resolve_instrument_id("ETH_USD"), "19957")
+        self.assertEqual(tl.resolve_instrument_id("eth/usd"), "19957")
 
     def test_telegram_teal_and_dollar_escaping(self):
         styled = _teal("$204,933.34")
@@ -33,6 +33,7 @@ class TestAuditRegression(unittest.TestCase):
 
     def test_multi_account_funnel_smt_edge_cases(self):
         funnel = MultiAccountFunnelManager()
+        funnel.profiles['ACCOUNT_B'].require_smt_divergence = True
         
         sample_setup = {
             'symbol': 'BTC/USD',

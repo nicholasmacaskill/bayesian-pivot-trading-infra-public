@@ -253,7 +253,7 @@ class RetrainingLoop:
             mae_r = 0.50
             mfe_r = 1.50  # Hit TP1 and trailed to breakeven
 
-        source_era = record.get('source_era', 'LIVE_PRODUCTION')
+        source_era = record.get('source_era') or ('HUMAN_ALPHA' if record.get('is_discretionary') else 'LIVE_PRODUCTION')
 
         # 3. Formulate Causal Rule Alignment / Exception Delta
         if source_era == 'HUMAN_ALPHA':
