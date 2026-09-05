@@ -4,6 +4,7 @@ import time
 import logging
 from datetime import datetime, date
 from dotenv import load_dotenv
+from src.core.config import Config
 
 load_dotenv('.env.local')
 load_dotenv()
@@ -175,6 +176,8 @@ class TradeLockerHelper:
                                 'entry_time': datetime.utcfromtimestamp(float(p[8]) / 1000).isoformat() + 'Z' if p[8] else None,
                                 'price': float(p[5] or 0.0),
                                 'qty': float(p[4] or 0.0),
+                                'stopLossOrderId': str(p[6]) if len(p) > 6 and p[6] else None,
+                                'takeProfitOrderId': str(p[7]) if len(p) > 7 and p[7] else None,
                                 'status': 'OPEN'
                             })
                         except Exception as e:
@@ -189,6 +192,8 @@ class TradeLockerHelper:
                             'entry_time': p.get('openDate') or p.get('created'),
                             'price': float(p.get('avgOpenPrice') or p.get('openPrice') or 0.0),
                             'qty': float(p.get('qty') or p.get('lotSize') or 0.0),
+                            'stopLoss': float(p.get('stopLoss') or 0.0) if p.get('stopLoss') else None,
+                            'takeProfit': float(p.get('takeProfit') or 0.0) if p.get('takeProfit') else None,
                             'status': 'OPEN'
                         })
                 return trades
@@ -433,7 +438,8 @@ class TradeLockerHelper:
         """
         if not self.access_token and not self.login():
             return False
-        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+        acc_part = f"/accounts/{self.account_id}" if self.account_id else ""
+        url = f"{self.base_url}/backend-api/trade{acc_part}/positions/{position_id}"
         payload = {"stopLossType": "absolute", "takeProfitType": "absolute"}
         if stop_loss is not None:
             payload["stopLoss"] = float(stop_loss)
@@ -654,16 +660,22 @@ class TradeLockerClient:
         self,
         symbol="BTC/USD",
         side="buy",
+        entry_price=None,
         stop_loss=None,
         take_profit=None,
-        risk_scale=0.50,
-        tranche_label="TRANCHE_1_PROBE",
+        risk_scale=1.00,
+        tranche_label="FULL_SIZE_ENTRY",
         ai_score=8.5,
         is_htf_confirmed=True,
+        has_smt=False,
+        session="",
+        hurst_exponent=0.58,
+        risk_pct_override=None,
         bypass_firewall=False
     ):
         """
-        Executes a sized order across all configured TradeLocker accounts with 2.5s rate-limit pacing.
+        Executes a dynamically sized order across all configured TradeLocker accounts with 2.5s rate-limit pacing.
+        Features Dynamic Fractional Kelly Risk Sizing (scales up on A+ confluence, caps at 1.00% max safety ceiling).
         Protected by the Sovereign ExecutionFirewall.
         """
         import time
@@ -688,9 +700,36 @@ class TradeLockerClient:
         if not self.helpers:
             logger.error("No TradeLocker account helpers configured.")
             return {"success": False, "filled_count": 0, "total_accounts": 0}
+
+        # ── DYNAMIC RISK SIZING CALCULATION (FRACTIONAL KELLY) ──
+        if risk_pct_override is not None:
+            target_risk_pct = float(risk_pct_override)
+        elif getattr(Config, 'DYNAMIC_RISK_SCALING_ENABLED', True):
+            # Evaluate A+ High Win-Rate Confluence
+            norm_score = float(ai_score) if float(ai_score) <= 10.0 else float(ai_score) / 10.0
+            min_score = getattr(Config, 'A_PLUS_MIN_SCORE', 9.0)
+            score_threshold = min_score if min_score <= 1.0 else (min_score / 10.0 if min_score <= 10.0 else min_score / 100.0)
+            score_passed = norm_score >= score_threshold
+            smt_passed = (not getattr(Config, 'A_PLUS_REQUIRE_SMT', True)) or bool(has_smt or is_htf_confirmed)
+            session_str = str(session or "").upper()
+            killzone_passed = (not getattr(Config, 'A_PLUS_REQUIRE_KILLZONE', True)) or any(kz in session_str for kz in ["LONDON", "NY", "KILLZONE", "CONTINUOUS"])
+            hurst_passed = float(hurst_exponent) >= getattr(Config, 'A_PLUS_MIN_HURST', 0.58)
+
+            is_a_plus = score_passed and smt_passed and (killzone_passed or norm_score >= 0.95) and hurst_passed
+            if is_a_plus:
+                target_risk_pct = getattr(Config, 'A_PLUS_RISK_PCT', 0.0085)
+                logger.info(f"💎 [DYNAMIC SIZING: A+ CONFLUENCE] Score={ai_score}, SMT={has_smt or is_htf_confirmed}, Session={session}, Hurst={hurst_exponent:.2f} -> SCALING RISK TO {target_risk_pct*100:.2f}%")
+            else:
+                target_risk_pct = getattr(Config, 'BASELINE_RISK_PCT', 0.005)
+        else:
+            target_risk_pct = getattr(Config, 'BASELINE_RISK_PCT', 0.005)
+
+        # Enforce Hard Safety Ceiling (Never exceed 1.00% on any trade)
+        max_ceiling = getattr(Config, 'MAX_SINGLE_TRADE_RISK_CEILING', 0.010)
+        target_risk_pct = min(target_risk_pct, max_ceiling)
             
         results = []
-        logger.info(f"⚡ [PROBE & SCALE] Dispatching {tranche_label} ({risk_scale*100:.0f}% Risk Scale) across {len(self.helpers)} accounts for {symbol} {side.upper()}...")
+        logger.info(f"⚡ [PROBE & SCALE] Dispatching {tranche_label} ({target_risk_pct*100:.2f}% Risk Basis, {risk_scale*100:.0f}% Tranche Scale) across {len(self.helpers)} accounts for {symbol} {side.upper()}...")
         
         for i, helper in enumerate(self.helpers):
             if i > 0:
@@ -711,38 +750,79 @@ class TradeLockerClient:
                     
                 # Exact Dynamic Fractional Dollar Risk Calculation
                 # Sizing: Lots = (Equity * Target Risk Pct) / Stop Loss Distance
-                target_risk_pct = 0.005  # Strict 0.50% risk per trade across all account sizes
                 target_risk_usd = equity * target_risk_pct
                 
-                # Calculate stop loss distance
-                if stop_loss is not None:
-                    # Estimate fill price based on stop distance
-                    stop_dist = abs(float(stop_loss) - (2500.0 if "ETH" in symbol else 85000.0 if "BTC" in symbol else 2700.0))
-                    if stop_dist < 5.0 or stop_dist > 500.0:
-                        stop_dist = 25.0 if "ETH" in symbol else 1000.0 if "BTC" in symbol else 15.0
+                # Calculate exact stop loss distance
+                if stop_loss is not None and entry_price is not None:
+                    stop_dist = abs(float(entry_price) - float(stop_loss))
+                elif stop_loss is not None:
+                    # Fallback if entry price is not explicitly passed
+                    stop_dist = 25.0 if "ETH" in symbol else 300.0 if "BTC" in symbol else 15.0
                 else:
-                    stop_dist = 25.0 if "ETH" in symbol else 1000.0 if "BTC" in symbol else 15.0
+                    stop_dist = 25.0 if "ETH" in symbol else 300.0 if "BTC" in symbol else 15.0
+                
+                if stop_dist <= 0:
+                    stop_dist = 25.0 if "ETH" in symbol else 300.0 if "BTC" in symbol else 15.0
                     
                 exact_lots = target_risk_usd / stop_dist
                 scaled_lot = round(exact_lots * risk_scale, 2)
                 if scaled_lot < 0.01:
                     scaled_lot = 0.01
                     
-                success = helper.place_order(
-                    instrument_id=instrument_id,
-                    side=side,
-                    qty=scaled_lot,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    order_type="market"
-                )
-                
-                if success:
-                    logger.info(f"✅ Account {i+1} ({helper.email}) filled {scaled_lot} lots {side.upper()} on {symbol} (SL: {stop_loss}, TP: {take_profit})")
-                    results.append(True)
+                is_scale_out_acc = getattr(Config, 'SPLIT_FLEET_SCALE_OUT_ENABLED', True) and (i in getattr(Config, 'SCALE_OUT_ACCOUNT_INDICES', [0, 2, 3, 4]))
+
+                if is_scale_out_acc and scaled_lot >= 0.02 and entry_price is not None and stop_loss is not None:
+                    # ── TWO-TRANCHE SPLIT EXECUTION (50% TP1 @ +1.5R, 50% TP2 @ Full Target) ──
+                    lot_t1 = round(scaled_lot * 0.50, 2)
+                    lot_t2 = round(scaled_lot - lot_t1, 2)
+                    if lot_t1 < 0.01: lot_t1 = 0.01
+                    if lot_t2 < 0.01: lot_t2 = 0.01
+                    
+                    tp1_r = getattr(Config, 'SCALE_OUT_TP1_R', 1.5)
+                    tp1_price = round(float(entry_price) + (tp1_r * stop_dist) if side == "buy" else float(entry_price) - (tp1_r * stop_dist), 2)
+                    
+                    # Place Tranche 1 (Cash Builder @ +1.5R)
+                    res_t1 = helper.place_order(
+                        instrument_id=instrument_id,
+                        side=side,
+                        qty=lot_t1,
+                        stop_loss=stop_loss,
+                        take_profit=tp1_price,
+                        order_type="market"
+                    )
+                    time.sleep(1.0)
+                    # Place Tranche 2 (Runner @ Full TP)
+                    res_t2 = helper.place_order(
+                        instrument_id=instrument_id,
+                        side=side,
+                        qty=lot_t2,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        order_type="market"
+                    )
+                    success = bool(res_t1 or res_t2)
+                    if success:
+                        logger.info(f"✅ Account {i+1} ({helper.email}) [SCALE-OUT SPLIT] Filled T1={lot_t1} lots (TP1: {tp1_price}) & T2={lot_t2} lots (TP2: {take_profit}) on {symbol}")
+                        results.append(True)
+                    else:
+                        logger.warning(f"⚠️ Account {i+1} ({helper.email}) scale-out order placement failed.")
+                        results.append(False)
                 else:
-                    logger.warning(f"⚠️ Account {i+1} ({helper.email}) order placement failed or rejected.")
-                    results.append(False)
+                    # ── FULL RUNNER SINGLE ORDER EXECUTION ──
+                    success = helper.place_order(
+                        instrument_id=instrument_id,
+                        side=side,
+                        qty=scaled_lot,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        order_type="market"
+                    )
+                    if success:
+                        logger.info(f"✅ Account {i+1} ({helper.email}) [FULL RUNNER] Filled {scaled_lot} lots {side.upper()} on {symbol} (SL: {stop_loss}, TP: {take_profit})")
+                        results.append(True)
+                    else:
+                        logger.warning(f"⚠️ Account {i+1} ({helper.email}) order placement failed or rejected.")
+                        results.append(False)
             except Exception as e:
                 logger.error(f"❌ Error dispatching to Account {i+1} ({helper.email}): {e}")
                 results.append(False)

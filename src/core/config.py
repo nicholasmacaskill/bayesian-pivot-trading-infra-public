@@ -192,14 +192,47 @@ class Config:
     HURST_MIN_MEMORY = 0.55          # Trending threshold
     HURST_MAX_RANDOM = 0.45          # Mean-reverting threshold
     
-    # ── AI Risk Logic ──────────────────────────────────────────
+    # ── AI Risk Logic & Tiered Profit Protection ─────────────
     ROI_OPTIMIZATION_ENABLED = True
     TP1_RATIO = 0.5                    # 50% scale out at TP1
-    BE_TRIGGER_R = 1.0                 # Move SL to entry (Break-Even) at +1.0R
+    BE_TRIGGER_R = 1.5                 # Tier 1: Move SL to entry (Break-Even) at +1.5R
+    TIER2_LOCK_TRIGGER_R = 2.5         # Tier 2: Trigger lock when trade reaches +2.5R
+    TIER2_LOCK_LOCKED_R = 1.0          # Lock in +1.0R guaranteed profit
+    TIER2_TP_PCT_TRIGGER = 0.80        # >= 80% TP distance also triggers Tier 2 lock
+    SESSION_TRANSITION_PROTECT_ENABLED = True  # Protect Asian positions before London Open
+    SESSION_TRANSITION_MIN_R = 1.0     # Minimum +1.0R floating to lock BE at session transition
     AI_MIN_SMT_CONVERGENCE = 0.7       # Threshold for "Institutional Convergence"
+
+    # ── Split-Fleet Barbell Architecture ──────────────────────
+    SPLIT_FLEET_SCALE_OUT_ENABLED = True
+    # Accounts that scale out 50% @ +1.5R to build realized cash balance:
+    # Index 0: Account 1 ($25k Payout Account)
+    # Index 2: Account 3 ($25k Account)
+    # Index 3: Account 4 ($10k Account)
+    # Index 4: Account 5 ($10k Account)
+    SCALE_OUT_ACCOUNT_INDICES = [0, 2, 3, 4]
     
-    # ── Tiered Risk Scaling (Final 98% Standard) ──────────────
-    AI_TRUST_TIER_AGGRESSIVE = 90      # Score 90+ -> 1.0% Risk
+    # Accounts that run 100% full position with Trailing Ratchet for max multi-R windfalls:
+    # Index 1: Account 2 ($50k Account)
+    # Index 5: Account 6 ($50k Account)
+    # Index 6: Account 7 ($25k Account)
+    # Index 7: Account 8 ($10k Account)
+    FULL_RUNNER_ACCOUNT_INDICES = [1, 5, 6, 7]
+    
+    SCALE_OUT_TP1_R = 1.5           # Take Profit 1 level = +1.5R
+    SCALE_OUT_TP1_PCT = 0.50        # 50% size closed at TP1
+    
+    # ── Tiered Risk Scaling (Dynamic Fractional Kelly Sizing) ──
+    DYNAMIC_RISK_SCALING_ENABLED = True
+    BASELINE_RISK_PCT = 0.005           # 0.50% Standard Risk (Default across all accounts)
+    A_PLUS_RISK_PCT = 0.0085            # 0.85% Scaled Risk (For A+ high-win-rate confluence setups)
+    A_PLUS_MIN_SCORE = 9.0              # AI Score threshold (>= 9.0 / 10.0 or >= 90 / 100)
+    A_PLUS_REQUIRE_SMT = True           # Requires verified SMT divergence
+    A_PLUS_REQUIRE_KILLZONE = True      # Requires London (07-10z) or NY (12-20z) Killzone
+    A_PLUS_MIN_HURST = 0.58             # Requires trending regime (Hurst >= 0.58)
+    MAX_SINGLE_TRADE_RISK_CEILING = 0.010 # 1.00% Hard Safety Ceiling per trade
+
+    AI_TRUST_TIER_AGGRESSIVE = 90      # Score 90+ -> 0.85% - 1.0% Risk
     AI_TRUST_TIER_CONSERVATIVE = 75    # Score 75-89 -> 0.5% Risk
     AI_TRUST_TIER_MINIMUM = 75         # < 75 -> 0% Risk (Monitor)
     # ──────────────────────────────────────────────────────────

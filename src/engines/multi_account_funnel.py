@@ -239,10 +239,13 @@ class MultiAccountFunnelManager:
         opp_dir = "SELL" if norm_dir == "BUY" else "BUY"
 
         # 1. In-flight intent check
-        if account_key:
-            with self._intent_lock:
-                if (norm_symbol, norm_dir, account_key) in self._pending_intents:
-                    return False, f"IN_FLIGHT_ORDER_INTENT_ACTIVE for {account_key}"
+        with self._intent_lock:
+            for (p_sym, p_dir, p_acc) in self._pending_intents:
+                if p_sym == norm_symbol:
+                    if p_dir == opp_dir:
+                        return False, f"IN_FLIGHT_OPPOSING_INTENT_ACTIVE: Opposing {p_dir} intent in flight on {p_acc}"
+                    if account_key and p_acc == account_key and p_dir == norm_dir:
+                        return False, f"IN_FLIGHT_ORDER_INTENT_ACTIVE for {account_key}"
 
         # 2. Existing position opposite check
         for pos in open_positions:
