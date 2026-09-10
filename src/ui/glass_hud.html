@@ -620,17 +620,44 @@
             </div>
           </div>
 
-          <!-- Strategy Quick-Select Chip Strip (All 9 Core Strategies) -->
-          <div class="flex items-center gap-1 font-mono text-[8px] mt-1 overflow-x-auto custom-scroll pb-0.5" id="strategy-tabs">
-            <button onclick="selectStrategy('strat_9')" id="tab-strat_9" class="btn-sharp-tab active">Strat 9 (Judas)</button>
-            <button onclick="selectStrategy('strat_8')" id="tab-strat_8" class="btn-sharp-tab">Strat 8 (Turtle)</button>
-            <button onclick="selectStrategy('strat_1')" id="tab-strat_1" class="btn-sharp-tab">Strat 1 (Asian)</button>
-            <button onclick="selectStrategy('strat_2')" id="tab-strat_2" class="btn-sharp-tab">Strat 2 (MSS)</button>
-            <button onclick="selectStrategy('strat_3')" id="tab-strat_3" class="btn-sharp-tab">Strat 3 (SMT)</button>
-            <button onclick="selectStrategy('strat_4')" id="tab-strat_4" class="btn-sharp-tab">Strat 4 (Trap)</button>
-            <button onclick="selectStrategy('strat_5')" id="tab-strat_5" class="btn-sharp-tab">Strat 5 (50% CE)</button>
-            <button onclick="selectStrategy('strat_6')" id="tab-strat_6" class="btn-sharp-tab">Strat 6 (Silver)</button>
-            <button onclick="selectStrategy('strat_7')" id="tab-strat_7" class="btn-sharp-tab">Strat 7 (SOL)</button>
+          <!-- Strategy Quick-Select Chip Strip (All 9 Core Strategies - Uniform Dimensions) -->
+          <div class="grid grid-cols-9 gap-1 font-mono text-[8px] mt-1 w-full" id="strategy-tabs">
+            <button onclick="selectStrategy('strat_9')" id="tab-strat_9" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center active" title="Strat 9 (Judas Inducement Hunter)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 9</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">Judas</span>
+            </button>
+            <button onclick="selectStrategy('strat_8')" id="tab-strat_8" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 8 (HTF Turtle Soup)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 8</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">Turtle</span>
+            </button>
+            <button onclick="selectStrategy('strat_1')" id="tab-strat_1" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 1 (Asian Range Fade)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 1</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">Asian</span>
+            </button>
+            <button onclick="selectStrategy('strat_2')" id="tab-strat_2" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 2 (MSS + 5m FVG)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 2</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">MSS</span>
+            </button>
+            <button onclick="selectStrategy('strat_3')" id="tab-strat_3" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 3 (SMT Intermarket)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 3</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">SMT</span>
+            </button>
+            <button onclick="selectStrategy('strat_4')" id="tab-strat_4" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 4 (Retail Inducement Trap)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 4</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">Trap</span>
+            </button>
+            <button onclick="selectStrategy('strat_5')" id="tab-strat_5" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 5 (50% Consequent Encroachment)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 5</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">50% CE</span>
+            </button>
+            <button onclick="selectStrategy('strat_6')" id="tab-strat_6" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 6 (Silver Bullet Rebalance)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 6</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">Silver</span>
+            </button>
+            <button onclick="selectStrategy('strat_7')" id="tab-strat_7" class="btn-sharp-tab flex flex-col items-center justify-center h-8.5 w-full p-0.5 text-center" title="Strat 7 (SOL Altcoin Hunter)">
+              <span class="font-bold leading-none text-[8px] truncate w-full">Strat 7</span>
+              <span class="text-[6.5px] opacity-75 truncate w-full mt-0.5">SOL</span>
+            </button>
           </div>
 
           <!-- Strategy Live vs Shadow Testing Breakdown Matrix -->
@@ -1175,9 +1202,9 @@
       const chips = document.querySelectorAll('#strategy-tabs button');
       chips.forEach(btn => {
         if (btn.id === `tab-${stratId}`) {
-          btn.className = "btn-sharp-tab active";
+          btn.classList.add('active');
         } else {
-          btn.className = "btn-sharp-tab";
+          btn.classList.remove('active');
         }
       });
 
