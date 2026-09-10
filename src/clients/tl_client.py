@@ -829,13 +829,15 @@ class TradeLockerClient:
                 # Sizing: Lots = (Equity * Target Risk Pct) / Stop Loss Distance
                 target_risk_usd = equity * target_risk_pct
 
-                # ── DISTANCE-TO-DEFAULT (DtD) 5% HWM TRAILING DRAWDOWN PROTECTION ──
-                # Dynamic floor calculation: Strictly 5.0% trailing from High-Water Mark (HWM)
+                # ── DISTANCE-TO-DEFAULT (DtD) 5% HWM TRAILING-TO-EVEN DRAWDOWN PROTECTION ──
+                # Rule: Trails 5.0% below peak High-Water Mark until floor reaches Starting Balance (Even Equity), then permanently locks at Starting Balance
                 initial_size = 10000.0 if equity < 18000.0 else (25000.0 if equity < 38000.0 else 50000.0)
                 max_dd_pct = getattr(Config, 'MAX_DRAWDOWN_LIMIT', 0.05)
                 # Account High-Water Mark: peak equity reached (at least initial size)
                 hwm = max(initial_size, equity)
-                hard_floor = hwm * (1.0 - max_dd_pct)
+                raw_trailing_floor = hwm * (1.0 - max_dd_pct)
+                # Floor locks at initial_size (even equity) and never trails higher than initial balance
+                hard_floor = min(initial_size, raw_trailing_floor)
                 remaining_buffer = max(0.0, equity - hard_floor)
                 
                 # Check Emergency Quarantine List or Low Buffer Gate
