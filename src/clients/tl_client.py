@@ -829,14 +829,26 @@ class TradeLockerClient:
                 # Sizing: Lots = (Equity * Target Risk Pct) / Stop Loss Distance
                 target_risk_usd = equity * target_risk_pct
 
+                # ── DISTANCE-TO-DEFAULT (DtD) 5% TRAILING DRAWDOWN PROTECTION ──
+                # Dynamic floor calculation: 5% trailing up to even equity (starting balance)
+                initial_size = 10000.0 if equity < 18000.0 else (25000.0 if equity < 38000.0 else 50000.0)
+                max_dd_pct = getattr(Config, 'MAX_DRAWDOWN_LIMIT', 0.05)
+                # Hard floor is 95% of initial size (5% max drawdown)
+                hard_floor = initial_size * (1.0 - max_dd_pct)
+                remaining_buffer = max(0.0, equity - hard_floor)
+                
+                # Cap dollar risk to at most 10% of remaining buffer to guarantee a 10-loss buffer runway
+                dtd_risk_cap = max(10.0, remaining_buffer * 0.10)
+                target_risk_usd = min(target_risk_usd, dtd_risk_cap)
+
                 # Enforce Hard Tier-Specific Dollar Risk Ceilings
                 if getattr(Config, 'TIER_CAPS_ENABLED', True):
                     if equity <= 15000.0:
-                        tier_cap = getattr(Config, 'TIER_MAX_RISK_10K', 30.0)
+                        tier_cap = getattr(Config, 'TIER_MAX_RISK_10K', 25.0)
                     elif equity <= 35000.0:
-                        tier_cap = getattr(Config, 'TIER_MAX_RISK_25K', 75.0)
+                        tier_cap = getattr(Config, 'TIER_MAX_RISK_25K', 65.0)
                     else:
-                        tier_cap = getattr(Config, 'TIER_MAX_RISK_50K', 150.0)
+                        tier_cap = getattr(Config, 'TIER_MAX_RISK_50K', 125.0)
                     target_risk_usd = min(target_risk_usd, tier_cap)
                 
                 # Calculate exact stop loss distance

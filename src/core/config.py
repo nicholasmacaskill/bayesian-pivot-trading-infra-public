@@ -54,8 +54,14 @@ class Config:
         "XAU/USD": 5.0,     # Capped at 5.0 Lots Gold
         "SOL/USD": 416.0,   # ~$50k notional at $120
     }
-    MAX_DRAWDOWN_LIMIT = 0.05  # 5.0% Total Account Drawdown Lockout (Strict Hard Ceiling)
-    DAILY_DRAWDOWN_LIMIT = 0.025 # 2.5% Daily Drawdown
+    MAX_DRAWDOWN_LIMIT = 0.05    # 5.0% Total Trailing Drawdown Lockout (Strict Hard Ceiling)
+    DAILY_DRAWDOWN_LIMIT = 0.015 # 1.5% Daily Drawdown Lockout (Ultra-Defensive)
+
+    # ── Tier-Specific Dollar Risk Ceilings (Distance-to-Default Protected) ──
+    TIER_CAPS_ENABLED = True
+    TIER_MAX_RISK_10K = 25.0     # Max $25 risk per trade on $10k accounts (0.25%)
+    TIER_MAX_RISK_25K = 65.0     # Max $65 risk per trade on $25k accounts (0.26%)
+    TIER_MAX_RISK_50K = 125.0    # Max $125 risk per trade on $50k accounts (0.25%)
 
     DAILY_TRADE_LIMIT = 2
     TARGET_RR = 3.0
