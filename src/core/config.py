@@ -57,6 +57,14 @@ class Config:
     MAX_DRAWDOWN_LIMIT = 0.05    # 5.0% Total Trailing Drawdown Lockout (Strict Hard Ceiling)
     DAILY_DRAWDOWN_LIMIT = 0.015 # 1.5% Daily Drawdown Lockout (Ultra-Defensive)
 
+    # ── Emergency Drawdown Protection & Quarantine ──
+    MIN_ACCOUNT_BUFFER_USD = 100.0  # Mandatory $100 minimum buffer above trailing floor to allow trading
+    EMERGENCY_LOCKOUT_ACCOUNTS = [
+        "h4sj53tg4f@upcomers.com",  # Account 8: 4.90% DD (Limit $9,629.23, $10 buffer remaining) - FROZEN
+        "hnr10rtj4k@upcomers.com",  # Account 5: 4.80%+ DD (Near trailing limit) - FROZEN
+        "vkrbpwdprh@upcomers.com",  # Account 4: 4.70%+ DD (Near trailing limit) - FROZEN
+    ]
+
     # ── Tier-Specific Dollar Risk Ceilings (Distance-to-Default Protected) ──
     TIER_CAPS_ENABLED = True
     TIER_MAX_RISK_10K = 25.0     # Max $25 risk per trade on $10k accounts (0.25%)

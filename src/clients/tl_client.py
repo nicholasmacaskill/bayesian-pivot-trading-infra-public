@@ -838,9 +838,11 @@ class TradeLockerClient:
                 hard_floor = hwm * (1.0 - max_dd_pct)
                 remaining_buffer = max(0.0, equity - hard_floor)
                 
-                # If an account has less than $50 buffer remaining, force minimum defensive lot or lockout
-                if remaining_buffer <= 0.0:
-                    logger.critical(f"🛑 [HARD TRAILING DD LOCKOUT] Account {i+1} ({helper.email}) equity (${equity:,.2f}) breached 5% HWM floor (${hard_floor:,.2f}). Sizing aborted.")
+                # Check Emergency Quarantine List or Low Buffer Gate
+                quarantined_accounts = getattr(Config, 'EMERGENCY_LOCKOUT_ACCOUNTS', [])
+                min_safe_buffer = getattr(Config, 'MIN_ACCOUNT_BUFFER_USD', 100.0)
+                if helper.email in quarantined_accounts or remaining_buffer < min_safe_buffer:
+                    logger.critical(f"🛡️ [EMERGENCY TRAILING DD QUARANTINE] Account {i+1} ({helper.email}) locked out! (Equity: ${equity:,.2f}, Buffer: ${remaining_buffer:,.2f} < ${min_safe_buffer:.2f} safe margin). Zero risk permitted.")
                     continue
 
                 # Cap dollar risk to at most 10% of remaining buffer to guarantee a 10-loss buffer runway
