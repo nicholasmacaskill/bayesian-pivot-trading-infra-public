@@ -471,7 +471,8 @@ class AIValidator:
                     pattern=setup.get('pattern', ''),
                     symbol=setup.get('symbol', 'BTC/USD'),
                     direction=setup.get('direction', 'LONG'),
-                    limit=2
+                    limit=2,
+                    df=df
                 )
                 memory_context = shadow_mem.format_memory_for_prompt(cases)
             except Exception as _mem_err:
@@ -518,16 +519,25 @@ class AIValidator:
             ### FORENSIC AUDIT OBJECTIVES:
             1. Structural Flaw Check: Is this a genuine institutional entry or retail trap?
             2. News Check: Are high-impact news catalysts (CPI, FOMC, NFP) within 30 min?
-            3. Order Book Check: Verify clean clearance and minimal slippage.
-
-            ### SCORING DIRECTIVE (0.0 - 10.0 Continuous Probability Scale):
-            - 9.0 - 10.0: Institutional Grade setup with flawless confluence.
-            - 8.0 - 8.9: Strong A-Tier setup with solid edge.
-            - 6.0 - 7.9: Marginal / B-Tier setup.
-            - 0.0 - 5.9: Toxic / Retail trap.
-
-            Verdict Options: FLOW_GO, REJECTED, INDUCEMENT_WARNING.
-
+            3. Discipline Gate: Does this meet strict SMC criteria (valid FVG, POI, SMT)?
+            
+            Return a JSON object in this exact schema:
+            {{
+                "live_execution": {{
+                    "score": <0.0-10.0 numerical rating>,
+                    "verdict": "<FLOW_GO if score >= {Config.get('AI_THRESHOLD', 5.5)} else REJECTED>",
+                    "reasoning": "<Concise forensic analysis of structural flaws, SMT, volume, and regime>",
+                    "execution_logic": "<Clear entry, SL, TP execution notes>",
+                    "discipline_check": "<PASSED or FAILED with specific rule violation>"
+                }},
+                "shadow_optimizer": {{
+                    "suggested_risk_multiplier": <1.0 for normal, 0.5 for probe, 1.25 for high confidence>,
+                    "regime_classification": "<Current detected regime>",
+                    "alpha_delta_prediction": "<Expected edge impact>",
+                    "slippage_estimate": "<Slippage estimate>",
+                    "optimization_reasoning": "<Optimization logic>"
+                }}
+            }}
             """
 
         if image_path:
@@ -535,29 +545,6 @@ class AIValidator:
                 prompt += self.sovereign_vision
             else:
                 prompt += "\nAnalysis of attached chart image requested for ICT confluence."
-
-        prompt += """
-        ### OUTPUT FORMAT (STRICT JSON):
-        Return EXACTLY this structure:
-        {{
-            "live_execution": {{
-                "score": <0.0-10.0>,
-                "verdict": "<FLOW_GO | REJECTED | INDUCEMENT_WARNING>",
-                "reasoning": "<Cite specific Oracle rules and confluence>",
-                "execution_logic": "<SL/TP adjustments>",
-                "discipline_check": "<Strategy drift warnings>"
-            }},
-            "shadow_optimizer": {{
-                "suggested_risk_multiplier": <e.g., 1.33 or 0.53>,
-                "regime_classification": "<Confirm or refine: {regime}>",
-                "alpha_delta_prediction": "<Quantify expected improvement/degradation vs control>",
-                "slippage_estimate": "<{slippage_info.get('slippage_pct', 'N/A')}%>",
-                "optimization_reasoning": "<Why this multiplier? What regime signals support it?>"
-            }}
-        }}
-        
-        CRITICAL: Return ONLY valid JSON. No markdown, no explanations outside the JSON structure.
-        """
 
         try:
             # For development, return simulated result if key is 'MOCK'
@@ -591,8 +578,33 @@ class AIValidator:
             # Validate structure (ensure both tracks exist)
             if 'live_execution' not in result or 'shadow_optimizer' not in result:
                 print("⚠️ AI returned incomplete dual-track structure. Using fallback.")
-                return self.hard_logic_audit(setup, df)
+                result = self.hard_logic_audit(setup, df)
             
+            # ── 🛡️ PRODUCTION VISUAL VECTOR SAFETY SHIELD ──
+            try:
+                from src.engines.visual_vector_engine import VisualVectorEngine
+                v_engine = VisualVectorEngine()
+                q_vec = v_engine.extract_geometric_features(df, setup=setup)
+                v_eval = v_engine.evaluate_visual_precedent(
+                    q_vec, 
+                    symbol=setup.get('symbol', 'BTC/USD'), 
+                    direction=setup.get('direction', 'LONG')
+                )
+                
+                rec = v_eval.get('recommendation', 'NEUTRAL')
+                live_res = result.get('live_execution', result)
+                orig_score = float(live_res.get('score', 7.5))
+                
+                if rec == 'REJECT_TRAP':
+                    live_res['score'] = max(4.0, round(orig_score - 1.5, 1))
+                    live_res['reasoning'] = f"{live_res.get('reasoning', '')} | ⚠️ {v_eval.get('key_reason', '')}"
+                    live_res['verdict'] = 'SHADOW_OBSERVATION' if live_res['score'] < getattr(Config, 'AI_VALIDATOR_MIN_SCORE', 7.5) else live_res.get('verdict')
+                    print(f"🛡️ [VISUAL VECTOR SHIELD] Score adjusted {orig_score} -> {live_res['score']} (Matched historical loss trap).")
+                elif rec == 'PASS_CONFIRMED':
+                    live_res['reasoning'] = f"{live_res.get('reasoning', '')} | 🏆 {v_eval.get('key_reason', '')}"
+            except Exception as _vec_err:
+                logger.debug(f"Visual Vector Safety Shield fallback: {_vec_err}")
+
             return result
                 
         except Exception as e:

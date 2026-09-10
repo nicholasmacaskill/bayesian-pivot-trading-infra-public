@@ -523,6 +523,14 @@ class RetrainingLoop:
         if export_jsonl:
             jsonl_path = str(self._export_jsonl(examples))
 
+        # 5. Incremental Visual Vector Backfill & Tournament Sync
+        try:
+            from scripts.backfill_visual_embeddings import run_visual_backfill
+            v_res = run_visual_backfill(limit=500, clear_existing=False)
+            logger.info(f"[Retraining] 🎨 Visual Vector Synced: {v_res.get('total_indexed', 0)} total precedent vectors active.")
+        except Exception as v_err:
+            logger.debug(f"[Retraining] Visual Vector sync skipped: {v_err}")
+
         elapsed = (datetime.utcnow() - start).total_seconds()
 
         summary = {
