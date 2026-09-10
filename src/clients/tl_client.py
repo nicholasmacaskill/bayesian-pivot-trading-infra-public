@@ -829,14 +829,20 @@ class TradeLockerClient:
                 # Sizing: Lots = (Equity * Target Risk Pct) / Stop Loss Distance
                 target_risk_usd = equity * target_risk_pct
 
-                # ── DISTANCE-TO-DEFAULT (DtD) 5% TRAILING DRAWDOWN PROTECTION ──
-                # Dynamic floor calculation: 5% trailing up to even equity (starting balance)
+                # ── DISTANCE-TO-DEFAULT (DtD) 5% HWM TRAILING DRAWDOWN PROTECTION ──
+                # Dynamic floor calculation: Strictly 5.0% trailing from High-Water Mark (HWM)
                 initial_size = 10000.0 if equity < 18000.0 else (25000.0 if equity < 38000.0 else 50000.0)
                 max_dd_pct = getattr(Config, 'MAX_DRAWDOWN_LIMIT', 0.05)
-                # Hard floor is 95% of initial size (5% max drawdown)
-                hard_floor = initial_size * (1.0 - max_dd_pct)
+                # Account High-Water Mark: peak equity reached (at least initial size)
+                hwm = max(initial_size, equity)
+                hard_floor = hwm * (1.0 - max_dd_pct)
                 remaining_buffer = max(0.0, equity - hard_floor)
                 
+                # If an account has less than $50 buffer remaining, force minimum defensive lot or lockout
+                if remaining_buffer <= 0.0:
+                    logger.critical(f"🛑 [HARD TRAILING DD LOCKOUT] Account {i+1} ({helper.email}) equity (${equity:,.2f}) breached 5% HWM floor (${hard_floor:,.2f}). Sizing aborted.")
+                    continue
+
                 # Cap dollar risk to at most 10% of remaining buffer to guarantee a 10-loss buffer runway
                 dtd_risk_cap = max(10.0, remaining_buffer * 0.10)
                 target_risk_usd = min(target_risk_usd, dtd_risk_cap)
