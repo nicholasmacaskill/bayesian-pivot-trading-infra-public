@@ -1,6 +1,9 @@
 import yfinance as yf
 import pandas as pd
 import logging
+import time
+import threading
+from typing import Optional, Dict
 from src.core.config import Config
 
 try:
@@ -17,6 +20,12 @@ class IntermarketEngine:
     SMT Divergence: If indices sweep but BTC doesn't, or vice-versa, reveals institutional intent.
     Bond Market: Rising yields = risk-off (bearish BTC), falling yields = risk-on (bullish BTC).
     """
+    _cached_context: Dict = {}
+    _last_fetch_time: float = 0.0
+    _cache_ttl: float = 60.0  # 60s TTL cache for zero-latency scans
+    _lock = threading.Lock()
+    _is_fetching = False
+
     def __init__(self):
         self.symbols = {
             "NQ": "^IXIC",      # NASDAQ Composite
@@ -25,26 +34,21 @@ class IntermarketEngine:
             "TNX": "^TNX"       # 10-Year Treasury Yield (Bond Market Sponsorship)
         }
 
-    def get_market_context(self):
+    def _fetch_from_yfinance(self) -> Optional[Dict]:
         context = {}
         try:
             for key, ticker in self.symbols.items():
-                # Fetch recent LTF data (5d period ensure we have data on weekends)
                 data = yf.download(ticker, period="5d", interval=Config.TIMEFRAME, progress=False)
-                
                 if data is not None and len(data) > 2:
-                    # Handle potential MultiIndex columns from yfinance
                     if isinstance(data.columns, pd.MultiIndex):
                         data.columns = data.columns.get_level_values(0)
                         
-                    # TREND PROTECTION: Check trend over last 12 candles (1 hour) instead of 1
                     window = 12
                     subset = data.tail(window)
                     current_close = float(subset['Close'].iloc[-1])
                     prev_close = float(subset['Close'].iloc[0])
                     
                     change = (current_close - prev_close) / prev_close * 100
-                    # Standard ICT threshold: 0.005% movement to confirm trend
                     trend = "UP" if change > 0.005 else "DOWN" if change < -0.005 else "NEUTRAL"
                     
                     context[key] = {
@@ -58,6 +62,40 @@ class IntermarketEngine:
         except Exception as e:
             logger.error(f"Error fetching intermarket data: {e}")
             return None
+
+    def get_market_context(self, force_refresh: bool = False) -> Optional[Dict]:
+        now = time.time()
+        
+        # 1. Fast path: return cache if valid
+        with IntermarketEngine._lock:
+            if not force_refresh and IntermarketEngine._cached_context and (now - IntermarketEngine._last_fetch_time < IntermarketEngine._cache_ttl):
+                return IntermarketEngine._cached_context
+        
+        # 2. Asynchronous background refresh if cache exists but is stale
+        if IntermarketEngine._cached_context and not force_refresh:
+            if not IntermarketEngine._is_fetching:
+                IntermarketEngine._is_fetching = True
+                def bg_worker():
+                    try:
+                        ctx = self._fetch_from_yfinance()
+                        if ctx:
+                            with IntermarketEngine._lock:
+                                IntermarketEngine._cached_context = ctx
+                                IntermarketEngine._last_fetch_time = time.time()
+                    finally:
+                        IntermarketEngine._is_fetching = False
+                
+                t = threading.Thread(target=bg_worker, daemon=True)
+                t.start()
+            return IntermarketEngine._cached_context
+        
+        # 3. Synchronous fetch on initial cold start
+        ctx = self._fetch_from_yfinance()
+        if ctx:
+            with IntermarketEngine._lock:
+                IntermarketEngine._cached_context = ctx
+                IntermarketEngine._last_fetch_time = time.time()
+        return IntermarketEngine._cached_context
     
     def calculate_cross_asset_divergence(self, btc_direction, context):
         """

@@ -2,6 +2,11 @@ import os
 import json
 import logging
 from typing import Optional, List, Any, Dict
+from dotenv import load_dotenv
+
+load_dotenv(".env.local")
+load_dotenv(".env")
+
 from google import genai
 import anthropic
 import openai

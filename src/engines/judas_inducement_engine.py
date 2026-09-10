@@ -213,6 +213,13 @@ class JudasInducementEngine:
     def format_telegram_alert(self, setup: Dict[str, Any]) -> str:
         """Formats an executive Telegram alert for Strategy 9 executions."""
         side_emoji = "🟢 LONG" if setup['direction'] == "LONG" else "🔴 SHORT"
+        now_utc = datetime.now(timezone.utc)
+        is_weekend = now_utc.weekday() in [5, 6]
+        if is_weekend or not getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', False) or not getattr(Config, 'LIVE_AUTO_EXECUTION', False):
+            exec_footer = "<i>Execution: 👻 Shadow Tracking ($0 Live Capital Risk)</i>"
+        else:
+            exec_footer = "<i>Execution: Market Order Placed on TradeLocker</i>"
+
         return (
             f"⚡ <b>STRATEGY 9: JUDAS INDUCEMENT HUNTER</b> ⚡\n\n"
             f"<b>Symbol:</b> <code>{setup['symbol']}</code>\n"
@@ -226,5 +233,5 @@ class JudasInducementEngine:
             f"• <b>Volume Multiplier:</b> <code>{setup['vol_mult']:.2f}x</code>\n"
             f"• <b>Session:</b> <code>{setup['session_tag']}</code>\n"
             f"• <b>Conviction:</b> <code>{setup['confidence_score']}/10 (Unbottlenecked Fast-Lane)</code>\n\n"
-            f"<i>Execution: Market Order Placed on TradeLocker</i>"
+            f"{exec_footer}"
         )

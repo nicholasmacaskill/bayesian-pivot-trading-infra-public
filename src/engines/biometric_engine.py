@@ -93,11 +93,11 @@ class BiometricEngine:
     def start_server(self):
         """Runs the FastAPI server in a background thread."""
         def run():
-            uvicorn.run(self.app, host="0.0.0.0", port=self.port, log_level="error")
+            uvicorn.run(self.app, host="127.0.0.1", port=self.port, log_level="error")
             
         server_thread = Thread(target=run, daemon=True)
         server_thread.start()
-        logger.info(f"🚀 Biometric Bridge active on port {self.port}")
+        logger.info(f"🚀 Biometric Bridge active on 127.0.0.1:{self.port}")
 
 if __name__ == "__main__":
     # Test execution

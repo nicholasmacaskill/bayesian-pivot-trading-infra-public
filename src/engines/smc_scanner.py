@@ -1828,6 +1828,8 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             if not (is_strong_bull or is_strong_bear):
                 return None
 
+        direction = 'LONG' if is_strong_bull else 'SHORT'
+
         # 2. HEURISTIC GATE: Hurst (Must be EXPANSION)
         df = self.fetch_data(symbol, timeframe)
         if df is None or len(df) < 50: return None
