@@ -71,6 +71,32 @@ def main():
             
     except Exception as e:
         print("Database query error:", e)
+
+    # 2. Champion vs Challenger Tournament Lab Registry
+    print("\n==========================================================================")
+    print("           CHAMPION VS. CHALLENGER A/B TOURNAMENT REGISTRY                ")
+    print("==========================================================================")
+    try:
+        df_variants = pd.read_sql_query("""
+            SELECT 
+                variant_id,
+                strategy_id,
+                variant_type,
+                samples,
+                wins,
+                losses,
+                win_rate,
+                total_r
+            FROM strategy_tournament_variants
+            WHERE is_active = 1
+            ORDER BY variant_type DESC, total_r DESC
+        """, conn)
+        if not df_variants.empty:
+            print(df_variants.to_string(index=False))
+        else:
+            print("No active tournament variants found.")
+    except Exception as var_err:
+        print("Error reading tournament variants:", var_err)
         
     print("\n==========================================================================")
     print("                     PROMOTION CRITERIA BENCHMARK                         ")

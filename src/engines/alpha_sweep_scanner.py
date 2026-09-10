@@ -492,16 +492,155 @@ class AlphaSweepScanner(SMCScanner):
             "target_stop_pool": trap["target_stop_pool"]
         }
 
-    def scan_symbol(self, symbol):
+    def check_strong_smt_sweep_shadow(self, symbol, df_5m, df_1h, killzone):
+        """
+        Scans for Strong SMT Divergence Sweeps during Premium Killzones.
+        100% SHADOW LAB ONLY - ZERO LIVE CAPITAL RISK.
+        """
+        try:
+            index_context = self.intermarket.get_market_context()
+            if not index_context:
+                return None
+                
+            atr_series = self.calculate_atr(df_5m)
+            atr_5m = atr_series.iloc[-1] if len(atr_series) > 0 and not pd.isna(atr_series.iloc[-1]) else 15.0
+            
+            c_high = df_5m.iloc[-2]['high']
+            c_low = df_5m.iloc[-2]['low']
+            c_open = df_5m.iloc[-2]['open']
+            c_close = df_5m.iloc[-2]['close']
+            c_range = max(c_high - c_low, 1e-8)
+            
+            recent_high = df_5m.iloc[-20:-2]['high'].max()
+            recent_low = df_5m.iloc[-20:-2]['low'].min()
+            
+            # Bullish SMT: Low swept, bullish rejection wick >= 40%, SMT score >= 0.70
+            if c_low < recent_low and c_close > recent_low:
+                lower_wick = min(c_open, c_close) - c_low
+                if lower_wick / c_range >= 0.40:
+                    smt_score = self.intermarket.calculate_cross_asset_divergence('LONG', index_context)
+                    if smt_score >= 0.70:
+                        closes_1h = df_1h['close'].values
+                        hurst = self.get_hurst_exponent(closes_1h)
+                        return {
+                            "direction": "LONG",
+                            "level": recent_low,
+                            "hurst": hurst,
+                            "trend": "SMT_DIVERGENCE_SWEEP",
+                            "regime": "INTERMARKET_SPONSORSHIP_EXPANSION",
+                            "pattern_type": "SMT_DIVERGENCE_SWEEP_SHADOW",
+                            "sweep_dist": recent_low - c_low,
+                            "atr": atr_5m,
+                            "price": c_close,
+                            "is_shadow_only": True,
+                            "smt_strength": smt_score
+                        }
+                        
+            # Bearish SMT: High swept, bearish rejection wick >= 40%, SMT score >= 0.70
+            if c_high > recent_high and c_close < recent_high:
+                upper_wick = c_high - max(c_open, c_close)
+                if upper_wick / c_range >= 0.40:
+                    smt_score = self.intermarket.calculate_cross_asset_divergence('SHORT', index_context)
+                    if smt_score >= 0.70:
+                        closes_1h = df_1h['close'].values
+                        hurst = self.get_hurst_exponent(closes_1h)
+                        return {
+                            "direction": "SHORT",
+                            "level": recent_high,
+                            "hurst": hurst,
+                            "trend": "SMT_DIVERGENCE_SWEEP",
+                            "regime": "INTERMARKET_SPONSORSHIP_EXPANSION",
+                            "pattern_type": "SMT_DIVERGENCE_SWEEP_SHADOW",
+                            "sweep_dist": c_high - recent_high,
+                            "atr": atr_5m,
+                            "price": c_close,
+                            "is_shadow_only": True,
+                            "smt_strength": smt_score
+                        }
+        except Exception as e:
+            logger.debug(f"SMT shadow check error: {e}")
+        return None
+
+    def check_fvg_50pct_ce_midpoint_shadow(self, symbol, df_5m, df_1h, killzone):
+        """
+        Scans for 50% Consequent Encroachment (CE) FVG Midpoint Reversals.
+        100% SHADOW LAB ONLY - ZERO LIVE CAPITAL RISK.
+        """
+        if len(df_1h) < 5 or len(df_5m) < 5:
+            return None
+            
+        try:
+            atr_series = self.calculate_atr(df_5m)
+            atr_5m = atr_series.iloc[-1] if len(atr_series) > 0 and not pd.isna(atr_series.iloc[-1]) else 15.0
+            
+            c_close_5m = df_5m.iloc[-2]['close']
+            c_low_5m = df_5m.iloc[-2]['low']
+            c_high_5m = df_5m.iloc[-2]['high']
+            
+            # Scan 1H for recent unmitigated Fair Value Gaps
+            for i in range(len(df_1h) - 4, len(df_1h) - 1):
+                c1_high = float(df_1h.iloc[i-1]['high'])
+                c1_low = float(df_1h.iloc[i-1]['low'])
+                c3_low = float(df_1h.iloc[i+1]['low'])
+                c3_high = float(df_1h.iloc[i+1]['high'])
+                
+                # Bullish FVG: Gap between C1 High and C3 Low
+                if c3_low > c1_high:
+                    ce_level = (c1_high + c3_low) / 2.0
+                    if c_low_5m <= ce_level and c_close_5m > ce_level:
+                        closes_1h = df_1h['close'].values
+                        hurst = self.get_hurst_exponent(closes_1h)
+                        return {
+                            "direction": "LONG",
+                            "level": ce_level,
+                            "hurst": hurst,
+                            "trend": "50PCT_CE_FVG_REVERSAL",
+                            "regime": "FVG_CONSEQUENT_ENCROACHMENT",
+                            "pattern_type": "FVG_50PCT_CE_REVERSAL_SHADOW",
+                            "sweep_dist": abs(c_close_5m - ce_level),
+                            "atr": atr_5m,
+                            "price": c_close_5m,
+                            "is_shadow_only": True,
+                            "fvg_top": c3_low,
+                            "fvg_bottom": c1_high
+                        }
+                        
+                # Bearish FVG: Gap between C1 Low and C3 High
+                if c3_high < c1_low:
+                    ce_level = (c1_low + c3_high) / 2.0
+                    if c_high_5m >= ce_level and c_close_5m < ce_level:
+                        closes_1h = df_1h['close'].values
+                        hurst = self.get_hurst_exponent(closes_1h)
+                        return {
+                            "direction": "SHORT",
+                            "level": ce_level,
+                            "hurst": hurst,
+                            "trend": "50PCT_CE_FVG_REVERSAL",
+                            "regime": "FVG_CONSEQUENT_ENCROACHMENT",
+                            "pattern_type": "FVG_50PCT_CE_REVERSAL_SHADOW",
+                            "sweep_dist": abs(c_close_5m - ce_level),
+                            "atr": atr_5m,
+                            "price": c_close_5m,
+                            "is_shadow_only": True,
+                            "fvg_top": c1_low,
+                            "fvg_bottom": c3_high
+                        }
+        except Exception as e:
+            logger.debug(f"50% CE FVG shadow check error: {e}")
+            
+        return None
+
+    def scan_symbol(self, symbol, is_shadow=False):
         """
         Runs the Bayesian Pivot Alpha scan on the given symbol.
         """
+        is_symbol_shadow = is_shadow or (symbol in getattr(Config, 'SHADOW_SYMBOLS', []))
         killzone = self.is_premium_killzone()
         if not killzone:
             logger.info(f"Skipping {symbol} scan: Outside premium Killzones.")
             return None
             
-        logger.info(f"Scanning {symbol} inside {killzone}...")
+        logger.info(f"Scanning {symbol} inside {killzone}{' [SHADOW LAB]' if is_symbol_shadow else ''}...")
         
         # Fetch 1H and 5m data
         df_1h = self.fetch_data(symbol, '1h', limit=100, synchronized=False)
@@ -529,6 +668,14 @@ class AlphaSweepScanner(SMCScanner):
         # 5. Quinary Hunt: Retail LuxAlgo Trap Fade (100% Zero-Risk Shadow Tracking)
         if not setup:
             setup = self.check_retail_trap_shadow(symbol, df_5m, df_1h, killzone)
+
+        # 6. Senary Hunt: Strong SMT Divergence Sweep (100% Zero-Risk Shadow Tracking)
+        if not setup:
+            setup = self.check_strong_smt_sweep_shadow(symbol, df_5m, df_1h, killzone)
+
+        # 7. Septenary Hunt: 50% Consequent Encroachment FVG Fill (100% Zero-Risk Shadow Tracking)
+        if not setup:
+            setup = self.check_fvg_50pct_ce_midpoint_shadow(symbol, df_5m, df_1h, killzone)
             
         if setup:
             pattern_type = setup.get('pattern_type', 'TURTLE_SOUP_LIQUIDITY_SWEEP')
@@ -648,6 +795,7 @@ class AlphaSweepScanner(SMCScanner):
             ai_validator_threshold = 9.0 if is_counter_regime else getattr(Config, 'AI_VALIDATOR_MIN_SCORE', 7.5)
             
             # ── PRE-COMPUTED ZERO-LATENCY AI RAG CONFLUENCE GATE ──
+            dynamic_risk_mult = 1.0
             try:
                 from src.engines.ai_permission_map import AIPermissionMap
                 ai_approved, dynamic_risk_mult, perm_msg = AIPermissionMap.evaluate_confluence(symbol, setup['direction'], pattern_type)
@@ -655,17 +803,22 @@ class AlphaSweepScanner(SMCScanner):
                 if not ai_approved:
                     shadow_score = min(shadow_score, 6.0) # Suppress score below live threshold
                 else:
-                    lots = round(lots * dynamic_risk_mult, 4)
+                    if not getattr(Config, 'VARIANT_SIZING_SHADOW_MODE', True):
+                        lots = round(lots * dynamic_risk_mult, 4)
+                    else:
+                        logger.info(f"🛡️ [VARIANT SIZING SHADOW MODE] Live sizing locked flat (1.0x). Variant mult ({dynamic_risk_mult}x) routed to Shadow Tournament.")
             except Exception as perm_eval_err:
                 logger.debug(f"AI Permission Map lookup error: {perm_eval_err}")
                 ai_approved = True
+                dynamic_risk_mult = 1.0
 
-            if is_counter_regime:
+            if is_counter_regime and not getattr(Config, 'VARIANT_SIZING_SHADOW_MODE', True):
                 lots = round(lots * 0.5, 4) # Throttle to 50% probe size if taking counter-regime setup
             
             passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved
             
-            is_archetype_shadow = (pattern_type not in ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"]) or setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW")
+            is_symbol_shadow = is_shadow or (symbol in getattr(Config, 'SHADOW_SYMBOLS', []))
+            is_archetype_shadow = (pattern_type not in ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"]) or setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW") or is_symbol_shadow
             is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator)
             
             ai_score_val = shadow_score
@@ -683,6 +836,10 @@ class AlphaSweepScanner(SMCScanner):
                     vwap_z = shadow_report.get('session_vwap', {}).get('z_score', 0)
                     kalman_st = shadow_report.get('kalman_mss', {}).get('state', 'NEUTRAL')
                     ai_reasoning = f"[👻 SHADOW TRADE - DIDN'T PASS AI VALIDATOR (Score: {shadow_score:.1f}/10 < {ai_validator_threshold})] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Failed confluences: CVD={cvd_detail}, VWAP_Z={vwap_z:.2f}, Kalman={kalman_st}."
+            elif is_symbol_shadow:
+                tag_label = "shadow asset quarantine ($0 live risk)"
+                pattern_str = f"[👻 SHADOW LAB - {symbol}] {base_pattern_str}"
+                ai_reasoning = f"[👻 SHADOW LAB ({symbol} $0 RISK)] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10. Tracking shadow expectancy..."
             elif is_archetype_shadow:
                 tag_label = "shadow archetype quarantine"
                 pattern_str = f"[👻 SHADOW LAB] {base_pattern_str}"
@@ -802,7 +959,8 @@ class AlphaSweepScanner(SMCScanner):
                                 entry_price=float(entry_price),
                                 stop_loss=float(sl_price),
                                 take_profit=float(tp_price),
-                                risk_usd=129.0
+                                risk_usd=129.0,
+                                variant_mult=float(dynamic_risk_mult)
                             )
                     except Exception as exec_err:
                         logger.error(f"Error auto-executing trade: {exec_err}")

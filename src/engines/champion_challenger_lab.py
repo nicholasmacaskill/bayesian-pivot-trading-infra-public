@@ -150,6 +150,138 @@ class ChampionChallengerLab:
                     "target_rr": 3.0
                 },
                 created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # Strategy 3: Strong SMT Divergence NY AM Sweep
+            "STRAT_3_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_3_SMT_DIVERGENCE_CHALLENGER",
+                strategy_id="STRATEGY_3_SMT_DIVERGENCE",
+                variant_type="CHALLENGER",
+                parameters={
+                    "session": "NY_AM",
+                    "min_smt_strength": 0.70,
+                    "min_wick_pct": 50.0,
+                    "target_rr": 3.0,
+                    "discount_premium_filter": True
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # Strategy 5: 50% Consequent Encroachment (CE) FVG Midpoint Fill
+            "STRAT_5_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_5_50PCT_CE_MT_CHALLENGER",
+                strategy_id="STRATEGY_5_50PCT_CE_MT",
+                variant_type="CHALLENGER",
+                parameters={
+                    "timeframe": "1h",
+                    "fvg_midpoint_fill_pct": 0.50,
+                    "killzone_gated": True,
+                    "target_rr": 3.5
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # ──────────────────────────────────────────────────────────────────
+            # VISUAL VECTOR CHALLENGERS (A/B Test vs. Live Champions)
+            # ──────────────────────────────────────────────────────────────────
+            "STRAT_9_VISUAL_VECTOR_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_9_VISUAL_VECTOR_CHALLENGER",
+                strategy_id="STRATEGY_9_JUDAS_INDUCEMENT",
+                variant_type="CHALLENGER",
+                parameters={
+                    "visual_vector_gating": True,
+                    "min_analog_similarity": 0.85,
+                    "block_on_trap_precedent": True,
+                    "min_wick_pct": 70.0,
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_8_VISUAL_VECTOR_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_8_VISUAL_VECTOR_CHALLENGER",
+                strategy_id="STRATEGY_8_TURTLE_SOUP_SWEEP",
+                variant_type="CHALLENGER",
+                parameters={
+                    "visual_vector_gating": True,
+                    "min_analog_similarity": 0.85,
+                    "block_on_trap_precedent": True,
+                    "min_smt_strength": 0.35,
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_3_VISUAL_VECTOR_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_3_VISUAL_VECTOR_CHALLENGER",
+                strategy_id="STRATEGY_3_SMT_DIVERGENCE",
+                variant_type="CHALLENGER",
+                parameters={
+                    "visual_vector_gating": True,
+                    "min_analog_similarity": 0.85,
+                    "session": "NY_AM",
+                    "min_smt_strength": 0.70,
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # ──────────────────────────────────────────────────────────────────
+            # CHRONOS TIME-SERIES CHALLENGERS (Shadow Lab 12-Candle Forecasts)
+            # ──────────────────────────────────────────────────────────────────
+            "STRAT_9_CHRONOS_SHADOW_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_9_CHRONOS_SHADOW_CHALLENGER",
+                strategy_id="STRATEGY_9_JUDAS_INDUCEMENT",
+                variant_type="CHALLENGER",
+                parameters={
+                    "chronos_time_series_gating": True,
+                    "min_expansion_prob": 0.55,
+                    "block_on_volatility_squeeze": False,
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_8_CHRONOS_SHADOW_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_8_CHRONOS_SHADOW_CHALLENGER",
+                strategy_id="STRATEGY_8_TURTLE_SOUP_SWEEP",
+                variant_type="CHALLENGER",
+                parameters={
+                    "chronos_time_series_gating": True,
+                    "min_expansion_prob": 0.55,
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_3_CHRONOS_SHADOW_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_3_CHRONOS_SHADOW_CHALLENGER",
+                strategy_id="STRATEGY_3_SMT_DIVERGENCE",
+                variant_type="CHALLENGER",
+                parameters={
+                    "chronos_time_series_gating": True,
+                    "min_expansion_prob": 0.55,
+                    "session": "NY_AM",
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "SOL_SHADOW_CHALLENGER": StrategyVariant(
+                variant_id="SOL_SHADOW_CHALLENGER",
+                strategy_id="SOL_INDUCEMENT_HUNTER",
+                variant_type="CHALLENGER",
+                parameters={
+                    "symbol": "SOL/USD",
+                    "is_shadow_only": True,
+                    "min_wick_pct": 55.0,
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_9_PULLBACK_RELOAD_CHALLENGER": StrategyVariant(
+                variant_id="STRAT_9_PULLBACK_RELOAD_CHALLENGER",
+                strategy_id="STRATEGY_9_JUDAS_INDUCEMENT",
+                variant_type="CHALLENGER",
+                parameters={
+                    "enable_pullback_reload": True,
+                    "initial_scalp_take_profit_r": 1.2,
+                    "reload_discount_pct": 0.50, # 50% retracement of initial push
+                    "reload_stop_buffer_atr": 0.20,
+                    "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
             )
         }
 
@@ -246,3 +378,48 @@ class ChampionChallengerLab:
                 f"{v.samples} | **{v.win_rate:.1f}%** | **{v.profit_factor:.2f}** | `{v.total_r:+.1f}R` |"
             )
         return "\n".join(lines)
+
+    def evaluate_visual_challenger_gate(self, variant_id: str, symbol: str, direction: str, df: Any = None, setup: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Evaluates whether a Visual Vector Challenger allows or blocks a trade based on visual precedent.
+        """
+        try:
+            from src.engines.visual_vector_engine import VisualVectorEngine
+            engine = VisualVectorEngine()
+            query_vec = engine.extract_geometric_features(df, setup=setup)
+            return engine.evaluate_visual_precedent(query_vec, symbol=symbol, direction=direction)
+        except Exception as e:
+            logger.debug(f"Visual challenger evaluation error: {e}")
+            return {'recommendation': 'NEUTRAL', 'win_rate': 50.0, 'key_reason': str(e)}
+
+    def evaluate_chronos_forecast_gate(self, variant_id: str, symbol: str, direction: str, df: Any = None) -> Dict[str, Any]:
+        """
+        Evaluates whether a Chronos Time-Series Shadow Challenger allows or blocks a trade based on 12-candle probability forecast.
+        """
+        try:
+            from src.engines.chronos_engine import ChronosEngine
+            c_engine = ChronosEngine()
+            forecast = c_engine.forecast_12_candles(df, symbol=symbol)
+            prob_up = forecast.get('prob_expansion_up', 0.33)
+            prob_down = forecast.get('prob_expansion_down', 0.33)
+            is_long = str(direction).upper() in ['BUY', 'LONG']
+            
+            dir_prob = prob_up if is_long else prob_down
+            if dir_prob >= 0.55:
+                recommendation = 'PASS_CONFIRMED'
+            elif (prob_down >= 0.55 and is_long) or (prob_up >= 0.55 and not is_long):
+                recommendation = 'REJECT_COUNTER_FORECAST'
+            else:
+                recommendation = 'NEUTRAL'
+
+            return {
+                'recommendation': recommendation,
+                'forecast': forecast,
+                'directional_probability': dir_prob,
+                'key_reason': forecast.get('reasoning', '')
+            }
+        except Exception as e:
+            logger.debug(f"Chronos challenger evaluation error: {e}")
+            return {'recommendation': 'NEUTRAL', 'key_reason': str(e)}
+
+

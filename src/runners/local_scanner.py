@@ -1158,24 +1158,29 @@ class LocalScannerRunner:
                             continue
 
                         # Risk Calculation (Target Profit Mode vs Fixed USD Risk vs standard Risk Per Trade)
-                        if getattr(Config, 'TARGET_PROFIT_MODE', False) and _actual_rr > 0:
+                        variant_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * getattr(self, 'alpha_mult', 1.0)
+                        if getattr(Config, 'VARIANT_SIZING_SHADOW_MODE', True):
+                            risk_amt = getattr(Config, 'FIXED_RISK_USD', 100.0)
+                            logger.info(f"🛡️ [VARIANT SIZING SHADOW MODE] Flat risk ${risk_amt:.2f} active for live execution. Variant Mult ({variant_mult:.2f}x) tracked in shadow logs.")
+                        elif getattr(Config, 'TARGET_PROFIT_MODE', False) and _actual_rr > 0:
                             risk_amt = Config.TARGET_PROFIT_USD / _actual_rr
                             if direction == 'LONG':
-                                risk_amt = risk_amt * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
+                                risk_amt = risk_amt * getattr(Config, 'LONG_RISK_MULTIPLIER', 1.0)
                             logger.info(f"🎯 TARGET PROFIT MODE: Risking ${risk_amt:.2f} to target ${Config.TARGET_PROFIT_USD:.2f} profit with R:R {_actual_rr:.2f}")
                         elif getattr(Config, 'FIXED_RISK_USD', None) is not None:
                             risk_amt = Config.FIXED_RISK_USD
                             if direction == 'LONG':
-                                risk_amt = risk_amt * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
+                                risk_amt = risk_amt * getattr(Config, 'LONG_RISK_MULTIPLIER', 1.0)
                             logger.info(f"🛡️ FIXED RISK MODE: Risking a hard limit of ${risk_amt:.2f} per trade")
                         else:
                             base_risk_pct = Config.RISK_PER_TRADE
-                            risk_mult = ai_multiplier * regime_result.suggested_size_mult * psych_mult * getattr(self, 'alpha_mult', 1.0)
+                            risk_mult = variant_mult
                             if direction == 'LONG':
-                                risk_mult = risk_mult * getattr(Config, 'LONG_RISK_MULTIPLIER', 0.5)
+                                risk_mult = risk_mult * getattr(Config, 'LONG_RISK_MULTIPLIER', 1.0)
                             if setup.get('bias_conflict'):
                                 risk_mult = risk_mult * 0.5
                                 logger.warning(f"⚠️ BIAS CONFLICT: Reducing risk to 50% for {symbol}")
+                            risk_amt = calc_equity * base_risk_pct * risk_mult
                         # Strict Risk Cap (Bayesian Pivot Guard Cap)
                         max_risk = getattr(Config, 'MAX_RISK_USD', 150.0)
                         if risk_amt > max_risk:
@@ -1217,6 +1222,7 @@ class LocalScannerRunner:
                             "take_profit": _tp,
                             "position_size": lots, 
                             "position_value": position_value,
+                            "variant_mult": variant_mult,
                             "regime_mult": regime_result.suggested_size_mult,
                             "psych_mult": psych_mult, 
                             "alpha_mult": getattr(self, 'alpha_mult', 1.0)

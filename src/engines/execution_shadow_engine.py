@@ -31,9 +31,11 @@ class ExecutionShadowEngine:
                     stop_loss REAL NOT NULL,
                     take_profit REAL NOT NULL,
                     risk_usd REAL DEFAULT 129.0,
+                    variant_mult REAL DEFAULT 1.0,
                     peak_mfe_r REAL DEFAULT 0.0,
                     live_ratchet_r REAL DEFAULT 0.0,
                     live_ratchet_pnl REAL DEFAULT 0.0,
+                    shadow_variant_pnl REAL DEFAULT 0.0,
                     shadow_partial_r REAL DEFAULT 0.0,
                     shadow_partial_pnl REAL DEFAULT 0.0,
                     shadow_binary_r REAL DEFAULT 0.0,
@@ -42,6 +44,15 @@ class ExecutionShadowEngine:
                     closed_at TEXT
                 )
             """)
+            # Safe column additions if table already existed
+            try:
+                conn.execute("ALTER TABLE execution_shadow_trades ADD COLUMN variant_mult REAL DEFAULT 1.0")
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE execution_shadow_trades ADD COLUMN shadow_variant_pnl REAL DEFAULT 0.0")
+            except Exception:
+                pass
             conn.commit()
             conn.close()
         except Exception as e:
@@ -54,21 +65,22 @@ class ExecutionShadowEngine:
         entry_price: float,
         stop_loss: float,
         take_profit: float,
-        risk_usd: float = 129.0
+        risk_usd: float = 129.0,
+        variant_mult: float = 1.0
     ) -> bool:
-        """Registers a new active trade for multi-strategy shadow tracking."""
+        """Registers a new active trade for multi-strategy and variant sizing shadow tracking."""
         try:
             self.init_db()
             now_iso = datetime.now(timezone.utc).isoformat()
             conn = get_db_connection()
             conn.execute("""
                 INSERT INTO execution_shadow_trades (
-                    timestamp, symbol, direction, entry_price, stop_loss, take_profit, risk_usd, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN')
-            """, (now_iso, symbol, direction.upper(), entry_price, stop_loss, take_profit, risk_usd))
+                    timestamp, symbol, direction, entry_price, stop_loss, take_profit, risk_usd, variant_mult, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+            """, (now_iso, symbol, direction.upper(), entry_price, stop_loss, take_profit, risk_usd, float(variant_mult)))
             conn.commit()
             conn.close()
-            logger.info(f"⚔️ [EXECUTION TOURNAMENT] Shadow Trade Registered for {symbol} {direction.upper()} @ {entry_price}")
+            logger.info(f"⚔️ [EXECUTION TOURNAMENT] Shadow Trade Registered for {symbol} {direction.upper()} @ {entry_price} (Variant Mult: {variant_mult:.2f}x)")
             return True
         except Exception as e:
             logger.error(f"Failed to register shadow tournament trade: {e}")
@@ -81,6 +93,7 @@ class ExecutionShadowEngine:
         """
         resolved = []
         try:
+            self.init_db()
             conn = get_db_connection()
             trades = conn.execute("""
                 SELECT * FROM execution_shadow_trades WHERE status = 'OPEN' AND symbol = ?
@@ -161,10 +174,14 @@ class ExecutionShadowEngine:
                 is_closed = hit_full_tp or hit_initial_sl
 
                 if is_closed:
+                    variant_mult = float(t.get("variant_mult", 1.0) or 1.0)
+                    variant_pnl = live_r * (risk_usd * variant_mult)
+
                     conn.execute("""
                         UPDATE execution_shadow_trades
                         SET peak_mfe_r = ?,
                             live_ratchet_r = ?, live_ratchet_pnl = ?,
+                            shadow_variant_pnl = ?,
                             shadow_partial_r = ?, shadow_partial_pnl = ?,
                             shadow_binary_r = ?, shadow_binary_pnl = ?,
                             status = 'CLOSED', closed_at = ?
@@ -172,15 +189,17 @@ class ExecutionShadowEngine:
                     """, (
                         peak_mfe,
                         live_r, live_r * risk_usd,
+                        variant_pnl,
                         partial_r, partial_r * risk_usd,
                         binary_r, binary_r * risk_usd,
                         now_iso, t_id
                     ))
                     resolved.append({
                         "id": t_id, "symbol": symbol,
-                        "live_ratchet_r": live_r, "shadow_partial_r": partial_r, "shadow_binary_r": binary_r
+                        "live_ratchet_r": live_r, "shadow_partial_r": partial_r, "shadow_binary_r": binary_r,
+                        "variant_mult": variant_mult, "variant_pnl": variant_pnl
                     })
-                    logger.info(f"🏁 [EXECUTION TOURNAMENT RESOLVED] {symbol}: Live={live_r:+.2f}R | Shadow Partial={partial_r:+.2f}R | Binary={binary_r:+.2f}R")
+                    logger.info(f"🏁 [EXECUTION TOURNAMENT RESOLVED] {symbol}: Live={live_r:+.2f}R (${live_r * risk_usd:+.2f}) | Variant Sizing ({variant_mult:.2f}x)=${variant_pnl:+.2f} | Shadow Partial={partial_r:+.2f}R | Binary={binary_r:+.2f}R")
                 else:
                     # Update peak MFE in flight
                     conn.execute("""
@@ -196,11 +215,13 @@ class ExecutionShadowEngine:
 
     @staticmethod
     def get_leaderboard() -> Dict:
-        """Returns cumulative statistics comparing all 3 execution models."""
+        """Returns cumulative statistics comparing execution models and sizing modes."""
         try:
+            ExecutionShadowEngine.init_db()
             conn = get_db_connection()
             rows = conn.execute("""
                 SELECT live_ratchet_r, live_ratchet_pnl,
+                       shadow_variant_pnl,
                        shadow_partial_r, shadow_partial_pnl,
                        shadow_binary_r, shadow_binary_pnl,
                        status
@@ -210,12 +231,20 @@ class ExecutionShadowEngine:
             conn.close()
 
             if not rows:
-                return {"total_trades": 0, "live_ratchet": {}, "shadow_partial": {}, "shadow_binary": {}}
+                return {
+                    "total_trades": 0,
+                    "live_ratchet": {},
+                    "shadow_variant_sizing": {},
+                    "shadow_partial": {},
+                    "shadow_binary": {}
+                }
 
             total = len(rows)
             live_r = sum(float(r["live_ratchet_r"]) for r in rows)
             live_pnl = sum(float(r["live_ratchet_pnl"]) for r in rows)
             live_wins = sum(1 for r in rows if float(r["live_ratchet_r"]) > 0)
+
+            variant_pnl = sum(float(r["shadow_variant_pnl"] or 0.0) for r in rows)
 
             partial_r = sum(float(r["shadow_partial_r"]) for r in rows)
             partial_pnl = sum(float(r["shadow_partial_pnl"]) for r in rows)
@@ -230,6 +259,10 @@ class ExecutionShadowEngine:
                 "live_ratchet": {
                     "total_r": round(live_r, 2), "total_pnl": round(live_pnl, 2),
                     "win_rate": round((live_wins / total) * 100, 1) if total > 0 else 0.0
+                },
+                "shadow_variant_sizing": {
+                    "total_pnl": round(variant_pnl, 2),
+                    "edge_vs_flat_usd": round(variant_pnl - live_pnl, 2)
                 },
                 "shadow_partial": {
                     "total_r": round(partial_r, 2), "total_pnl": round(partial_pnl, 2),
