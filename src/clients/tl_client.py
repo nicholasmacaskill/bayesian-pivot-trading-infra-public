@@ -22,9 +22,43 @@ class TradeLockerHelper:
         self.access_token = None
         self.account_id = None
         self.acc_num = None # New Field for 'accNum' header
+        self._instruments_cache = {}
+        self._symbol_cache = {}
         
+    def sync_instruments(self):
+        """Discovers and caches all tradable instruments and routes directly from the broker API."""
+        if not self.access_token:
+            return False
+        try:
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/instruments"
+            resp = requests.get(url, headers=self._get_headers(auth=True), timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                instruments = data.get('d', {}).get('instruments', [])
+                for inst in instruments:
+                    name = str(inst.get('name', '')).replace("/", "").replace("_", "").upper()
+                    tradable_id = str(inst.get('tradableInstrumentId') or inst.get('id'))
+                    trade_routes = [r for r in inst.get('routes', []) if r.get('type') == 'TRADE']
+                    route_id = trade_routes[0].get('id') if trade_routes else 2025730
+                    self._instruments_cache[name] = {
+                        'tradableInstrumentId': int(tradable_id),
+                        'routeId': int(route_id),
+                        'name': inst.get('name'),
+                        'description': inst.get('description'),
+                        'type': inst.get('type')
+                    }
+                    self._symbol_cache[tradable_id] = inst.get('name')
+                logger.info(f"✅ Synced {len(self._instruments_cache)} broker instruments for {self.email}")
+                return True
+        except Exception as e:
+            logger.debug(f"Broker instrument sync note: {e}")
+        return False
+
     def resolve_symbol(self, instrument_id):
-        """Maps internal IDs to human-readable symbols."""
+        """Maps internal IDs to human-readable symbols using live cache with canonical fallback."""
+        str_id = str(instrument_id)
+        if hasattr(self, '_symbol_cache') and str_id in self._symbol_cache:
+            return self._symbol_cache[str_id]
         mapping = {
             "206": "BTC/USD",
             "207": "ETH/USD",
@@ -39,11 +73,13 @@ class TradeLockerHelper:
             "19915": "XAU/USD",
             "19968": "SOL/USD",
             "19973": "GALA/USD",
+            "20020": "EUR/USD",
+            "19987": "GBP/USD",
         }
-        symbol = mapping.get(str(instrument_id))
+        symbol = mapping.get(str_id)
         if not symbol:
             logger.debug(f"Unmapped instrument ID: {instrument_id}")
-            return str(instrument_id)
+            return str_id
         return symbol
 
     def _get_headers(self, auth=False):
@@ -116,6 +152,10 @@ class TradeLockerHelper:
                     self.acc_num = accounts[0].get('accNum')
                     self.balance = float(accounts[0].get('projectedEquity') or accounts[0].get('accountBalance') or 25000.0)
                     print(f"DEBUG: Account Discovery Meta: {accounts[0]}")
+                    try:
+                        self.sync_instruments()
+                    except Exception:
+                        pass
                     return True
             if resp.status_code not in [502, 503, 504]:
                 logger.warning(f"Failed to fetch account details: {resp.status_code}")
@@ -324,13 +364,23 @@ class TradeLockerHelper:
             logger.error(f"History Fetch Error: {e}")
             return []
 
-    def place_order(self, instrument_id, side, qty, stop_loss=None, take_profit=None, order_type="market", price=0.0):
-        """Stealth & Idempotent Order Execution Module"""
+    def place_order(self, instrument_id, side, qty, stop_loss=None, take_profit=None, order_type="market", price=0.0, symbol_hint=None):
+        """Stealth & Idempotent Order Execution Module with Pre-Flight Broker Invariant Verification."""
         import time
         from src.engines.multi_account_funnel import align_lot_size
 
         if not self.access_token and not self.login(): 
             return False
+
+        # Pre-Flight Invariant: Verify instrument matches target asset hint
+        if symbol_hint:
+            resolved_sym = self.resolve_symbol(instrument_id).replace("/", "").replace("_", "").upper()
+            target_sym = symbol_hint.replace("/", "").replace("_", "").upper()
+            # If target has a specific asset ticker, ensure it matches
+            for asset_key in ["XAU", "GOLD", "BTC", "ETH", "SOL", "EUR", "GBP"]:
+                if asset_key in target_sym and asset_key not in resolved_sym:
+                    logger.critical(f"🚨 [BROKER MISMATCH INTERCEPTED] Refusing to place order: Target '{symbol_hint}' does not match resolved instrument '{resolved_sym}' (ID: {instrument_id})!")
+                    return False
 
         # 1. Align Lot Size with Broker Metadata Step Constraints
         aligned_qty = align_lot_size(qty, min_lot=0.01, lot_step=0.01)
@@ -338,13 +388,21 @@ class TradeLockerHelper:
             logger.error(f"❌ Order Rejected: Quantity {qty} below min lot (0.01)")
             return False
 
+        # Dynamically determine routeId from metadata cache
+        route_id = 2025730
+        if hasattr(self, '_instruments_cache') and self._instruments_cache:
+            for inst_meta in self._instruments_cache.values():
+                if str(inst_meta.get('tradableInstrumentId')) == str(instrument_id):
+                    route_id = inst_meta.get('routeId', 2025730)
+                    break
+
         url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/orders"
         payload = {
             "tradableInstrumentId": int(instrument_id),
             "qty": float(aligned_qty),
             "side": side.lower(),
             "type": order_type.lower(),
-            "routeId": 2025730,
+            "routeId": int(route_id),
             "validity": "IOC"
         }
         if order_type.lower() == "limit":
@@ -631,8 +689,16 @@ class TradeLockerClient:
         return [] # Placeholder
 
     def resolve_instrument_id(self, symbol="BTC/USD") -> str:
-        """Resolves broker instrument ID for BTC/USD, ETH/USD, SOL/USD, and XAU/USD (Gold) on TradeLocker (Upcomers)."""
+        """Dynamically resolves broker tradableInstrumentId for any asset with verified live broker metadata cache."""
         norm = symbol.replace("/", "").replace("_", "").upper()
+        # 1. First check if any helper has dynamic broker metadata cached
+        for h in self.helpers:
+            if hasattr(h, '_instruments_cache') and h._instruments_cache:
+                for k, meta in h._instruments_cache.items():
+                    if norm == k or norm in k or k in norm:
+                        return str(meta['tradableInstrumentId'])
+                        
+        # 2. Hardcoded canonical mappings as verified fallback
         if "BTC" in norm:
             return "19965"
         elif "ETH" in norm:
@@ -641,6 +707,10 @@ class TradeLockerClient:
             return "19967"
         elif "XAU" in norm or "GOLD" in norm:
             return "19915"
+        elif "EUR" in norm:
+            return "20020"
+        elif "GBP" in norm:
+            return "19987"
         return "19965"
 
     def execute_trade(self, symbol="BTC/USD", side="buy", qty=0.15, stop_loss=None, take_profit=None, account_index=0):
@@ -659,7 +729,8 @@ class TradeLockerClient:
             qty=qty,
             stop_loss=stop_loss,
             take_profit=take_profit,
-            order_type="market"
+            order_type="market",
+            symbol_hint=symbol
         )
 
     def execute_trade_across_all_accounts(
@@ -804,7 +875,8 @@ class TradeLockerClient:
                         qty=lot_t1,
                         stop_loss=stop_loss,
                         take_profit=tp1_price,
-                        order_type="market"
+                        order_type="market",
+                        symbol_hint=symbol
                     )
                     time.sleep(1.0)
                     # Place Tranche 2 (Runner @ Full TP)
@@ -814,7 +886,8 @@ class TradeLockerClient:
                         qty=lot_t2,
                         stop_loss=stop_loss,
                         take_profit=take_profit,
-                        order_type="market"
+                        order_type="market",
+                        symbol_hint=symbol
                     )
                     success = bool(res_t1 or res_t2)
                     if success:
@@ -831,7 +904,8 @@ class TradeLockerClient:
                         qty=scaled_lot,
                         stop_loss=stop_loss,
                         take_profit=take_profit,
-                        order_type="market"
+                        order_type="market",
+                        symbol_hint=symbol
                     )
                     if success:
                         logger.info(f"✅ Account {i+1} ({helper.email}) [FULL RUNNER] Filled {scaled_lot} lots {side.upper()} on {symbol} (SL: {stop_loss}, TP: {take_profit})")
