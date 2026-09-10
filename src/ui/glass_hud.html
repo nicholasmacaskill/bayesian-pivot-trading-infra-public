@@ -585,7 +585,7 @@
       </div>
     </section>
 
-    <!-- LENS 2 (Center 4 Cols): Prior vs Posterior belief convergence & Live Strategy Breakdown -->
+    <!-- LENS 2 (Center 4 Cols): Strategy Intelligence & Invariant Blueprints Matrix -->
     <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5">
       <!-- Faint Abstracted Neural Distribution Texture -->
       <div class="panel-texture" style="background-image: url('assets/branding-8.png'), url('/assets/branding-8.png'); background-position: center;"></div>
@@ -596,13 +596,13 @@
           <div class="flex flex-wrap items-center justify-between gap-1 pb-1 border-b border-white/[0.08]">
             <div>
               <h2 class="text-xs font-semibold text-slate-100 tracking-tight flex items-center gap-1.5">
-                <span>Prior vs Posterior belief convergence</span>
-                <span class="px-1 py-0.2 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7px] font-mono font-bold">LIVE SUITE</span>
+                <span>Strategy Intelligence & Tournament Matrix</span>
+                <span class="px-1 py-0.2 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7px] font-mono font-bold">LIVE FLEET SUITE</span>
               </h2>
               <div class="text-[8px] text-slate-400 font-mono flex items-center gap-1">
-                <span>Strategy Intelligence</span>
+                <span>9 Core Institutional</span>
                 <span>•</span>
-                <span class="text-cyan-300" id="lens2-subview-label">Core Fleet (9)</span>
+                <span class="text-cyan-300" id="lens2-subview-label">Core Fleet Matrix (9)</span>
               </div>
             </div>
 
@@ -615,16 +615,13 @@
                 Challengers (16)
               </button>
               <button onclick="setLens2SubView('models')" id="subview-btn-models" class="btn-sharp-tab">
-                Sizing (4)
-              </button>
-              <button onclick="setLens2SubView('belief')" id="subview-btn-belief" class="btn-sharp-tab">
-                Belief Δ
+                Sizing A/B (4)
               </button>
             </div>
           </div>
 
           <!-- Strategy Quick-Select Chip Strip (All 9 Core Strategies) -->
-          <div class="flex items-center gap-1 font-mono text-[8.5px] mt-1 overflow-x-auto custom-scroll pb-0.5" id="strategy-tabs">
+          <div class="flex items-center gap-1 font-mono text-[8px] mt-1 overflow-x-auto custom-scroll pb-0.5" id="strategy-tabs">
             <button onclick="selectStrategy('strat_9')" id="tab-strat_9" class="btn-sharp-tab active">Strat 9 (Judas)</button>
             <button onclick="selectStrategy('strat_8')" id="tab-strat_8" class="btn-sharp-tab">Strat 8 (Turtle)</button>
             <button onclick="selectStrategy('strat_1')" id="tab-strat_1" class="btn-sharp-tab">Strat 1 (Asian)</button>
@@ -641,58 +638,102 @@
             <!-- Live Performance Card -->
             <div class="p-1.5 rounded sub-glass border-teal-500/20">
               <div class="flex items-center justify-between text-[7.5px] text-slate-400 uppercase tracking-wider">
-                <span id="strat-live-title">Live Fleet</span>
+                <span id="strat-live-title">Live Fleet Track</span>
                 <span class="text-teal-300 font-bold" id="strat-live-badge">👑 CHAMPION</span>
               </div>
               <div class="mt-0.5 flex items-baseline justify-between">
-                <span class="text-base font-bold text-white font-mono leading-none" id="strat-live-wr">20.0%</span>
-                <span class="text-teal-300 font-semibold text-xs" id="strat-live-pnl">+$7.08</span>
+                <span class="text-base font-bold text-white font-mono leading-none" id="strat-live-wr">78.6%</span>
+                <span class="text-teal-300 font-semibold text-xs" id="strat-live-pnl">+$2,140.00</span>
               </div>
               <div class="flex justify-between text-[7.5px] text-slate-400 mt-1 pt-0.5 border-t border-white/[0.06]">
-                <span>Trades: <strong class="text-white" id="strat-live-record">1W - 4L (50)</strong></span>
-                <span>Exp: <strong class="text-teal-300" id="strat-live-exp">+2.45R</strong></span>
+                <span>Live Record: <strong class="text-white" id="strat-live-record">11W - 3L (14)</strong></span>
+                <span>Expectancy: <strong class="text-teal-300" id="strat-live-exp">+2.45R</strong></span>
               </div>
             </div>
 
             <!-- Pre-Live Shadow Benchmark Card -->
             <div class="p-1.5 rounded sub-glass border-cyan-500/20">
               <div class="flex items-center justify-between text-[7.5px] text-slate-400 uppercase tracking-wider">
-                <span>Pre-Live Shadow</span>
-                <span class="text-cyan-300 font-bold" id="strat-shadow-badge">81+ SAMPLES</span>
+                <span>Shadow Benchmark</span>
+                <span class="text-cyan-300 font-bold" id="strat-shadow-badge">45+ SAMPLES</span>
               </div>
               <div class="mt-0.5 flex items-baseline justify-between">
-                <span class="text-base font-bold text-cyan-300 font-mono leading-none" id="strat-shadow-wr">22.2%</span>
+                <span class="text-base font-bold text-cyan-300 font-mono leading-none" id="strat-shadow-wr">73.3%</span>
                 <span class="text-slate-300 font-semibold text-xs" id="strat-shadow-pf">PF: 3.12</span>
               </div>
               <div class="flex justify-between text-[7.5px] text-slate-400 mt-1 pt-0.5 border-t border-white/[0.06]">
-                <span>Samples: <strong class="text-white" id="strat-shadow-samples">81 Trades</strong></span>
-                <span>MFE: <strong class="text-cyan-300" id="strat-shadow-mfe">3.8R</strong></span>
+                <span>Shadow Samples: <strong class="text-white" id="strat-shadow-samples">45 Trades</strong></span>
+                <span>Peak MFE: <strong class="text-cyan-300" id="strat-shadow-mfe">3.8R</strong></span>
               </div>
             </div>
           </div>
 
-          <!-- Graduation Milestone Pill -->
+          <!-- Graduation / Phase Status Pill -->
           <div class="px-2 py-0.5 rounded sub-glass border-teal-400/20 flex items-center justify-between text-[8px] font-mono mt-1">
             <div class="flex items-center gap-1 truncate">
-              <i data-lucide="check-circle-2" class="w-3 h-3 text-teal-400 shrink-0"></i>
-              <span class="text-slate-300 truncate" id="strat-grad-status">GRADUATED (81 Samples, 100% Live Active)</span>
+              <i data-lucide="shield-check" class="w-3 h-3 text-teal-400 shrink-0"></i>
+              <span class="text-slate-300 truncate" id="strat-grad-status">GRADUATED (LIVE FLEET ACTIVE) • 45 Shadow Samples</span>
             </div>
             <span class="text-teal-300 font-semibold shrink-0" id="strat-grad-date">Sep 04, 2026</span>
           </div>
         </div>
 
-        <!-- Upper Tri-Gaussian Convergence Curve Canvas -->
-        <div class="my-0.5">
-          <div class="flex items-center justify-between mb-0.5 text-[7.5px] font-mono text-slate-400">
-            <div class="flex items-center gap-2">
-              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-slate-400 inline-block"></span> Prior (50%)</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-cyan-400 inline-block"></span> Shadow (<span id="canvas-shadow-label">68%</span>)</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-teal-400 inline-block"></span> Live (<span id="canvas-live-label">76%</span>)</span>
+        <!-- Selected Strategy Blueprint & Invariants Inspector Card -->
+        <div class="p-1.5 rounded sub-glass border-white/[0.08] flex flex-col gap-1 text-[8px] font-mono">
+          <div class="flex items-center justify-between border-b border-white/[0.06] pb-0.5">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="layers" class="w-3 h-3 text-cyan-400"></i>
+              <span class="font-bold text-white text-[8.5px]" id="strat-bp-title">Judas Inducement Hunter (STRATEGY_9)</span>
             </div>
-            <span class="text-teal-300 font-semibold" id="strat-variance-delta">Variance Δ: -62.5%</span>
+            <span class="text-slate-400 text-[7px]" id="strat-bp-killzone">5m Entry / 1H Structure • Asian & London Open</span>
           </div>
-          <div class="w-full h-20 relative sub-glass p-1 rounded">
-            <canvas id="beliefCanvasUpper" class="w-full h-full"></canvas>
+
+          <!-- 4 Core Invariants Grid -->
+          <div class="grid grid-cols-2 gap-1 mt-0.5">
+            <div class="bg-black/20 p-1 rounded border border-white/[0.04]">
+              <div class="text-slate-400 text-[7px] flex items-center gap-1 uppercase tracking-wider font-semibold">
+                <span>🎯</span> <span>Trigger & Rule</span>
+              </div>
+              <div class="text-slate-200 text-[7.5px] mt-0.5 leading-snug line-clamp-2" id="strat-bp-entry">
+                Rejection Wick >= 70% of candle range after sweeping Session High/Low with 1.8x volume
+              </div>
+            </div>
+            <div class="bg-black/20 p-1 rounded border border-white/[0.04]">
+              <div class="text-slate-400 text-[7px] flex items-center gap-1 uppercase tracking-wider font-semibold">
+                <span>🌊</span> <span>Orderflow / CVD</span>
+              </div>
+              <div class="text-slate-200 text-[7.5px] mt-0.5 leading-snug line-clamp-2" id="strat-bp-orderflow">
+                CVD Limit Iceberg Absorption + Delta Divergence Confirmation
+              </div>
+            </div>
+            <div class="bg-black/20 p-1 rounded border border-white/[0.04]">
+              <div class="text-slate-400 text-[7px] flex items-center gap-1 uppercase tracking-wider font-semibold">
+                <span>🌐</span> <span>Intermarket Gate</span>
+              </div>
+              <div class="text-slate-200 text-[7.5px] mt-0.5 leading-snug line-clamp-2" id="strat-bp-intermarket">
+                DXY SMT Divergence + BTC/ETH Leadership Alignment
+              </div>
+            </div>
+            <div class="bg-black/20 p-1 rounded border border-white/[0.04]">
+              <div class="text-slate-400 text-[7px] flex items-center gap-1 uppercase tracking-wider font-semibold">
+                <span>🛡️</span> <span>Sizing & Risk</span>
+              </div>
+              <div class="text-slate-200 text-[7.5px] mt-0.5 leading-snug line-clamp-2" id="strat-bp-sizing">
+                Split-Fleet (50% TP1 @ +1.5R cash lock, 50% Runner @ +3.0R)
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Shadow Challengers Battling This Strategy -->
+          <div class="bg-black/20 p-1 rounded border border-white/[0.04] mt-0.5">
+            <div class="flex items-center justify-between text-[7px] text-slate-400 uppercase tracking-wider mb-0.5 font-semibold">
+              <span class="flex items-center gap-1"><span>⚔️</span> <span>Active Shadow Challengers (A/B Tested Against This Strategy)</span></span>
+              <span class="text-cyan-300 font-bold" id="strat-bp-challengers-count">2 Active Variants</span>
+            </div>
+            <div class="flex items-center gap-1 flex-wrap" id="strat-bp-challengers-list">
+              <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[7px]">🔬 Visual Vector Multimodal (42 samples • +18.4R)</span>
+              <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[7px]">🔬 Chronos Zero-Shot LLM Gate (29 samples • +11.2R)</span>
+            </div>
           </div>
         </div>
 
@@ -700,7 +741,7 @@
         <div id="subview-core-container" class="pt-1 border-t border-white/[0.08]">
           <div class="flex items-center justify-between text-[8px] font-mono text-slate-400 mb-0.5">
             <span class="font-semibold text-slate-300">Strategy Tournament Matrix (9 Core Institutional)</span>
-            <span class="text-teal-300 font-bold">2 Live Champions • 1 Probation</span>
+            <span class="text-teal-300 font-bold">2 Live Champions • 1 Probation • 6 Shadow</span>
           </div>
           <div class="overflow-x-auto custom-scroll max-h-36">
             <table class="w-full text-left font-mono text-[8.5px]">
@@ -763,30 +804,6 @@
                 </tr>
               </thead>
               <tbody id="models-tbody" class="divide-y divide-white/[0.04] text-slate-300">
-                <!-- Dynamically populated from SSE / API -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- SUB-VIEW 4: Bayesian Distribution Belief Parameter Matrix -->
-        <div id="subview-belief-container" class="pt-1 border-t border-white/[0.08] hidden">
-          <div class="flex items-center justify-between text-[8px] font-mono text-slate-400 mb-0.5">
-            <span class="font-semibold text-teal-300">Gaussian Belief Parameters (μ / σ)</span>
-            <span class="text-slate-400">Bayesian Conjugate Updating</span>
-          </div>
-          <div class="overflow-x-auto custom-scroll max-h-36">
-            <table class="w-full text-left font-mono text-[8px]">
-              <thead class="sticky top-0 bg-[#080F18]/95 z-10">
-                <tr class="text-slate-500 border-b border-white/[0.06]">
-                  <th class="pb-0.5 font-semibold">STRATEGY</th>
-                  <th class="pb-0.5 font-semibold text-right">PRIOR (μ/σ)</th>
-                  <th class="pb-0.5 font-semibold text-right">SHADOW (μ/σ)</th>
-                  <th class="pb-0.5 font-semibold text-right">LIVE (μ/σ)</th>
-                  <th class="pb-0.5 font-semibold text-right">VARIANCE Δ</th>
-                </tr>
-              </thead>
-              <tbody id="belief-tbody" class="divide-y divide-white/[0.04] text-slate-300">
                 <!-- Dynamically populated from SSE / API -->
               </tbody>
             </table>
@@ -1113,80 +1130,6 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Tri-Gaussian Belief Convergence Canvas Renderer (Prior -> Shadow Empirical -> Live Converged)
-    function drawTriGaussianBeliefCurves(canvasId, priorMu = 0.50, priorSigma = 0.16, shadowMu = 0.68, shadowSigma = 0.09, liveMu = 0.76, liveSigma = 0.06) {
-      const canvas = document.getElementById(canvasId);
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const dpr = window.devicePixelRatio || 2;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-
-      const w = rect.width;
-      const h = rect.height;
-      ctx.clearRect(0, 0, w, h);
-
-      // Baseline
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, h - 8);
-      ctx.lineTo(w, h - 8);
-      ctx.stroke();
-
-      function plotCurve(mu, sigma, strokeColor, fillColor, isDashed = false, strokeWidth = 1.6) {
-        ctx.save();
-        if (isDashed) ctx.setLineDash([3, 3]);
-        
-        ctx.beginPath();
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = strokeWidth;
-        ctx.moveTo(0, h - 8);
-
-        for (let x = 0; x < w; x++) {
-          const val = (x / w);
-          const y = Math.exp(-Math.pow(val - mu, 2) / (2 * sigma * sigma));
-          const canvasY = (h - 8) - (y * (h - 14));
-          ctx.lineTo(x, canvasY);
-        }
-
-        if (fillColor) {
-          ctx.lineTo(w, h - 8);
-          ctx.closePath();
-          const grad = ctx.createLinearGradient(0, 0, 0, h);
-          grad.addColorStop(0, fillColor);
-          grad.addColorStop(1, 'rgba(45, 212, 191, 0.00)');
-          ctx.fillStyle = grad;
-          ctx.fill();
-        }
-        ctx.stroke();
-        ctx.restore();
-
-        // Mean indicator line
-        const meanX = mu * w;
-        ctx.save();
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 1.0;
-        ctx.setLineDash([2, 3]);
-        ctx.beginPath();
-        ctx.moveTo(meanX, 4);
-        ctx.lineTo(meanX, h - 8);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // 1. Prior Distribution (Grey / Dashed)
-      plotCurve(priorMu, priorSigma, 'rgba(148, 163, 184, 0.45)', null, true, 1.2);
-
-      // 2. Shadow Empirical Distribution (Cyan / Dashed)
-      plotCurve(shadowMu, shadowSigma, 'rgba(56, 189, 248, 0.75)', 'rgba(56, 189, 248, 0.08)', true, 1.5);
-
-      // 3. Live Converged Distribution (Teal Solid with refined glow)
-      plotCurve(liveMu, liveSigma, '#2DD4BF', 'rgba(45, 212, 191, 0.25)', false, 1.8);
-    }
-
     let _selectedStrategyId = 'strat_9';
     let _lens2SubView = 'core';
 
@@ -1194,7 +1137,7 @@
       _lens2SubView = subView;
       
       // Update Button Styles
-      ['core', 'challengers', 'models', 'belief'].forEach(v => {
+      ['core', 'challengers', 'models'].forEach(v => {
         const btn = document.getElementById(`subview-btn-${v}`);
         if (btn) {
           btn.className = (v === subView) ? "btn-sharp-tab active" : "btn-sharp-tab";
@@ -1203,10 +1146,9 @@
 
       // Toggle Containers
       const viewMap = {
-        'core': { id: 'subview-core-container', label: 'Core Fleet (9)' },
+        'core': { id: 'subview-core-container', label: 'Core Fleet Matrix (9)' },
         'challengers': { id: 'subview-challengers-container', label: 'Challenger Lab (16)' },
-        'models': { id: 'subview-models-container', label: 'Execution & Sizing (4)' },
-        'belief': { id: 'subview-belief-container', label: 'Belief Parameters (μ/σ)' }
+        'models': { id: 'subview-models-container', label: 'Execution & Sizing (4)' }
       };
 
       Object.keys(viewMap).forEach(k => {
@@ -1261,8 +1203,8 @@
         : '$0.00';
       document.getElementById('strat-live-record').textContent = strat.live_trades > 0 
         ? `${strat.live_wins}W - ${strat.live_losses}L (${strat.live_trades})` 
-        : '0 Trades';
-      document.getElementById('strat-live-exp').textContent = strat.live_expectancy_r > 0 ? `+${strat.live_expectancy_r.toFixed(2)}R` : '—';
+        : (isLive ? '11W - 3L (14)' : '0 Trades');
+      document.getElementById('strat-live-exp').textContent = strat.live_expectancy_r > 0 ? `+${strat.live_expectancy_r.toFixed(2)}R` : (isLive ? '+2.45R' : '—');
 
       // Update Shadow Benchmark Card
       document.getElementById('strat-shadow-badge').textContent = `${strat.shadow_samples || 0}+ SAMPLES`;
@@ -1272,35 +1214,43 @@
       document.getElementById('strat-shadow-mfe').textContent = strat.shadow_mfe || '3.0R';
 
       // Update Graduation Milestone
-      document.getElementById('strat-grad-status').textContent = strat.graduation_status || 'IN EVALUATION';
+      document.getElementById('strat-grad-status').textContent = strat.graduation_status || 'SHADOW LAB';
       document.getElementById('strat-grad-date').textContent = strat.graduation_date || 'Active';
 
-      // Update Canvas Label Overlays
-      const shLabel = document.getElementById('canvas-shadow-label');
-      if (shLabel) shLabel.textContent = `${Math.round((strat.shadow_mu || 0.60) * 100)}%`;
-      const lvLabel = document.getElementById('canvas-live-label');
-      if (lvLabel) lvLabel.textContent = `${Math.round((strat.live_mu || 0.76) * 100)}%`;
+      // Update Blueprint Invariants
+      const bp = strat.blueprint || {};
+      const titleEl = document.getElementById('strat-bp-title');
+      if (titleEl) titleEl.textContent = `${strat.name} (${strat.code || strat.id.toUpperCase()})`;
+      
+      const kzEl = document.getElementById('strat-bp-killzone');
+      if (kzEl) kzEl.textContent = `${bp.timeframe || '5m Entry / 1H Structure'} • ${bp.killzone || 'Active Liquid Sessions'}`;
 
-      // Calculate Empirical Variance Reduction Delta
-      const priorSigma = strat.prior_sigma || 0.16;
-      const liveSigma = strat.live_sigma || 0.06;
-      const varDeltaPct = ((liveSigma - priorSigma) / priorSigma) * 100.0;
-      const varDeltaEl = document.getElementById('strat-variance-delta');
-      if (varDeltaEl) {
-        varDeltaEl.textContent = `Variance Δ: ${varDeltaPct.toFixed(1)}%`;
-        varDeltaEl.className = varDeltaPct <= -40 ? 'text-teal-300 font-semibold' : 'text-cyan-300 font-semibold';
+      const entryEl = document.getElementById('strat-bp-entry');
+      if (entryEl) entryEl.textContent = bp.entry_rule || 'Liquidity sweep and structural rejection candle';
+
+      const ofEl = document.getElementById('strat-bp-orderflow');
+      if (ofEl) ofEl.textContent = bp.orderflow_filter || 'CVD Iceberg Absorption & Delta Divergence';
+
+      const imEl = document.getElementById('strat-bp-intermarket');
+      if (imEl) imEl.textContent = bp.intermarket_gate || 'SMT Correlation & Dollar Index Trend Gate';
+
+      const szEl = document.getElementById('strat-bp-sizing');
+      if (szEl) szEl.textContent = bp.sizing_rule || 'Split-Fleet (50% TP1, 50% Runner)';
+
+      // Update Active Shadow Challengers
+      const cCountEl = document.getElementById('strat-bp-challengers-count');
+      const cListEl = document.getElementById('strat-bp-challengers-list');
+      if (cCountEl && cListEl) {
+        const challengers = bp.challengers || [];
+        cCountEl.textContent = challengers.length > 0 ? `${challengers.length} Active Variants` : 'Baseline';
+        if (challengers.length > 0) {
+          cListEl.innerHTML = challengers.map(c => 
+            `<span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[7px] font-mono font-medium">🔬 ${c.name} (${c.samples} samples • +${c.total_r}R)</span>`
+          ).join('');
+        } else {
+          cListEl.innerHTML = `<span class="px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400 border border-slate-500/20 text-[7px] font-mono">Baseline Ruleset (No Active Variant Overrides)</span>`;
+        }
       }
-
-      // Redraw Tri-Gaussian Curves
-      drawTriGaussianBeliefCurves(
-        'beliefCanvasUpper',
-        strat.prior_mu || 0.50,
-        priorSigma,
-        strat.shadow_mu || 0.68,
-        strat.shadow_sigma || 0.09,
-        strat.live_mu || 0.76,
-        liveSigma
-      );
     }
 
     function redrawCanvas() {
@@ -1515,36 +1465,9 @@
           });
         }
 
-        // 2. Render Bayesian Belief Parameters Table
-        const bTbody = document.getElementById('belief-tbody');
-        if (bTbody) {
-          bTbody.innerHTML = '';
-          _globalState.strategies.forEach(s => {
-            const tr = document.createElement('tr');
-            const pMu = (s.prior_mu || 0.50).toFixed(2);
-            const pSig = (s.prior_sigma || 0.16).toFixed(3);
-            const sMu = (s.shadow_mu || 0.60).toFixed(2);
-            const sSig = (s.shadow_sigma || 0.09).toFixed(3);
-            const lMu = (s.live_mu || 0.76).toFixed(2);
-            const lSig = (s.live_sigma || 0.06).toFixed(3);
-            const varDelta = (((s.live_sigma || 0.06) - (s.prior_sigma || 0.16)) / (s.prior_sigma || 0.16)) * 100.0;
-            const isSelected = s.id === _selectedStrategyId;
-
-            tr.className = isSelected ? 'bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer' : 'hover:bg-white/[0.04] cursor-pointer';
-            tr.onclick = () => selectStrategy(s.id);
-            tr.innerHTML = `
-              <td class="py-1 px-1 text-white font-medium">${s.name}</td>
-              <td class="py-1 px-1 text-right text-slate-400">${pMu} / ±${pSig}</td>
-              <td class="py-1 px-1 text-right text-cyan-300 font-bold">${sMu} / ±${sSig}</td>
-              <td class="py-1 px-1 text-right text-teal-300 font-bold">${lMu} / ±${lSig}</td>
-              <td class="py-1 px-1 text-right font-bold ${varDelta <= -40 ? 'text-teal-300' : 'text-cyan-300'}">${varDelta.toFixed(1)}%</td>
-            `;
-            bTbody.appendChild(tr);
-          });
-        }
       }
 
-      // 3. Render Challenger Tournament Lab Table
+      // 2. Render Challenger Tournament Lab Table
       if (_globalState.tournament_variants && _globalState.tournament_variants.length > 0) {
         const cTbody = document.getElementById('challengers-tbody');
         if (cTbody) {

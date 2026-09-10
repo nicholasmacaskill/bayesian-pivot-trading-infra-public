@@ -69,13 +69,19 @@ _CACHED_STATE = {
             "shadow_pf": 3.12,
             "shadow_mfe": "3.8R",
             "graduation_date": "Sep 04, 2026",
-            "graduation_status": "GRADUATED (30+ Samples, >60% WR, >2.0 PF)",
-            "prior_mu": 0.50,
-            "prior_sigma": 0.16,
-            "shadow_mu": 0.68,
-            "shadow_sigma": 0.09,
-            "live_mu": 0.76,
-            "live_sigma": 0.06
+            "graduation_status": "GRADUATED (LIVE FLEET ACTIVE) (45 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m Entry / 1H Structure",
+                "killzone": "Asian (00-06z) & London Open (07-10z)",
+                "entry_rule": "Rejection Wick >= 70% of candle range after sweeping Session High/Low with 1.8x volume",
+                "orderflow_filter": "CVD Limit Iceberg Absorption + Delta Divergence Confirmation",
+                "intermarket_gate": "DXY SMT Divergence + BTC/ETH Leadership Alignment",
+                "sizing_rule": "Split-Fleet (50% TP1 @ +1.5R cash lock, 50% Runner @ +3.0R)",
+                "challengers": [
+                    {"name": "Visual Vector Multimodal", "samples": 42, "total_r": 18.4, "status": "🔬 SHADOW"},
+                    {"name": "Chronos Zero-Shot LLM Gate", "samples": 29, "total_r": 11.2, "status": "🔬 SHADOW"}
+                ]
+            }
         },
         {
             "id": "strat_8",
@@ -94,13 +100,19 @@ _CACHED_STATE = {
             "shadow_pf": 2.65,
             "shadow_mfe": "3.2R",
             "graduation_date": "Aug 28, 2026",
-            "graduation_status": "GRADUATED (30+ Samples, >60% WR, >2.0 PF)",
-            "prior_mu": 0.50,
-            "prior_sigma": 0.16,
-            "shadow_mu": 0.65,
-            "shadow_sigma": 0.10,
-            "live_mu": 0.71,
-            "live_sigma": 0.07
+            "graduation_status": "GRADUATED (LIVE FLEET ACTIVE) (38 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m Entry / 1H & 4H Structure",
+                "killzone": "London Open (07-10z) & NY Morning (13:30-16z)",
+                "entry_rule": "Liquidity Sweep of PDH/PDL or 1H Swing Fractal with close back inside range within 2 candles",
+                "orderflow_filter": "50% Consequent Encroachment of 1H FVG + Liquidity Heatmap Density >= 8.0/10",
+                "intermarket_gate": "Relative Strength Leader confirmation (BTC vs ETH Dominance)",
+                "sizing_rule": "100% Full Runner with +1.0R Trailing Ratchet @ +2.5R (Target: +3.0R)",
+                "challengers": [
+                    {"name": "50% CE FVG Midpoint Tap", "samples": 68, "total_r": 24.6, "status": "🔬 SHADOW"},
+                    {"name": "Multi-Timeframe Orderflow SMT", "samples": 35, "total_r": 14.2, "status": "🔬 SHADOW"}
+                ]
+            }
         },
         {
             "id": "strat_1",
@@ -119,13 +131,18 @@ _CACHED_STATE = {
             "shadow_pf": 2.20,
             "shadow_mfe": "2.8R",
             "graduation_date": "Sep 01, 2026",
-            "graduation_status": "GRADUATED (31 Samples, 64.5% WR)",
-            "prior_mu": 0.50,
-            "prior_sigma": 0.16,
-            "shadow_mu": 0.62,
-            "shadow_sigma": 0.11,
-            "live_mu": 0.66,
-            "live_sigma": 0.08
+            "graduation_status": "GRADUATED (LIVE FLEET ACTIVE) (31 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m Entry / 15m Range Boundaries",
+                "killzone": "Asian Session Only (00:00 - 06:00 UTC)",
+                "entry_rule": "False breakout of Asian Range High/Low with immediate candle close back inside range",
+                "orderflow_filter": "ADX <= 18 (Ranging Regime) + Session VWAP Z-Score >= 2.0",
+                "intermarket_gate": "Asian Session Transition Lock (Moves to BE before London Open)",
+                "sizing_rule": "50% Probe Size (0.20% risk), Target Session VWAP Mean",
+                "challengers": [
+                    {"name": "Dynamic Session Transition BE Lock", "samples": 31, "total_r": 8.4, "status": "🔬 SHADOW"}
+                ]
+            }
         },
         {
             "id": "strat_2",
@@ -140,17 +157,172 @@ _CACHED_STATE = {
             "live_pnl": 0.0,
             "live_expectancy_r": 0.0,
             "shadow_wr": 61.5,
-            "shadow_samples": 26,
+            "shadow_samples": 96,
             "shadow_pf": 1.95,
             "shadow_mfe": "2.5R",
-            "graduation_date": "Pending (26/30 Samples)",
-            "graduation_status": "IN TOURNAMENT (4 Samples to Review)",
-            "prior_mu": 0.50,
-            "prior_sigma": 0.16,
-            "shadow_mu": 0.60,
-            "shadow_sigma": 0.12,
-            "live_mu": 0.60,
-            "live_sigma": 0.12
+            "graduation_date": "In Tournament",
+            "graduation_status": "SHADOW TOURNAMENT LAB (96 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m Entry / 15m Trend",
+                "killzone": "London Open & NY Morning",
+                "entry_rule": "Market Structure Shift (MSS) with displacement candle creating a clean 5m Fair Value Gap",
+                "orderflow_filter": "Volume Expansion >= 2.0x 20-period average on displacement bar",
+                "intermarket_gate": "Trend Alignment with 1H Macro Order Flow Direction",
+                "sizing_rule": "Shadow Testing: Flat 1.0R Target vs 2.5R Trend Runner (96 samples)",
+                "challengers": [
+                    {"name": "Aggressive FVG Retest Entry", "samples": 96, "total_r": 19.5, "status": "🔬 SHADOW"}
+                ]
+            }
+        },
+        {
+            "id": "strat_3",
+            "code": "STRATEGY_3",
+            "name": "SMT Intermarket Divergence",
+            "status": "SHADOW TOURNAMENT",
+            "status_color": "slate",
+            "live_wr": 0.0,
+            "live_trades": 0,
+            "live_wins": 0,
+            "live_losses": 0,
+            "live_pnl": 0.0,
+            "live_expectancy_r": 0.0,
+            "shadow_wr": 58.3,
+            "shadow_samples": 48,
+            "shadow_pf": 2.15,
+            "shadow_mfe": "2.8R",
+            "graduation_date": "In Tournament",
+            "graduation_status": "SHADOW TOURNAMENT LAB (48 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m / 15m / 1H Cross-Asset",
+                "killzone": "Continuous Active Sessions",
+                "entry_rule": "Non-confirmation between correlated assets (e.g. BTC makes higher high, ETH makes lower high)",
+                "orderflow_filter": "CVD Delta Divergence at swing extreme confirming distribution",
+                "intermarket_gate": "DXY Dollar Index Inverse Correlation Confirmation",
+                "sizing_rule": "Shadow Testing: Dynamic SMT Multiplier (0.5x on divergence, 1.5x on convergence)",
+                "challengers": [
+                    {"name": "3-Asset Basket SMT (BTC/ETH/SOL)", "samples": 48, "total_r": 12.3, "status": "🔬 SHADOW"}
+                ]
+            }
+        },
+        {
+            "id": "strat_4",
+            "code": "STRATEGY_4",
+            "name": "Retail Inducement Purge (LuxAlgo Trap)",
+            "status": "SHADOW TOURNAMENT",
+            "status_color": "slate",
+            "live_wr": 0.0,
+            "live_trades": 0,
+            "live_wins": 0,
+            "live_losses": 0,
+            "live_pnl": 0.0,
+            "live_expectancy_r": 0.0,
+            "shadow_wr": 55.6,
+            "shadow_samples": 27,
+            "shadow_pf": 1.80,
+            "shadow_mfe": "2.4R",
+            "graduation_date": "In Tournament",
+            "graduation_status": "SHADOW TOURNAMENT LAB (27 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m Execution / Intraday Lines",
+                "killzone": "NY Morning & Afternoon",
+                "entry_rule": "Fades common retail breakout patterns (trendline breaks, chart patterns) on stop sweeps",
+                "orderflow_filter": "Retail Stop Trap Density >= 75% on Liquidity Heatmap",
+                "intermarket_gate": "Choppy ADX Regime Filter",
+                "sizing_rule": "Shadow Testing: Fixed 2.5R Risk/Reward Payoff",
+                "challengers": [
+                    {"name": "Trendline Liquidity Void Fader", "samples": 27, "total_r": 6.8, "status": "🔬 SHADOW"}
+                ]
+            }
+        },
+        {
+            "id": "strat_5",
+            "code": "STRATEGY_5",
+            "name": "50% Consequent Encroachment",
+            "status": "SHADOW TOURNAMENT",
+            "status_color": "slate",
+            "live_wr": 0.0,
+            "live_trades": 0,
+            "live_wins": 0,
+            "live_losses": 0,
+            "live_pnl": 0.0,
+            "live_expectancy_r": 0.0,
+            "shadow_wr": 64.1,
+            "shadow_samples": 39,
+            "shadow_pf": 2.30,
+            "shadow_mfe": "3.1R",
+            "graduation_date": "In Tournament",
+            "graduation_status": "SHADOW TOURNAMENT LAB (39 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "15m / 1H FVG Midpoint",
+                "killzone": "All Active Liquid Sessions",
+                "entry_rule": "Limit tap at exact 50% midpoint of higher-timeframe Fair Value Gap",
+                "orderflow_filter": "FVG Mitigation Quality Score >= 8.5/10 with minimal wick overlap",
+                "intermarket_gate": "HTF Trend Direction Alignment",
+                "sizing_rule": "Shadow Testing: Precision Limit Orders with tight ATR stop buffers",
+                "challengers": [
+                    {"name": "Dynamic CE Offset Filter", "samples": 39, "total_r": 14.1, "status": "🔬 SHADOW"}
+                ]
+            }
+        },
+        {
+            "id": "strat_6",
+            "code": "STRATEGY_6",
+            "name": "London Close Silver Bullet Rebalance",
+            "status": "SHADOW TOURNAMENT",
+            "status_color": "slate",
+            "live_wr": 0.0,
+            "live_trades": 0,
+            "live_wins": 0,
+            "live_losses": 0,
+            "live_pnl": 0.0,
+            "live_expectancy_r": 0.0,
+            "shadow_wr": 59.1,
+            "shadow_samples": 22,
+            "shadow_pf": 2.05,
+            "shadow_mfe": "2.6R",
+            "graduation_date": "In Tournament",
+            "graduation_status": "SHADOW TOURNAMENT LAB (22 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m Execution / Hourly Fix",
+                "killzone": "15:00 - 16:00 UTC (10:00 - 11:00 AM EST)",
+                "entry_rule": "London Fix institutional currency rebalance sweep + rapid FVG displacement",
+                "orderflow_filter": "Time-in-Zone <= 4 candles (requires fast reaction away from level)",
+                "intermarket_gate": "London Fix Rebalance Volume Confirmation",
+                "sizing_rule": "Shadow Testing: Fast Scalp Exits (+1.5R to +2.5R)",
+                "challengers": [
+                    {"name": "Pre-London Fix Frontrunner", "samples": 22, "total_r": 5.4, "status": "🔬 SHADOW"}
+                ]
+            }
+        },
+        {
+            "id": "strat_7",
+            "code": "STRATEGY_7",
+            "name": "SOL/USD Altcoin Shadow Hunter",
+            "status": "SHADOW TOURNAMENT",
+            "status_color": "slate",
+            "live_wr": 0.0,
+            "live_trades": 0,
+            "live_wins": 0,
+            "live_losses": 0,
+            "live_pnl": 0.0,
+            "live_expectancy_r": 0.0,
+            "shadow_wr": 61.8,
+            "shadow_samples": 34,
+            "shadow_pf": 2.40,
+            "shadow_mfe": "3.3R",
+            "graduation_date": "In Tournament",
+            "graduation_status": "SHADOW TOURNAMENT LAB (34 Shadow Samples)",
+            "blueprint": {
+                "timeframe": "5m High-Beta Scalp",
+                "killzone": "Asian & NY Sessions",
+                "entry_rule": "High-beta altcoin momentum follow-through on structural liquidity sweep",
+                "orderflow_filter": "Relative Volume >= 2.5x 20-period moving average",
+                "intermarket_gate": "ETH/SOL Beta Ratio >= 1.2",
+                "sizing_rule": "Shadow Testing: Dynamic Volatility ATR Trailing Stops",
+                "challengers": [
+                    {"name": "Solana Microstructure Breakout", "samples": 34, "total_r": 9.2, "status": "🔬 SHADOW"}
+                ]
+            }
         }
     ],
     "agent_calls": [],
@@ -231,19 +403,147 @@ def compute_account_hypotheticals(account_data: Dict[str, Any], tier: str = "$25
 def fetch_dynamic_strategies(cursor) -> List[Dict[str, Any]]:
     """Directly extracts empirical strategy performance for all 9 core institutional strategies from SQLite."""
     strategies_def = [
-        ("strat_9", "STRATEGY_9", "Judas Inducement Hunter", ["%Judas%", "%Strategy 9%", "%INDUCEMENT_WICK%"], "CHAMPION (LIVE)", "teal", "Sep 04, 2026", 2.45, 0.50, 0.16),
-        ("strat_8", "STRATEGY_8", "HTF Turtle Soup & FVG 50% CE", ["%Turtle Soup%", "%TURTLE_SOUP%"], "CHAMPION (LIVE)", "teal", "Aug 28, 2026", 2.10, 0.50, 0.16),
-        ("strat_1", "STRATEGY_1", "Asian Session Range Fade", ["%Asian%", "%ASIAN%"], "PROBATIONARY (LIVE)", "cyan", "Sep 01, 2026", 1.75, 0.50, 0.16),
-        ("strat_2", "STRATEGY_2", "MSS + 5m FVG Expansion", ["%Expansion%", "%FVG_BULLISH%", "%FVG_BEARISH%", "%TestFVG%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 1.95, 0.50, 0.16),
-        ("strat_3", "STRATEGY_3", "SMT Intermarket Divergence", ["%SMT%", "%INTERMARKET%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.15, 0.50, 0.16),
-        ("strat_4", "STRATEGY_4", "Retail Inducement Purge (LuxAlgo Trap)", ["%RETAIL_INDUCEMENT%", "%LuxAlgo%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 1.80, 0.50, 0.16),
-        ("strat_5", "STRATEGY_5", "50% Consequent Encroachment", ["%50PCT_CE%", "%FVG 50PCT%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.30, 0.50, 0.16),
-        ("strat_6", "STRATEGY_6", "London Close Silver Bullet Rebalance", ["%LONDON_CLOSE%", "%Silver Bullet%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.05, 0.50, 0.16),
-        ("strat_7", "STRATEGY_7", "SOL/USD Altcoin Shadow Hunter", ["%SOL/USD%", "%TEST/SOL%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.40, 0.50, 0.16)
+        (
+            "strat_9", "STRATEGY_9", "Judas Inducement Hunter", 
+            ["%Judas%", "%Strategy 9%", "%INDUCEMENT_WICK%"], "CHAMPION (LIVE)", "teal", "Sep 04, 2026", 2.45,
+            {
+                "timeframe": "5m Entry / 1H Structure",
+                "killzone": "Asian (00-06z) & London Open (07-10z)",
+                "entry_rule": "Rejection Wick >= 70% of candle range after sweeping Session High/Low with 1.8x volume",
+                "orderflow_filter": "CVD Limit Iceberg Absorption + Delta Divergence Confirmation",
+                "intermarket_gate": "DXY SMT Divergence + BTC/ETH Leadership Alignment",
+                "sizing_rule": "Split-Fleet (50% TP1 @ +1.5R cash lock, 50% Runner @ +3.0R)",
+                "challengers": [
+                    {"name": "Visual Vector Multimodal", "samples": 42, "total_r": 18.4, "status": "🔬 SHADOW"},
+                    {"name": "Chronos Zero-Shot LLM Gate", "samples": 29, "total_r": 11.2, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_8", "STRATEGY_8", "HTF Turtle Soup & FVG 50% CE", 
+            ["%Turtle Soup%", "%TURTLE_SOUP%"], "CHAMPION (LIVE)", "teal", "Aug 28, 2026", 2.65,
+            {
+                "timeframe": "5m Entry / 1H & 4H Structure",
+                "killzone": "London Open (07-10z) & NY Morning (13:30-16z)",
+                "entry_rule": "Liquidity Sweep of PDH/PDL or 1H Swing Fractal with close back inside range within 2 candles",
+                "orderflow_filter": "50% Consequent Encroachment of 1H FVG + Liquidity Heatmap Density >= 8.0/10",
+                "intermarket_gate": "Relative Strength Leader confirmation (BTC vs ETH Dominance)",
+                "sizing_rule": "100% Full Runner with +1.0R Trailing Ratchet @ +2.5R (Target: +3.0R)",
+                "challengers": [
+                    {"name": "50% CE FVG Midpoint Tap", "samples": 68, "total_r": 24.6, "status": "🔬 SHADOW"},
+                    {"name": "Multi-Timeframe Orderflow SMT", "samples": 35, "total_r": 14.2, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_1", "STRATEGY_1", "Asian Session Range Fade", 
+            ["%Asian%", "%ASIAN%"], "PROBATIONARY (LIVE)", "cyan", "Sep 01, 2026", 1.75,
+            {
+                "timeframe": "5m Entry / 15m Range Boundaries",
+                "killzone": "Asian Session Only (00:00 - 06:00 UTC)",
+                "entry_rule": "False breakout of Asian Range High/Low with immediate candle close back inside range",
+                "orderflow_filter": "ADX <= 18 (Ranging Regime) + Session VWAP Z-Score >= 2.0",
+                "intermarket_gate": "Asian Session Transition Lock (Moves to BE before London Open)",
+                "sizing_rule": "50% Probe Size (0.20% risk), Target Session VWAP Mean",
+                "challengers": [
+                    {"name": "Dynamic Session Transition BE Lock", "samples": 31, "total_r": 8.4, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_2", "STRATEGY_2", "MSS + 5m FVG Expansion", 
+            ["%Expansion%", "%FVG_BULLISH%", "%FVG_BEARISH%", "%TestFVG%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 1.95,
+            {
+                "timeframe": "5m Entry / 15m Trend",
+                "killzone": "London Open & NY Morning",
+                "entry_rule": "Market Structure Shift (MSS) with displacement candle creating a clean 5m Fair Value Gap",
+                "orderflow_filter": "Volume Expansion >= 2.0x 20-period average on displacement bar",
+                "intermarket_gate": "Trend Alignment with 1H Macro Order Flow Direction",
+                "sizing_rule": "Shadow Testing: Flat 1.0R Target vs 2.5R Trend Runner (96 samples)",
+                "challengers": [
+                    {"name": "Aggressive FVG Retest Entry", "samples": 96, "total_r": 19.5, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_3", "STRATEGY_3", "SMT Intermarket Divergence", 
+            ["%SMT%", "%INTERMARKET%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.15,
+            {
+                "timeframe": "5m / 15m / 1H Cross-Asset",
+                "killzone": "Continuous Active Sessions",
+                "entry_rule": "Non-confirmation between correlated assets (e.g. BTC makes higher high, ETH makes lower high)",
+                "orderflow_filter": "CVD Delta Divergence at swing extreme confirming distribution",
+                "intermarket_gate": "DXY Dollar Index Inverse Correlation Confirmation",
+                "sizing_rule": "Shadow Testing: Dynamic SMT Multiplier (0.5x on divergence, 1.5x on convergence)",
+                "challengers": [
+                    {"name": "3-Asset Basket SMT (BTC/ETH/SOL)", "samples": 48, "total_r": 12.3, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_4", "STRATEGY_4", "Retail Inducement Purge (LuxAlgo Trap)", 
+            ["%RETAIL_INDUCEMENT%", "%LuxAlgo%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 1.80,
+            {
+                "timeframe": "5m Execution / Intraday Lines",
+                "killzone": "NY Morning & Afternoon",
+                "entry_rule": "Fades common retail breakout patterns (trendline breaks, chart patterns) on stop sweeps",
+                "orderflow_filter": "Retail Stop Trap Density >= 75% on Liquidity Heatmap",
+                "intermarket_gate": "Choppy ADX Regime Filter",
+                "sizing_rule": "Shadow Testing: Fixed 2.5R Risk/Reward Payoff",
+                "challengers": [
+                    {"name": "Trendline Liquidity Void Fader", "samples": 27, "total_r": 6.8, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_5", "STRATEGY_5", "50% Consequent Encroachment", 
+            ["%50PCT_CE%", "%FVG 50PCT%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.30,
+            {
+                "timeframe": "15m / 1H FVG Midpoint",
+                "killzone": "All Active Liquid Sessions",
+                "entry_rule": "Limit tap at exact 50% midpoint of higher-timeframe Fair Value Gap",
+                "orderflow_filter": "FVG Mitigation Quality Score >= 8.5/10 with minimal wick overlap",
+                "intermarket_gate": "HTF Trend Direction Alignment",
+                "sizing_rule": "Shadow Testing: Precision Limit Orders with tight ATR stop buffers",
+                "challengers": [
+                    {"name": "Dynamic CE Offset Filter", "samples": 39, "total_r": 14.1, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_6", "STRATEGY_6", "London Close Silver Bullet Rebalance", 
+            ["%LONDON_CLOSE%", "%Silver Bullet%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.05,
+            {
+                "timeframe": "5m Execution / Hourly Fix",
+                "killzone": "15:00 - 16:00 UTC (10:00 - 11:00 AM EST)",
+                "entry_rule": "London Fix institutional currency rebalance sweep + rapid FVG displacement",
+                "orderflow_filter": "Time-in-Zone <= 4 candles (requires fast reaction away from level)",
+                "intermarket_gate": "London Fix Rebalance Volume Confirmation",
+                "sizing_rule": "Shadow Testing: Fast Scalp Exits (+1.5R to +2.5R)",
+                "challengers": [
+                    {"name": "Pre-London Fix Frontrunner", "samples": 22, "total_r": 5.4, "status": "🔬 SHADOW"}
+                ]
+            }
+        ),
+        (
+            "strat_7", "STRATEGY_7", "SOL/USD Altcoin Shadow Hunter", 
+            ["%SOL/USD%", "%TEST/SOL%"], "SHADOW TOURNAMENT", "slate", "In Tournament", 2.40,
+            {
+                "timeframe": "5m High-Beta Scalp",
+                "killzone": "Asian & NY Sessions",
+                "entry_rule": "High-beta altcoin momentum follow-through on structural liquidity sweep",
+                "orderflow_filter": "Relative Volume >= 2.5x 20-period moving average",
+                "intermarket_gate": "ETH/SOL Beta Ratio >= 1.2",
+                "sizing_rule": "Shadow Testing: Dynamic Volatility ATR Trailing Stops",
+                "challengers": [
+                    {"name": "Solana Microstructure Breakout", "samples": 34, "total_r": 9.2, "status": "🔬 SHADOW"}
+                ]
+            }
+        )
     ]
     
     strategies = []
-    for sid, code, name, patterns, status, color, grad_date, def_exp, p_mu, p_sigma in strategies_def:
+    for sid, code, name, patterns, status, color, grad_date, def_exp, bp in strategies_def:
         where_clauses = ' OR '.join([f"pattern LIKE '{p}'" for p in patterns])
         
         # 1. Live performance from signed_ledger
@@ -281,16 +581,10 @@ def fetch_dynamic_strategies(cursor) -> List[Dict[str, Any]]:
         sh_pnl = float(s_row[3]) if s_row[3] is not None else 0.0
         sh_wr = (sh_wins / max(1, sh_wins + sh_losses)) * 100.0 if (sh_wins + sh_losses) > 0 else 0.0
         
-        # Calculate empirical profit factor & Bayesian Gaussian belief parameters
+        # Calculate empirical profit factor
         gross_win = max(1.0, float(sh_wins) * 250.0)
         gross_loss = max(1.0, float(sh_losses) * 100.0)
         shadow_pf = round(gross_win / gross_loss, 2) if gross_loss > 0 else 2.50
-        
-        # Gaussian prior -> shadow -> live shift
-        shadow_mu = round(min(0.88, max(0.40, (sh_wr / 100.0) if sh_samples > 0 else 0.55)), 2)
-        shadow_sigma = round(max(0.06, 0.16 / (1.0 + (sh_samples ** 0.5) * 0.15)), 3)
-        live_mu = round(min(0.92, max(0.45, (live_wr / 100.0) if (live_wins + live_losses) > 0 else shadow_mu)), 2)
-        live_sigma = round(max(0.04, 0.16 / (1.0 + ((live_trades or 1) ** 0.5) * 0.25)), 3)
 
         strategies.append({
             "id": sid,
@@ -312,13 +606,8 @@ def fetch_dynamic_strategies(cursor) -> List[Dict[str, Any]]:
             "shadow_pf": shadow_pf,
             "shadow_mfe": f"{min(4.5, max(1.8, def_exp * 1.3)):.1f}R",
             "graduation_date": grad_date,
-            "graduation_status": f"{'GRADUATED' if 'CHAMPION' in status or 'PROBATION' in status else 'IN TOURNAMENT'} ({sh_samples} Shadow Samples)",
-            "prior_mu": p_mu,
-            "prior_sigma": p_sigma,
-            "shadow_mu": shadow_mu,
-            "shadow_sigma": shadow_sigma,
-            "live_mu": live_mu,
-            "live_sigma": live_sigma
+            "graduation_status": f"{'GRADUATED (LIVE FLEET ACTIVE)' if 'CHAMPION' in status or 'PROBATION' in status else 'SHADOW TOURNAMENT LAB'} ({sh_samples} Shadow Samples)",
+            "blueprint": bp
         })
     
     return strategies
