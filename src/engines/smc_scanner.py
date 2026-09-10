@@ -1613,14 +1613,16 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                 # Bulls want to buy a dip (lower limit price)
                 limit_entry = current['close'] - (atr * Config.ENTRY_OFFSET_ATR_MULTIPLIER)
                 
-                # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR)
-                stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 1.5))
-                min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.002)
+                # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR and recent fractal low)
+                stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 2.0))
+                min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.003)
                 min_stop_distance = limit_entry * min_stop_pct
                 stop_buffer = max(stop_buffer, min_stop_distance)
                 
                 direction = 'LONG'
-                stop_loss = limit_entry - stop_buffer
+                recent_low_val = df['low'].iloc[-12:].min() if len(df) >= 12 else (limit_entry - stop_buffer)
+                calc_stop = limit_entry - stop_buffer
+                stop_loss = min(calc_stop, recent_low_val - (atr * 0.5))
                 risk = limit_entry - stop_loss
                 
                 # Trinity Check
@@ -1730,14 +1732,16 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
                 # Bears want to sell a pump (higher limit price)
                 limit_entry = current['close'] + (atr * Config.ENTRY_OFFSET_ATR_MULTIPLIER)
                 
-                # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR)
-                stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 1.5))
-                min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.002)
+                # Ensure stop loss is not too tight (floor at MIN_STOP_LOSS_ATR and recent fractal high)
+                stop_buffer = max(atr * Config.STOP_LOSS_ATR_MULTIPLIER, atr * Config.get('MIN_STOP_LOSS_ATR', 2.0))
+                min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.003)
                 min_stop_distance = limit_entry * min_stop_pct
                 stop_buffer = max(stop_buffer, min_stop_distance)
                 
                 direction = 'SHORT'
-                stop_loss = limit_entry + stop_buffer
+                recent_high_val = df['high'].iloc[-12:].max() if len(df) >= 12 else (limit_entry + stop_buffer)
+                calc_stop = limit_entry + stop_buffer
+                stop_loss = max(calc_stop, recent_high_val + (atr * 0.5))
                 risk = stop_loss - limit_entry
                 
                 cross_asset_div = self.intermarket.calculate_cross_asset_divergence('SHORT', index_context)

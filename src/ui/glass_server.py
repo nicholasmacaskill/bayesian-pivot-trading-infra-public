@@ -808,6 +808,15 @@ def update_live_state():
                 })
             _CACHED_STATE["shadow_trades"] = shadow
 
+            # 3.5 Sync Live Total Fleet NAV & Positions from sync_state / journal
+            try:
+                cursor.execute("SELECT val FROM sync_state WHERE key = 'total_equity'")
+                row = cursor.fetchone()
+                if row and row[0]:
+                    _CACHED_STATE["total_fleet_nav"] = float(row[0])
+            except Exception:
+                pass
+
             # 4. Fetch Signed Ledger recent executions & build real Fleet Audit Stream
             cursor.execute("""
                 SELECT signal_id, timestamp, symbol, direction, pattern, ai_score, entry_price, outcome, pnl 

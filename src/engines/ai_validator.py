@@ -480,9 +480,19 @@ class AIValidator:
 
             safe_memory = memory_context if memory_context else "No highly similar historical setups found for reference."
             
+            entry_val = setup.get('entry') or setup.get('entry_price', 0.0)
+            sl_val = setup.get('stop_loss', 0.0)
+            tp_val = setup.get('target') or setup.get('take_profit', 0.0)
+            risk_dist = abs(entry_val - sl_val) if entry_val and sl_val else 0.0
+            risk_dist_str = f"${risk_dist:,.2f}" if risk_dist > 0 else "Dynamic"
+            
             prompt = self.sovereign_prompt.format(
                 symbol=setup['symbol'],
                 pattern=setup.get('pattern', 'SMC Logic'),
+                entry=f"${entry_val:,.2f}" if entry_val else "Market / Dynamic",
+                stop_loss=f"${sl_val:,.2f}" if sl_val else "Dynamic Invalidation",
+                target=f"${tp_val:,.2f}" if tp_val else "Dynamic Target",
+                risk_dist=risk_dist_str,
                 phase=setup.get('time_quartile', {}).get('phase', 'Unknown'),
                 position='Deep Discount' if setup.get('is_discount') else 'Premium' if setup.get('is_premium') else 'Neutral',
                 smt_strength=setup.get('smt_strength', 0),
@@ -501,13 +511,18 @@ class AIValidator:
             prompt += normalization_hint
         else:
             # Public Lite Version (General ICT logic)
+            entry_val = setup.get('entry') or setup.get('entry_price', 0.0)
+            sl_val = setup.get('stop_loss', 0.0)
+            tp_val = setup.get('target') or setup.get('take_profit', 0.0)
             prompt = f"""
             YOU ARE AN INSTITUTIONAL RISK MANAGER (ICT PHILOSOPHY).
             Analyze this trade setup using Standard ICT concepts (PO3, FVG, SMT).
             
             ### GOAL: Identify if this setup aligns with institutional expansion or retail inducement.
             
+            - Symbol: {setup.get('symbol')}
             - Pattern: {setup.get('pattern', 'SMC Logic')}
+            - Entry: ${entry_val:,.2f} | Stop Loss: ${sl_val:,.2f} | Target: ${tp_val:,.2f}
             - SMT Strength: {setup.get('smt_strength', 0)}
             - Regime: {regime_detail}
             - Confluences: {oracle_rules}
@@ -520,6 +535,7 @@ class AIValidator:
             1. Structural Flaw Check: Is this a genuine institutional entry or retail trap?
             2. News Check: Are high-impact news catalysts (CPI, FOMC, NFP) within 30 min?
             3. Discipline Gate: Does this meet strict SMC criteria (valid FVG, POI, SMT)?
+            4. Stop Loss & Spread Immunity: Verify the Stop Loss sits safely beyond micro-fractal wicks and broker spread noise (>0.35% for crypto).
             
             Return a JSON object in this exact schema:
             {{

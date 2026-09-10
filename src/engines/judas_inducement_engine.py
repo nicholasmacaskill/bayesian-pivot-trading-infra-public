@@ -103,17 +103,23 @@ class JudasInducementEngine:
 
         # 5. Precision Price Levels
         entry_price = close_p
-        buffer = atr_20 * 0.25  # 0.25 ATR safety buffer beyond wick extreme to prevent micro-nips
-
+        min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.003)
+        min_stop_distance = entry_price * min_stop_pct
+        # Safety buffer beyond wick extreme (0.5x ATR) with min stop floor
+        buffer = max(atr_20 * 0.5, min_stop_distance * 0.5)
 
         if direction == "LONG":
             stop_loss = round(low_p - buffer, 2)
+            if (entry_price - stop_loss) < min_stop_distance:
+                stop_loss = round(entry_price - min_stop_distance, 2)
             risk_dist = entry_price - stop_loss
             if risk_dist <= 0:
                 return None
             take_profit = round(entry_price + (risk_dist * self.target_rr), 2)
         else: # SHORT
             stop_loss = round(high_p + buffer, 2)
+            if (stop_loss - entry_price) < min_stop_distance:
+                stop_loss = round(entry_price + min_stop_distance, 2)
             risk_dist = stop_loss - entry_price
             if risk_dist <= 0:
                 return None

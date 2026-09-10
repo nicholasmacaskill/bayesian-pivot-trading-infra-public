@@ -32,14 +32,13 @@ class Config:
     MAX_RISK_USD = 150.0    # Strict absolute risk cap per trade
     MAX_PROFIT_USD = 400.0  # Strict absolute profit cap per trade
     MAX_NOTIONAL_VALUE_USD = 50000.0  # Hard cap: max position value per trade
-    MIN_STOP_LOSS_ATR = 1.5           # Minimum stop loss distance (ATR multiplier)
-    # Minimum stop distance per asset as % of price (prevents tiny-ATR runaway lots)
-    # e.g. BTC at $83k → min stop = $166; ATR must cause at least this distance
+    MIN_STOP_LOSS_ATR = 2.0           # Minimum stop loss distance (2.0x ATR multiplier for spread immunity)
+    # Minimum stop distance per asset as % of price (prevents micro-spread stop runs)
     MIN_STOP_PCT = {
-        "BTC/USD": 0.002,   # 0.2% = ~$166 at $83k
-        "ETH/USD": 0.002,   # 0.2% = ~$3.60 at $1,800
-        "XAU/USD": 0.002,   # 0.2% = ~$4.80 at $2,400
-        "SOL/USD": 0.002,   # 0.2% = ~$0.24 at $120
+        "BTC/USD": 0.003,   # 0.30% = ~$250 at $83k
+        "ETH/USD": 0.0035,  # 0.35% = ~$8.70 at $2,480 (Immune to broker spread micro-wicks)
+        "XAU/USD": 0.003,   # 0.30% = ~$7.20 at $2,400
+        "SOL/USD": 0.0035,  # 0.35% = ~$0.45 at $130
     }
     # Minimum target distance per asset as % of price (ensures 2.5R+ intraday targets pass)
     MIN_TARGET_PCT = {
