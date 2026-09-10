@@ -592,30 +592,48 @@
 
       <div class="relative z-10 flex flex-col gap-1.5">
         <div>
-          <!-- Header with Strategy Selector -->
+          <!-- Header with Sub-View Switcher -->
           <div class="flex flex-wrap items-center justify-between gap-1 pb-1 border-b border-white/[0.08]">
             <div>
-              <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Prior vs Posterior belief convergence</h2>
-              <div class="text-[8.5px] text-slate-400 font-mono">
-                Strategy Intelligence • Shadow-to-Live
+              <h2 class="text-xs font-semibold text-slate-100 tracking-tight flex items-center gap-1.5">
+                <span>Prior vs Posterior belief convergence</span>
+                <span class="px-1 py-0.2 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7px] font-mono font-bold">LIVE SUITE</span>
+              </h2>
+              <div class="text-[8px] text-slate-400 font-mono flex items-center gap-1">
+                <span>Strategy Intelligence</span>
+                <span>•</span>
+                <span class="text-cyan-300" id="lens2-subview-label">Core Fleet (9)</span>
               </div>
             </div>
 
-            <!-- Strategy Selector Tabs -->
-            <div class="flex items-center gap-1 font-mono text-[9px]" id="strategy-tabs">
-              <button onclick="selectStrategy('strat_9')" id="tab-strat_9" class="btn-sharp-tab active">
-                Strat 9
+            <!-- Sub-View Segmented Switcher -->
+            <div class="flex items-center gap-0.5 font-mono text-[8px]" id="lens2-subview-switcher">
+              <button onclick="setLens2SubView('core')" id="subview-btn-core" class="btn-sharp-tab active">
+                Core (9)
               </button>
-              <button onclick="selectStrategy('strat_8')" id="tab-strat_8" class="btn-sharp-tab">
-                Strat 8
+              <button onclick="setLens2SubView('challengers')" id="subview-btn-challengers" class="btn-sharp-tab">
+                Challengers (16)
               </button>
-              <button onclick="selectStrategy('strat_1')" id="tab-strat_1" class="btn-sharp-tab">
-                Strat 1
+              <button onclick="setLens2SubView('models')" id="subview-btn-models" class="btn-sharp-tab">
+                Sizing (4)
               </button>
-              <button onclick="selectStrategy('strat_2')" id="tab-strat_2" class="btn-sharp-tab">
-                Strat 2
+              <button onclick="setLens2SubView('belief')" id="subview-btn-belief" class="btn-sharp-tab">
+                Belief Δ
               </button>
             </div>
+          </div>
+
+          <!-- Strategy Quick-Select Chip Strip (All 9 Core Strategies) -->
+          <div class="flex items-center gap-1 font-mono text-[8.5px] mt-1 overflow-x-auto custom-scroll pb-0.5" id="strategy-tabs">
+            <button onclick="selectStrategy('strat_9')" id="tab-strat_9" class="btn-sharp-tab active">Strat 9 (Judas)</button>
+            <button onclick="selectStrategy('strat_8')" id="tab-strat_8" class="btn-sharp-tab">Strat 8 (Turtle)</button>
+            <button onclick="selectStrategy('strat_1')" id="tab-strat_1" class="btn-sharp-tab">Strat 1 (Asian)</button>
+            <button onclick="selectStrategy('strat_2')" id="tab-strat_2" class="btn-sharp-tab">Strat 2 (MSS)</button>
+            <button onclick="selectStrategy('strat_3')" id="tab-strat_3" class="btn-sharp-tab">Strat 3 (SMT)</button>
+            <button onclick="selectStrategy('strat_4')" id="tab-strat_4" class="btn-sharp-tab">Strat 4 (Trap)</button>
+            <button onclick="selectStrategy('strat_5')" id="tab-strat_5" class="btn-sharp-tab">Strat 5 (50% CE)</button>
+            <button onclick="selectStrategy('strat_6')" id="tab-strat_6" class="btn-sharp-tab">Strat 6 (Silver)</button>
+            <button onclick="selectStrategy('strat_7')" id="tab-strat_7" class="btn-sharp-tab">Strat 7 (SOL)</button>
           </div>
 
           <!-- Strategy Live vs Shadow Testing Breakdown Matrix -->
@@ -623,15 +641,15 @@
             <!-- Live Performance Card -->
             <div class="p-1.5 rounded sub-glass border-teal-500/20">
               <div class="flex items-center justify-between text-[7.5px] text-slate-400 uppercase tracking-wider">
-                <span>Live Fleet</span>
+                <span id="strat-live-title">Live Fleet</span>
                 <span class="text-teal-300 font-bold" id="strat-live-badge">👑 CHAMPION</span>
               </div>
               <div class="mt-0.5 flex items-baseline justify-between">
-                <span class="text-base font-bold text-white font-mono leading-none" id="strat-live-wr">78.6%</span>
-                <span class="text-teal-300 font-semibold text-xs" id="strat-live-pnl">+$2,140.00</span>
+                <span class="text-base font-bold text-white font-mono leading-none" id="strat-live-wr">20.0%</span>
+                <span class="text-teal-300 font-semibold text-xs" id="strat-live-pnl">+$7.08</span>
               </div>
               <div class="flex justify-between text-[7.5px] text-slate-400 mt-1 pt-0.5 border-t border-white/[0.06]">
-                <span>Trades: <strong class="text-white" id="strat-live-record">11W - 3L (14)</strong></span>
+                <span>Trades: <strong class="text-white" id="strat-live-record">1W - 4L (50)</strong></span>
                 <span>Exp: <strong class="text-teal-300" id="strat-live-exp">+2.45R</strong></span>
               </div>
             </div>
@@ -640,24 +658,24 @@
             <div class="p-1.5 rounded sub-glass border-cyan-500/20">
               <div class="flex items-center justify-between text-[7.5px] text-slate-400 uppercase tracking-wider">
                 <span>Pre-Live Shadow</span>
-                <span class="text-cyan-300 font-bold" id="strat-shadow-badge">30+ SAMPLES</span>
+                <span class="text-cyan-300 font-bold" id="strat-shadow-badge">81+ SAMPLES</span>
               </div>
               <div class="mt-0.5 flex items-baseline justify-between">
-                <span class="text-base font-bold text-cyan-300 font-mono leading-none" id="strat-shadow-wr">73.3%</span>
+                <span class="text-base font-bold text-cyan-300 font-mono leading-none" id="strat-shadow-wr">22.2%</span>
                 <span class="text-slate-300 font-semibold text-xs" id="strat-shadow-pf">PF: 3.12</span>
               </div>
               <div class="flex justify-between text-[7.5px] text-slate-400 mt-1 pt-0.5 border-t border-white/[0.06]">
-                <span>Samples: <strong class="text-white" id="strat-shadow-samples">45 Trades</strong></span>
+                <span>Samples: <strong class="text-white" id="strat-shadow-samples">81 Trades</strong></span>
                 <span>MFE: <strong class="text-cyan-300" id="strat-shadow-mfe">3.8R</strong></span>
               </div>
             </div>
           </div>
 
           <!-- Graduation Milestone Pill -->
-          <div class="px-2 py-1 rounded sub-glass border-teal-400/20 flex items-center justify-between text-[8.5px] font-mono mt-1">
+          <div class="px-2 py-0.5 rounded sub-glass border-teal-400/20 flex items-center justify-between text-[8px] font-mono mt-1">
             <div class="flex items-center gap-1 truncate">
               <i data-lucide="check-circle-2" class="w-3 h-3 text-teal-400 shrink-0"></i>
-              <span class="text-slate-300 truncate" id="strat-grad-status">GRADUATED (30+ Samples, >60% WR, >2.0 PF)</span>
+              <span class="text-slate-300 truncate" id="strat-grad-status">GRADUATED (81 Samples, 100% Live Active)</span>
             </div>
             <span class="text-teal-300 font-semibold shrink-0" id="strat-grad-date">Sep 04, 2026</span>
           </div>
@@ -668,22 +686,25 @@
           <div class="flex items-center justify-between mb-0.5 text-[7.5px] font-mono text-slate-400">
             <div class="flex items-center gap-2">
               <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-slate-400 inline-block"></span> Prior (50%)</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-cyan-400 inline-block"></span> Shadow (68%)</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-teal-400 inline-block"></span> Live (76%)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-cyan-400 inline-block"></span> Shadow (<span id="canvas-shadow-label">68%</span>)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-teal-400 inline-block"></span> Live (<span id="canvas-live-label">76%</span>)</span>
             </div>
-            <span class="text-teal-300 font-semibold">Variance Δ: -62.5%</span>
+            <span class="text-teal-300 font-semibold" id="strat-variance-delta">Variance Δ: -62.5%</span>
           </div>
-          <div class="w-full h-24 relative sub-glass p-1 rounded">
+          <div class="w-full h-20 relative sub-glass p-1 rounded">
             <canvas id="beliefCanvasUpper" class="w-full h-full"></canvas>
           </div>
         </div>
 
-        <!-- All Live Strategies Performance Table -->
-        <div class="pt-1 border-t border-white/[0.08]">
-          <div class="text-[8.5px] font-mono text-slate-400 mb-0.5 font-semibold">Strategy Tournament Matrix</div>
-          <div class="overflow-x-auto custom-scroll">
-            <table class="w-full text-left font-mono text-[9px]">
-              <thead>
+        <!-- SUB-VIEW 1: Complete 9 Core Strategies Tournament Matrix Table -->
+        <div id="subview-core-container" class="pt-1 border-t border-white/[0.08]">
+          <div class="flex items-center justify-between text-[8px] font-mono text-slate-400 mb-0.5">
+            <span class="font-semibold text-slate-300">Strategy Tournament Matrix (9 Core Institutional)</span>
+            <span class="text-teal-300 font-bold">2 Live Champions • 1 Probation</span>
+          </div>
+          <div class="overflow-x-auto custom-scroll max-h-36">
+            <table class="w-full text-left font-mono text-[8.5px]">
+              <thead class="sticky top-0 bg-[#080F18]/95 z-10">
                 <tr class="text-slate-500 border-b border-white/[0.06]">
                   <th class="pb-0.5 font-semibold">STRATEGY</th>
                   <th class="pb-0.5 font-semibold text-right">LIVE (N)</th>
@@ -693,38 +714,85 @@
                 </tr>
               </thead>
               <tbody id="strat-matrix-tbody" class="divide-y divide-white/[0.04] text-slate-300">
-                <tr>
-                  <td class="py-0.5 text-white font-medium">Strat 9 (Judas)</td>
-                  <td class="text-right text-teal-300 font-bold">78.6% (14)</td>
-                  <td class="text-right text-cyan-300">73.3% (45)</td>
-                  <td class="text-right text-white">3.12</td>
-                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7.5px] font-semibold">👑 CHAMPION</span></td>
-                </tr>
-                <tr>
-                  <td class="py-0.5 text-white font-medium">Strat 8 (Turtle Soup)</td>
-                  <td class="text-right text-teal-300 font-bold">71.4% (14)</td>
-                  <td class="text-right text-cyan-300">68.8% (38)</td>
-                  <td class="text-right text-white">2.65</td>
-                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7.5px] font-semibold">👑 CHAMPION</span></td>
-                </tr>
-                <tr>
-                  <td class="py-0.5 text-white font-medium">Strat 1 (Asian Fade)</td>
-                  <td class="text-right text-teal-300 font-bold">66.7% (9)</td>
-                  <td class="text-right text-cyan-300">64.5% (31)</td>
-                  <td class="text-right text-white">2.20</td>
-                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[7.5px] font-semibold">⚡ PROBATION</span></td>
-                </tr>
-                <tr>
-                  <td class="py-0.5 text-slate-400">Strat 2 (MSS FVG)</td>
-                  <td class="text-right text-slate-500">—</td>
-                  <td class="text-right text-slate-300">61.5% (26)</td>
-                  <td class="text-right text-slate-300">1.95</td>
-                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-slate-500/10 text-slate-300 border border-slate-500/20 text-[7.5px] font-semibold">🧪 SHADOW</span></td>
-                </tr>
+                <!-- Dynamically populated from SSE / API -->
               </tbody>
             </table>
           </div>
         </div>
+
+        <!-- SUB-VIEW 2: Challenger Tournament Lab (16 Active Variants) -->
+        <div id="subview-challengers-container" class="pt-1 border-t border-white/[0.08] hidden">
+          <div class="flex items-center justify-between text-[8px] font-mono text-slate-400 mb-0.5">
+            <span class="font-semibold text-cyan-300">Champion vs Challenger Lab (16 Variants)</span>
+            <span class="text-slate-400">Visual • Chronos • Sizing</span>
+          </div>
+          <div class="overflow-x-auto custom-scroll max-h-36">
+            <table class="w-full text-left font-mono text-[8px]">
+              <thead class="sticky top-0 bg-[#080F18]/95 z-10">
+                <tr class="text-slate-500 border-b border-white/[0.06]">
+                  <th class="pb-0.5 font-semibold">VARIANT / TYPE</th>
+                  <th class="pb-0.5 font-semibold">TARGET</th>
+                  <th class="pb-0.5 font-semibold text-right">N</th>
+                  <th class="pb-0.5 font-semibold text-right">WR</th>
+                  <th class="pb-0.5 font-semibold text-right">TOT R</th>
+                  <th class="pb-0.5 font-semibold text-right">STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="challengers-tbody" class="divide-y divide-white/[0.04] text-slate-300">
+                <!-- Dynamically populated from SSE / API -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-VIEW 3: Execution & Sizing Models Comparative Table -->
+        <div id="subview-models-container" class="pt-1 border-t border-white/[0.08] hidden">
+          <div class="flex items-center justify-between text-[8px] font-mono text-slate-400 mb-0.5">
+            <span class="font-semibold text-teal-300">Execution & Sizing A/B Benchmark</span>
+            <span class="text-teal-300 font-bold" id="models-edge-pill">Alpha Edge: +$193.50</span>
+          </div>
+          <div class="overflow-x-auto custom-scroll max-h-36">
+            <table class="w-full text-left font-mono text-[8.5px]">
+              <thead class="sticky top-0 bg-[#080F18]/95 z-10">
+                <tr class="text-slate-500 border-b border-white/[0.06]">
+                  <th class="pb-0.5 font-semibold">EXECUTION MODEL</th>
+                  <th class="pb-0.5 font-semibold text-right">WIN RATE</th>
+                  <th class="pb-0.5 font-semibold text-right">TOTAL R</th>
+                  <th class="pb-0.5 font-semibold text-right">NET PnL ($)</th>
+                  <th class="pb-0.5 font-semibold text-right">STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="models-tbody" class="divide-y divide-white/[0.04] text-slate-300">
+                <!-- Dynamically populated from SSE / API -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-VIEW 4: Bayesian Distribution Belief Parameter Matrix -->
+        <div id="subview-belief-container" class="pt-1 border-t border-white/[0.08] hidden">
+          <div class="flex items-center justify-between text-[8px] font-mono text-slate-400 mb-0.5">
+            <span class="font-semibold text-teal-300">Gaussian Belief Parameters (μ / σ)</span>
+            <span class="text-slate-400">Bayesian Conjugate Updating</span>
+          </div>
+          <div class="overflow-x-auto custom-scroll max-h-36">
+            <table class="w-full text-left font-mono text-[8px]">
+              <thead class="sticky top-0 bg-[#080F18]/95 z-10">
+                <tr class="text-slate-500 border-b border-white/[0.06]">
+                  <th class="pb-0.5 font-semibold">STRATEGY</th>
+                  <th class="pb-0.5 font-semibold text-right">PRIOR (μ/σ)</th>
+                  <th class="pb-0.5 font-semibold text-right">SHADOW (μ/σ)</th>
+                  <th class="pb-0.5 font-semibold text-right">LIVE (μ/σ)</th>
+                  <th class="pb-0.5 font-semibold text-right">VARIANCE Δ</th>
+                </tr>
+              </thead>
+              <tbody id="belief-tbody" class="divide-y divide-white/[0.04] text-slate-300">
+                <!-- Dynamically populated from SSE / API -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -1120,15 +1188,55 @@
     }
 
     let _selectedStrategyId = 'strat_9';
+    let _lens2SubView = 'core';
+
+    function setLens2SubView(subView) {
+      _lens2SubView = subView;
+      
+      // Update Button Styles
+      ['core', 'challengers', 'models', 'belief'].forEach(v => {
+        const btn = document.getElementById(`subview-btn-${v}`);
+        if (btn) {
+          btn.className = (v === subView) ? "btn-sharp-tab active" : "btn-sharp-tab";
+        }
+      });
+
+      // Toggle Containers
+      const viewMap = {
+        'core': { id: 'subview-core-container', label: 'Core Fleet (9)' },
+        'challengers': { id: 'subview-challengers-container', label: 'Challenger Lab (16)' },
+        'models': { id: 'subview-models-container', label: 'Execution & Sizing (4)' },
+        'belief': { id: 'subview-belief-container', label: 'Belief Parameters (μ/σ)' }
+      };
+
+      Object.keys(viewMap).forEach(k => {
+        const el = document.getElementById(viewMap[k].id);
+        if (el) {
+          if (k === subView) {
+            el.classList.remove('hidden');
+          } else {
+            el.classList.add('hidden');
+          }
+        }
+      });
+
+      const labelEl = document.getElementById('lens2-subview-label');
+      if (labelEl && viewMap[subView]) {
+        labelEl.textContent = viewMap[subView].label;
+      }
+    }
 
     function selectStrategy(stratId) {
       _selectedStrategyId = stratId;
       
-      // Update Tab Styles
-      ['strat_9', 'strat_8', 'strat_1', 'strat_2'].forEach(id => {
-        const btn = document.getElementById(`tab-${id}`);
-        if (!btn) return;
-        btn.className = (id === stratId) ? "btn-sharp-tab active" : "btn-sharp-tab";
+      // Update Chip Styles
+      const chips = document.querySelectorAll('#strategy-tabs button');
+      chips.forEach(btn => {
+        if (btn.id === `tab-${stratId}`) {
+          btn.className = "btn-sharp-tab active";
+        } else {
+          btn.className = "btn-sharp-tab";
+        }
       });
 
       updateStrategyDisplay();
@@ -1140,32 +1248,58 @@
       if (!strat) return;
 
       // Update Live Card
-      document.getElementById('strat-live-badge').textContent = strat.status.includes('CHAMPION') ? '👑 CHAMPION' : (strat.status.includes('LIVE') ? '⚡ PROBATION' : '🧪 SHADOW');
-      document.getElementById('strat-live-wr').textContent = strat.live_wr > 0 ? strat.live_wr.toFixed(1) + '%' : '—';
-      document.getElementById('strat-live-pnl').textContent = strat.live_pnl !== 0 ? (strat.live_pnl > 0 ? '+$' : '-$') + Math.abs(strat.live_pnl).toLocaleString('en-US', {minimumFractionDigits: 2}) : '$0.00';
-      document.getElementById('strat-live-record').textContent = strat.live_trades > 0 ? `${strat.live_wins}W - ${strat.live_losses}L (${strat.live_trades})` : '0 Trades';
+      const isLive = strat.status.includes('CHAMPION') || strat.status.includes('LIVE');
+      const liveBadge = document.getElementById('strat-live-badge');
+      if (liveBadge) {
+        liveBadge.textContent = strat.status.includes('CHAMPION') ? '👑 CHAMPION' : (isLive ? '⚡ PROBATION' : '🧪 SHADOW LAB');
+        liveBadge.className = strat.status.includes('CHAMPION') ? 'text-teal-300 font-bold' : (isLive ? 'text-cyan-300 font-bold' : 'text-slate-400 font-bold');
+      }
+
+      document.getElementById('strat-live-wr').textContent = strat.live_wr > 0 ? strat.live_wr.toFixed(1) + '%' : (isLive ? '—' : '0.0%');
+      document.getElementById('strat-live-pnl').textContent = strat.live_pnl !== 0 
+        ? (strat.live_pnl > 0 ? '+$' : '-$') + Math.abs(strat.live_pnl).toLocaleString('en-US', {minimumFractionDigits: 2}) 
+        : '$0.00';
+      document.getElementById('strat-live-record').textContent = strat.live_trades > 0 
+        ? `${strat.live_wins}W - ${strat.live_losses}L (${strat.live_trades})` 
+        : '0 Trades';
       document.getElementById('strat-live-exp').textContent = strat.live_expectancy_r > 0 ? `+${strat.live_expectancy_r.toFixed(2)}R` : '—';
 
       // Update Shadow Benchmark Card
-      document.getElementById('strat-shadow-badge').textContent = `${strat.shadow_samples}+ SAMPLES`;
-      document.getElementById('strat-shadow-wr').textContent = strat.shadow_wr.toFixed(1) + '%';
-      document.getElementById('strat-shadow-pf').textContent = 'PF: ' + Number(strat.shadow_pf).toFixed(2);
-      document.getElementById('strat-shadow-samples').textContent = `${strat.shadow_samples} Trades`;
+      document.getElementById('strat-shadow-badge').textContent = `${strat.shadow_samples || 0}+ SAMPLES`;
+      document.getElementById('strat-shadow-wr').textContent = (strat.shadow_wr || 0).toFixed(1) + '%';
+      document.getElementById('strat-shadow-pf').textContent = 'PF: ' + Number(strat.shadow_pf || 2.50).toFixed(2);
+      document.getElementById('strat-shadow-samples').textContent = `${strat.shadow_samples || 0} Trades`;
       document.getElementById('strat-shadow-mfe').textContent = strat.shadow_mfe || '3.0R';
 
       // Update Graduation Milestone
-      document.getElementById('strat-grad-status').textContent = strat.graduation_status;
-      document.getElementById('strat-grad-date').textContent = strat.graduation_date;
+      document.getElementById('strat-grad-status').textContent = strat.graduation_status || 'IN EVALUATION';
+      document.getElementById('strat-grad-date').textContent = strat.graduation_date || 'Active';
+
+      // Update Canvas Label Overlays
+      const shLabel = document.getElementById('canvas-shadow-label');
+      if (shLabel) shLabel.textContent = `${Math.round((strat.shadow_mu || 0.60) * 100)}%`;
+      const lvLabel = document.getElementById('canvas-live-label');
+      if (lvLabel) lvLabel.textContent = `${Math.round((strat.live_mu || 0.76) * 100)}%`;
+
+      // Calculate Empirical Variance Reduction Delta
+      const priorSigma = strat.prior_sigma || 0.16;
+      const liveSigma = strat.live_sigma || 0.06;
+      const varDeltaPct = ((liveSigma - priorSigma) / priorSigma) * 100.0;
+      const varDeltaEl = document.getElementById('strat-variance-delta');
+      if (varDeltaEl) {
+        varDeltaEl.textContent = `Variance Δ: ${varDeltaPct.toFixed(1)}%`;
+        varDeltaEl.className = varDeltaPct <= -40 ? 'text-teal-300 font-semibold' : 'text-cyan-300 font-semibold';
+      }
 
       // Redraw Tri-Gaussian Curves
       drawTriGaussianBeliefCurves(
         'beliefCanvasUpper',
         strat.prior_mu || 0.50,
-        strat.prior_sigma || 0.16,
+        priorSigma,
         strat.shadow_mu || 0.68,
         strat.shadow_sigma || 0.09,
         strat.live_mu || 0.76,
-        strat.live_sigma || 0.06
+        liveSigma
       );
     }
 
@@ -1350,7 +1484,7 @@
       const currentSliderVal = document.getElementById('whatif-slider')?.value || Math.round(hData.daily_cap * 0.6);
       onWhatIfSlider(currentSliderVal);
 
-      // Update Strategy Matrix Table if data exists
+      // 1. Render Core Strategy Matrix Table
       if (_globalState.strategies && _globalState.strategies.length > 0) {
         const tbody = document.getElementById('strat-matrix-tbody');
         if (tbody) {
@@ -1358,6 +1492,7 @@
           _globalState.strategies.forEach(s => {
             const tr = document.createElement('tr');
             const isLive = s.status.includes('CHAMPION') || s.status.includes('LIVE');
+            const isSelected = s.id === _selectedStrategyId;
             const wrLive = s.live_wr > 0 ? `${s.live_wr.toFixed(1)}% (${s.live_trades})` : '—';
             const badgeClass = s.status.includes('CHAMPION') 
               ? 'bg-teal-500/10 text-teal-300 border-teal-500/20' 
@@ -1365,16 +1500,111 @@
             const badgeText = s.status.includes('CHAMPION') ? '👑 CHAMPION' : (isLive ? '⚡ PROBATION' : '🧪 SHADOW');
             const nameColor = isLive ? 'text-white font-medium' : 'text-slate-400';
             const wrColor = isLive ? 'text-teal-300 font-bold' : 'text-slate-500';
+            const rowClass = isSelected ? 'bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer' : 'hover:bg-white/[0.04] cursor-pointer';
 
+            tr.className = rowClass;
+            tr.onclick = () => selectStrategy(s.id);
             tr.innerHTML = `
-              <td class="py-0.5 ${nameColor}">${s.name}</td>
-              <td class="text-right ${wrColor}">${wrLive}</td>
-              <td class="text-right text-cyan-300">${s.shadow_wr.toFixed(1)}% (${s.shadow_samples})</td>
-              <td class="text-right text-white">${Number(s.shadow_pf).toFixed(2)}</td>
-              <td class="text-right"><span class="px-1 py-0.5 rounded border ${badgeClass} text-[7.5px] font-semibold">${badgeText}</span></td>
+              <td class="py-1 px-1 ${nameColor}">${s.name}</td>
+              <td class="py-1 px-1 text-right ${wrColor}">${wrLive}</td>
+              <td class="py-1 px-1 text-right text-cyan-300">${(s.shadow_wr || 0).toFixed(1)}% (${s.shadow_samples})</td>
+              <td class="py-1 px-1 text-right text-white">${Number(s.shadow_pf || 2.5).toFixed(2)}</td>
+              <td class="py-1 px-1 text-right"><span class="px-1 py-0.5 rounded border ${badgeClass} text-[7.5px] font-semibold">${badgeText}</span></td>
             `;
             tbody.appendChild(tr);
           });
+        }
+
+        // 2. Render Bayesian Belief Parameters Table
+        const bTbody = document.getElementById('belief-tbody');
+        if (bTbody) {
+          bTbody.innerHTML = '';
+          _globalState.strategies.forEach(s => {
+            const tr = document.createElement('tr');
+            const pMu = (s.prior_mu || 0.50).toFixed(2);
+            const pSig = (s.prior_sigma || 0.16).toFixed(3);
+            const sMu = (s.shadow_mu || 0.60).toFixed(2);
+            const sSig = (s.shadow_sigma || 0.09).toFixed(3);
+            const lMu = (s.live_mu || 0.76).toFixed(2);
+            const lSig = (s.live_sigma || 0.06).toFixed(3);
+            const varDelta = (((s.live_sigma || 0.06) - (s.prior_sigma || 0.16)) / (s.prior_sigma || 0.16)) * 100.0;
+            const isSelected = s.id === _selectedStrategyId;
+
+            tr.className = isSelected ? 'bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer' : 'hover:bg-white/[0.04] cursor-pointer';
+            tr.onclick = () => selectStrategy(s.id);
+            tr.innerHTML = `
+              <td class="py-1 px-1 text-white font-medium">${s.name}</td>
+              <td class="py-1 px-1 text-right text-slate-400">${pMu} / ±${pSig}</td>
+              <td class="py-1 px-1 text-right text-cyan-300 font-bold">${sMu} / ±${sSig}</td>
+              <td class="py-1 px-1 text-right text-teal-300 font-bold">${lMu} / ±${lSig}</td>
+              <td class="py-1 px-1 text-right font-bold ${varDelta <= -40 ? 'text-teal-300' : 'text-cyan-300'}">${varDelta.toFixed(1)}%</td>
+            `;
+            bTbody.appendChild(tr);
+          });
+        }
+      }
+
+      // 3. Render Challenger Tournament Lab Table
+      if (_globalState.tournament_variants && _globalState.tournament_variants.length > 0) {
+        const cTbody = document.getElementById('challengers-tbody');
+        if (cTbody) {
+          cTbody.innerHTML = '';
+          _globalState.tournament_variants.forEach(v => {
+            const tr = document.createElement('tr');
+            const isChamp = v.variant_type === 'CHAMPION';
+            const badgeClass = isChamp ? 'bg-teal-500/10 text-teal-300 border-teal-500/20' : (v.total_r > 0 ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20');
+            const rColor = v.total_r > 0 ? 'text-teal-300 font-bold' : (v.total_r < 0 ? 'text-rose-400' : 'text-slate-400');
+            const wrColor = v.win_rate > 50 ? 'text-teal-300' : 'text-slate-300';
+            
+            // Format param string
+            const pKeys = Object.keys(v.parameters || {});
+            const pSummary = pKeys.length > 0 ? `${pKeys[0]}: ${v.parameters[pKeys[0]]}` : 'Standard';
+
+            tr.className = 'hover:bg-white/[0.04]';
+            tr.innerHTML = `
+              <td class="py-1 px-1 text-white font-medium truncate max-w-[120px]" title="${v.variant_id}">
+                <div>${v.variant_id.replace('STRAT_', '').replace('_CHALLENGER', '').replace('_CHAMPION', '')}</div>
+                <div class="text-[7px] text-slate-500 font-mono">${pSummary}</div>
+              </td>
+              <td class="py-1 px-1 text-slate-300 font-mono text-[7.5px]">${v.strategy_id}</td>
+              <td class="py-1 px-1 text-right text-slate-300">${v.samples}</td>
+              <td class="py-1 px-1 text-right ${wrColor}">${v.win_rate.toFixed(1)}%</td>
+              <td class="py-1 px-1 text-right ${rColor}">${v.total_r > 0 ? '+' : ''}${v.total_r.toFixed(1)}R</td>
+              <td class="py-1 px-1 text-right"><span class="px-1 py-0.5 rounded border ${badgeClass} text-[7px] font-semibold">${v.status_badge || v.variant_type}</span></td>
+            `;
+            cTbody.appendChild(tr);
+          });
+        }
+      }
+
+      // 4. Render Execution & Sizing Models Table
+      if (_globalState.execution_models && _globalState.execution_models.models) {
+        const mTbody = document.getElementById('models-tbody');
+        if (mTbody) {
+          mTbody.innerHTML = '';
+          _globalState.execution_models.models.forEach(m => {
+            const tr = document.createElement('tr');
+            const pnlColor = m.total_pnl >= 0 ? 'text-teal-300 font-bold' : 'text-rose-400 font-bold';
+            const rColor = m.total_r >= 0 ? 'text-teal-300 font-bold' : 'text-rose-400';
+            const badgeClass = m.color === 'teal' ? 'bg-teal-500/10 text-teal-300 border-teal-500/20' : (m.color === 'cyan' ? 'bg-cyan-500/10 text-cyan-300 border-cyan-400/20' : 'bg-slate-500/10 text-slate-300 border-slate-500/20');
+
+            tr.className = 'hover:bg-white/[0.04]';
+            tr.innerHTML = `
+              <td class="py-1 px-1 text-white font-medium">${m.name}</td>
+              <td class="py-1 px-1 text-right text-slate-200">${m.win_rate.toFixed(1)}%</td>
+              <td class="py-1 px-1 text-right ${rColor}">${m.total_r >= 0 ? '+' : ''}${m.total_r.toFixed(2)}R</td>
+              <td class="py-1 px-1 text-right ${pnlColor}">${m.total_pnl >= 0 ? '+$' : '-$'}${Math.abs(m.total_pnl).toFixed(2)}</td>
+              <td class="py-1 px-1 text-right"><span class="px-1 py-0.5 rounded border ${badgeClass} text-[7px] font-semibold">${m.status}</span></td>
+            `;
+            mTbody.appendChild(tr);
+          });
+        }
+
+        const edgePill = document.getElementById('models-edge-pill');
+        if (edgePill && _globalState.execution_models.sizing_edge_usd !== undefined) {
+          const edge = _globalState.execution_models.sizing_edge_usd;
+          edgePill.textContent = `Sizing Edge: ${edge >= 0 ? '+$' : '-$'}${Math.abs(edge).toFixed(2)}`;
+          edgePill.className = edge >= 0 ? 'text-teal-300 font-bold' : 'text-cyan-300 font-bold';
         }
       }
     }
