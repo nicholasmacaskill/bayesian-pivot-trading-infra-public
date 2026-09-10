@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BayesianPivot Agent // Agent Observability Layer</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            space: '#060B12',
+            teal: {
+              300: '#5EEAD4',
+              400: '#2DD4BF',
+              500: '#14B8A6',
+              600: '#0D9488',
+            },
+            cyan: {
+              300: '#7DD3FC',
+              400: '#38BDF8',
+              500: '#0EA5E9',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    :root {
+      --ambient-opacity-1: 0.12;
+      --ambient-opacity-2: 0.10;
+      --dark-overlay-opacity: 0.88;
+      --panel-tex-opacity: 0.08;
+    }
+
+    body {
+      background-color: #060B12;
+      background-image: 
+        radial-gradient(1200px circle at 50% -10%, rgba(20, 184, 166, 0.10) 0%, transparent 65%),
+        radial-gradient(950px circle at 85% 75%, rgba(56, 189, 248, 0.06) 0%, transparent 60%),
+        radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 24px 24px;
+      color: #E2E8F0;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* 🌌 Abstracted BayesianPivot Global Background Texture & Dark Overlay System */
+    .global-ambient-backdrop {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: -1;
+      overflow: hidden;
+      background-color: #060B12;
+    }
+
+    .ambient-layer-1 {
+      position: absolute;
+      top: -8%;
+      left: 2%;
+      width: 95vw;
+      height: 90vh;
+      background-image: url('assets/branding-1.png'), url('/assets/branding-1.png');
+      background-size: cover;
+      background-position: center;
+      opacity: var(--ambient-opacity-1);
+      filter: blur(22px) saturate(140%) brightness(65%);
+      mix-blend-mode: screen;
+      transition: opacity 0.4s ease;
+    }
+
+    .ambient-layer-2 {
+      position: absolute;
+      bottom: -8%;
+      right: -5%;
+      width: 90vw;
+      height: 85vh;
+      background-image: url('assets/branding-8.png'), url('/assets/branding-8.png');
+      background-size: cover;
+      background-position: center;
+      opacity: var(--ambient-opacity-2);
+      filter: blur(26px) saturate(130%) brightness(60%);
+      mix-blend-mode: screen;
+      transition: opacity 0.4s ease;
+    }
+
+    /* 🌑 Deep Dark Obsidian Vignette Overlay - Keeps text and panels crystal clear */
+    .ambient-dark-overlay {
+      position: absolute;
+      inset: 0;
+      background: 
+        radial-gradient(ellipse at 50% 30%, rgba(6, 11, 18, 0.65) 0%, rgba(6, 11, 18, 0.92) 75%, #060B12 100%),
+        linear-gradient(180deg, rgba(6, 11, 18, 0.40) 0%, rgba(6, 11, 18, 0.85) 60%, rgba(6, 11, 18, 0.98) 100%);
+      box-shadow: inset 0 0 160px 40px rgba(0, 0, 0, 0.95);
+      opacity: var(--dark-overlay-opacity);
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    /* 💎 Precision-Milled Crystalline Glossy Glass Panels - High-Contrast Dark Obsidian */
+    .liquid-glass {
+      background: 
+        radial-gradient(120% 50% at 50% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.01) 35%, transparent 65%),
+        linear-gradient(
+          135deg,
+          rgba(15, 25, 38, 0.92) 0%,
+          rgba(9, 16, 26, 0.95) 50%,
+          rgba(6, 11, 18, 0.98) 100%
+        );
+      backdrop-filter: blur(28px) saturate(180%) brightness(100%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 10px 12px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 
+        inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.50),
+        inset 1px 0 0 0 rgba(255, 255, 255, 0.12),
+        inset -1px 0 0 0 rgba(255, 255, 255, 0.08),
+        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 16px 36px -8px rgba(0, 0, 0, 0.95),
+        0 0 20px -8px rgba(20, 184, 166, 0.10);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .liquid-glass:hover {
+      border-color: rgba(56, 189, 248, 0.35);
+      box-shadow: 
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.65),
+        inset 1px 0 0 0 rgba(56, 189, 248, 0.25),
+        inset -1px 0 0 0 rgba(56, 189, 248, 0.10),
+        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(56, 189, 248, 0.15),
+        0 18px 40px -8px rgba(0, 0, 0, 0.98),
+        0 0 24px -6px rgba(56, 189, 248, 0.18);
+    }
+
+    /* 🔮 Subtle Abstracted Panel Background Texture Layer */
+    .panel-texture {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: inherit;
+      background-repeat: no-repeat;
+      background-size: cover;
+      opacity: var(--panel-tex-opacity);
+      filter: blur(16px) saturate(120%) brightness(70%);
+      mix-blend-mode: screen;
+      transition: opacity 0.3s ease;
+    }
+
+    .liquid-glass:hover .panel-texture {
+      opacity: calc(var(--panel-tex-opacity) * 1.4);
+    }
+
+    .liquid-glass::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 28%;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.01) 55%,
+        transparent 100%
+      );
+      border-radius: 8px 8px 0 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .liquid-glass::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 6%;
+      right: 6%;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 10%,
+        rgba(255, 255, 255, 0.50) 45%,
+        rgba(56, 189, 248, 0.35) 65%,
+        rgba(45, 212, 191, 0.20) 85%,
+        transparent 100%
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Micro-Glass Sub-Panels */
+    .sub-glass {
+      background: rgba(8, 15, 24, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.40),
+        0 2px 6px rgba(0, 0, 0, 0.40);
+      position: relative;
+    }
+
+    .sub-glass:hover {
+      background: rgba(12, 22, 34, 0.85);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* 🗡️ Ultra-Sharp Precision Glass Buttons */
+    .btn-sharp {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(8, 15, 24, 0.80);
+      color: #94A3B8;
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.40),
+        0 1px 3px rgba(0, 0, 0, 0.40);
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .btn-sharp:hover {
+      color: #FFFFFF;
+      border-color: rgba(56, 189, 248, 0.45);
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.12) 0%, rgba(56, 189, 248, 0.02) 100%), rgba(12, 22, 34, 0.90);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+        0 0 8px -2px rgba(56, 189, 248, 0.35);
+    }
+
+    .btn-sharp:active {
+      transform: translateY(0.5px) scale(0.98);
+      box-shadow: 
+        inset 0 1px 2px rgba(0, 0, 0, 0.60),
+        0 0 0 1px rgba(56, 189, 248, 0.30);
+    }
+
+    .btn-sharp.active, .btn-sharp[data-active="true"] {
+      color: #2DD4BF;
+      border-color: rgba(45, 212, 191, 0.55);
+      background: linear-gradient(180deg, rgba(20, 184, 166, 0.22) 0%, rgba(20, 184, 166, 0.05) 100%), rgba(8, 22, 30, 0.95);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(45, 212, 191, 0.45),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.50),
+        0 0 10px -2px rgba(45, 212, 191, 0.40);
+    }
+
+    /* Sharp Micro-Tabs (A1-A8 & Strat 9/8/1/2) */
+    .btn-sharp-tab {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(8, 15, 24, 0.80);
+      color: #94A3B8;
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+
+    .btn-sharp-tab:hover {
+      color: #FFFFFF;
+      border-color: rgba(56, 189, 248, 0.40);
+      background: rgba(14, 26, 40, 0.90);
+    }
+
+    .btn-sharp-tab.active {
+      color: #2DD4BF;
+      border-color: rgba(45, 212, 191, 0.55);
+      background: rgba(13, 34, 42, 0.95);
+      box-shadow: inset 0 1px 0 0 rgba(45, 212, 191, 0.40), 0 0 8px -2px rgba(45, 212, 191, 0.35);
+    }
+
+    /* Sharp Emergency Flatten Button */
+    .btn-sharp-danger {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 7px 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(244, 63, 94, 0.45);
+      background: linear-gradient(180deg, rgba(244, 63, 94, 0.18) 0%, rgba(244, 63, 94, 0.05) 100%), rgba(28, 10, 16, 0.88);
+      color: #FDA4AF;
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.60),
+        0 2px 8px rgba(244, 63, 94, 0.18);
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+
+    .btn-sharp-danger:hover {
+      color: #FFFFFF;
+      border-color: rgba(244, 63, 94, 0.85);
+      background: linear-gradient(180deg, rgba(244, 63, 94, 0.35) 0%, rgba(244, 63, 94, 0.12) 100%), rgba(42, 12, 22, 0.95);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+        0 0 16px -2px rgba(244, 63, 94, 0.50);
+    }
+
+    .btn-sharp-danger:active {
+      transform: translateY(1px) scale(0.98);
+    }
+
+    /* Custom Slim Scrollbars */
+    .custom-scroll::-webkit-scrollbar {
+      width: 3.5px;
+      height: 3.5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 3px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.30);
+      border-radius: 3px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(45, 212, 191, 0.60);
+    }
+  </style>
+</head>
+<body class="max-w-[1820px] mx-auto w-full">
+
+  <!-- Ambient Global Texture Backdrop with Dark Obsidian Vignette Overlay -->
+  <div class="global-ambient-backdrop" id="global-backdrop">
+    <div class="ambient-layer-1" id="ambient-l1"></div>
+    <div class="ambient-layer-2" id="ambient-l2"></div>
+    <div class="ambient-dark-overlay" id="ambient-dark"></div>
+  </div>
+
+  <!-- Compact Sleek Header -->
+  <header class="mb-2 flex flex-wrap items-center justify-between gap-2 relative z-10">
+    <div class="flex items-center gap-2">
+      <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_8px_#2DD4BF]"></span>
+        <span>BayesianPivot Agent</span>
+      </h1>
+      <span class="text-slate-500 text-xs font-medium">/ Agent Observability Layer</span>
+    </div>
+
+    <!-- Live Telemetry Status Pill & Texture Control -->
+    <div class="flex items-center gap-2.5 font-mono text-[10.5px] text-slate-300 sub-glass px-2.5 py-0.5 rounded shadow">
+      <!-- Texture Intensity & Dark Overlay Preset Switcher -->
+      <div class="flex items-center gap-1 text-[9px] text-slate-400">
+        <span>Theme:</span>
+        <button onclick="setTextureMode('dark')" id="btn-tex-dark" class="btn-sharp active">Dark Contrast</button>
+        <button onclick="setTextureMode('subtle')" id="btn-tex-subtle" class="btn-sharp">Subtle</button>
+        <button onclick="setTextureMode('vivid')" id="btn-tex-vivid" class="btn-sharp">Vivid</button>
+        <button onclick="setTextureMode('off')" id="btn-tex-off" class="btn-sharp">Flat</button>
+      </div>
+      <span class="text-slate-600">|</span>
+      <div class="flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse shadow-[0_0_8px_#2DD4BF]"></span>
+        <span class="text-teal-300 font-semibold tracking-wide" id="daemon-status">NOMINAL</span>
+      </div>
+      <span class="text-slate-600">|</span>
+      <div>Tick: <span class="text-white font-semibold" id="tick-latency">0.4ms</span></div>
+      <span class="text-slate-600">|</span>
+      <div>Engine: <span class="text-cyan-400 font-semibold">Gemini 2.5 Flash</span></div>
+      <span class="text-slate-600">|</span>
+      <div id="utc-clock" class="text-slate-400">--:--:-- UTC</div>
+    </div>
+  </header>
+
+  <!-- 3 Primary Observability Lenses (Top Row) -->
+  <main class="grid grid-cols-1 lg:grid-cols-12 gap-2 mb-2 relative z-10">
+
+    <!-- LENS 1 (Left 4 Cols): Upcomers 20% consistency velocity (All 8 Accounts) -->
+    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5">
+      <!-- Faint Abstracted Refraction Texture -->
+      <div class="panel-texture" style="background-image: url('assets/branding-3.png'), url('/assets/branding-3.png'); background-position: 85% 15%;"></div>
+
+      <div class="relative z-10 flex flex-col gap-1.5">
+        <!-- Top Half: Gauge & Account Switcher -->
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-1 pb-1 border-b border-white/[0.08]">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="gauge" class="w-3.5 h-3.5 text-teal-400"></i>
+              <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Upcomers 20% Velocity</h2>
+            </div>
+            <!-- Account Switcher Mini-Tabs (A1 - A8) -->
+            <div class="flex items-center gap-1 font-mono text-[9px]" id="gauge-account-tabs">
+              <button onclick="selectAccount('Account 1')" id="acc-tab-1" class="btn-sharp-tab active">A1</button>
+              <button onclick="selectAccount('Account 2')" id="acc-tab-2" class="btn-sharp-tab">A2</button>
+              <button onclick="selectAccount('Account 3')" id="acc-tab-3" class="btn-sharp-tab">A3</button>
+              <button onclick="selectAccount('Account 4')" id="acc-tab-4" class="btn-sharp-tab">A4</button>
+              <button onclick="selectAccount('Account 5')" id="acc-tab-5" class="btn-sharp-tab">A5</button>
+              <button onclick="selectAccount('Account 6')" id="acc-tab-6" class="btn-sharp-tab">A6</button>
+              <button onclick="selectAccount('Account 7')" id="acc-tab-7" class="btn-sharp-tab">A7</button>
+              <button onclick="selectAccount('Account 8')" id="acc-tab-8" class="btn-sharp-tab">A8</button>
+            </div>
+          </div>
+
+          <!-- High-Precision Radial Arc Gauge -->
+          <div class="relative flex flex-col items-center my-0.5 w-full">
+            <svg class="w-48 h-24 overflow-visible" viewBox="0 0 240 130">
+              <defs>
+                <linearGradient id="meter-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#0D9488" />
+                  <stop offset="55%" stop-color="#2DD4BF" />
+                  <stop offset="100%" stop-color="#38BDF8" />
+                </linearGradient>
+              </defs>
+
+              <!-- Background Arc Band -->
+              <path d="M 30 115 A 90 90 0 0 1 210 115" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="20" stroke-linecap="round" />
+              <!-- Active Value Arc Band -->
+              <path id="gauge-arc" d="M 30 115 A 90 90 0 0 1 210 115" fill="none" stroke="url(#meter-grad)" stroke-width="20" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="195" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1);" />
+              <!-- Center Pivot Hub -->
+              <circle cx="120" cy="115" r="5.5" fill="#38BDF8" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" />
+              <!-- Needle -->
+              <line id="gauge-needle" x1="120" y1="115" x2="165" y2="45" stroke="#38BDF8" stroke-width="3" stroke-linecap="round" style="transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);" />
+            </svg>
+
+            <!-- Dynamic Text Below Gauge -->
+            <div class="text-center">
+              <div class="text-base font-bold tracking-tight text-white font-mono leading-tight" id="gauge-acc-display">
+                $25,566.33 <span class="text-teal-300 font-normal">→</span> $27,000
+              </div>
+              <div class="text-[8.5px] text-slate-400 font-mono" id="gauge-acc-subtitle">
+                Account 1 ($25k Funded) • Target Profit: +$2,000.00
+              </div>
+            </div>
+          </div>
+
+          <!-- Metrics Detail (3-col row) -->
+          <div class="grid grid-cols-3 gap-1 pt-1 border-t border-white/[0.08]">
+            <div class="p-1 rounded sub-glass text-center">
+              <div class="text-[7.5px] text-slate-400 uppercase tracking-wider">Net Realized</div>
+              <div class="font-mono font-bold text-teal-300 text-[10.5px]" id="gauge-profit">+$566.33</div>
+            </div>
+            <div class="p-1 rounded sub-glass text-center">
+              <div class="text-[7.5px] text-slate-400 uppercase tracking-wider">20% Cap / Day</div>
+              <div class="font-mono text-white font-semibold text-[10.5px]" id="gauge-cap">$400.00</div>
+            </div>
+            <div class="p-1 rounded sub-glass text-center">
+              <div class="text-[7.5px] text-slate-400 uppercase tracking-wider" id="gauge-progress-label">Payout Pct</div>
+              <div class="font-mono text-cyan-300 font-bold text-[10.5px]" id="gauge-pct">28.3%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hypotheticals Section Header & Select -->
+        <div class="pt-1 border-t border-white/[0.08]">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="calculator" class="w-3.5 h-3.5 text-teal-400"></i>
+              <h3 class="text-xs font-semibold text-slate-100 tracking-tight">Pass & Payout Hypotheticals</h3>
+            </div>
+            <select id="hypo-acc-select" onchange="selectAccount(this.value)" class="bg-black/60 border border-white/15 text-[8.5px] font-mono text-teal-300 rounded px-1.5 py-0.5 focus:outline-none focus:border-teal-400 transition-colors">
+              <option value="Account 1">Account 1 ($25k Funded)</option>
+              <option value="Account 2">Account 2 ($50k Eval)</option>
+              <option value="Account 3">Account 3 ($25k Eval)</option>
+              <option value="Account 4">Account 4 ($10k Eval)</option>
+              <option value="Account 5">Account 5 ($10k Eval)</option>
+              <option value="Account 6">Account 6 ($50k Eval)</option>
+              <option value="Account 7">Account 7 ($25k Eval)</option>
+              <option value="Account 8">Account 8 ($10k Eval)</option>
+            </select>
+          </div>
+
+          <!-- Remaining Target & Consistency Cap Pill -->
+          <div class="grid grid-cols-2 gap-1 text-xs font-mono mb-1">
+            <div class="p-1 rounded sub-glass">
+              <div class="text-[7.5px] text-slate-400 uppercase tracking-wider">Remaining To Target</div>
+              <div class="text-[10.5px] font-bold text-white mt-0.5" id="hypo-needed">$1,433.67</div>
+            </div>
+            <div class="p-1 rounded sub-glass">
+              <div class="text-[7.5px] text-slate-400 uppercase tracking-wider">20% Consistency Cap</div>
+              <div class="text-[10.5px] font-bold text-teal-300 mt-0.5" id="hypo-cap">$400.00 / day</div>
+            </div>
+          </div>
+
+          <!-- 3 Pacing Scenarios -->
+          <div class="space-y-1 font-mono" id="hypo-scenarios-container">
+            <!-- Scenario 1: Max 20% Cap (Fastest) -->
+            <div class="p-1 rounded sub-glass hover:border-teal-400/30 transition-all">
+              <div class="flex items-center justify-between text-[10.5px]">
+                <span class="text-slate-300 font-medium flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                  <span>20% Cap Pace (Fastest)</span>
+                </span>
+                <span class="text-teal-300 font-bold text-[10.5px]" id="hypo-cap-days">4 Days</span>
+              </div>
+              <div class="flex items-center justify-between text-[8.5px] text-slate-400 mt-0.5">
+                <span>Required: <strong class="text-white" id="hypo-cap-rate">+$358.42/d</strong></span>
+                <span>ETA: <strong class="text-teal-300" id="hypo-cap-date">Sep 16, 2026</strong></span>
+              </div>
+            </div>
+
+            <!-- Scenario 2: Baseline Bayesian Expectancy -->
+            <div class="p-1 rounded sub-glass hover:border-cyan-400/30 transition-all">
+              <div class="flex items-center justify-between text-[10.5px]">
+                <span class="text-slate-300 font-medium flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                  <span>Bayesian 1.5R Rate</span>
+                </span>
+                <span class="text-cyan-300 font-bold text-[10.5px]" id="hypo-base-days">6 Days</span>
+              </div>
+              <div class="flex items-center justify-between text-[8.5px] text-slate-400 mt-0.5">
+                <span>Required: <strong class="text-white" id="hypo-base-rate">+$238.94/d</strong></span>
+                <span>ETA: <strong class="text-cyan-300" id="hypo-base-date">Sep 18, 2026</strong></span>
+              </div>
+            </div>
+
+            <!-- Scenario 3: Conservative Pacing -->
+            <div class="p-1 rounded sub-glass hover:border-slate-400/30 transition-all">
+              <div class="flex items-center justify-between text-[10.5px]">
+                <span class="text-slate-300 font-medium flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  <span>Conservative 1.0R Rate</span>
+                </span>
+                <span class="text-slate-200 font-bold text-[10.5px]" id="hypo-cons-days">10 Days</span>
+              </div>
+              <div class="flex items-center justify-between text-[8.5px] text-slate-400 mt-0.5">
+                <span>Required: <strong class="text-white" id="hypo-cons-rate">+$143.37/d</strong></span>
+                <span>ETA: <strong class="text-slate-300" id="hypo-cons-date">Sep 24, 2026</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive "What-If" Calculator Bar -->
+        <div class="pt-1 border-t border-white/[0.08]">
+          <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 mb-0.5">
+            <span>What-If Daily PnL:</span>
+            <span class="text-white font-bold" id="whatif-val-display">$250 / day</span>
+          </div>
+          <input type="range" id="whatif-slider" min="50" max="600" step="25" value="250" oninput="onWhatIfSlider(this.value)" class="w-full accent-teal-400 h-1 bg-black/40 rounded cursor-pointer">
+          <div class="flex items-center justify-between text-[8.5px] font-mono mt-1 p-1 rounded sub-glass" id="whatif-result">
+            <span class="text-slate-400">Projected Pass:</span>
+            <span class="text-teal-300 font-bold" id="whatif-output">6 Days (Sep 18) • 12.5% Cap OK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LENS 2 (Center 4 Cols): Prior vs Posterior belief convergence & Live Strategy Breakdown -->
+    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5">
+      <!-- Faint Abstracted Neural Distribution Texture -->
+      <div class="panel-texture" style="background-image: url('assets/branding-8.png'), url('/assets/branding-8.png'); background-position: center;"></div>
+
+      <div class="relative z-10 flex flex-col gap-1.5">
+        <div>
+          <!-- Header with Strategy Selector -->
+          <div class="flex flex-wrap items-center justify-between gap-1 pb-1 border-b border-white/[0.08]">
+            <div>
+              <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Prior vs Posterior belief convergence</h2>
+              <div class="text-[8.5px] text-slate-400 font-mono">
+                Strategy Intelligence • Shadow-to-Live
+              </div>
+            </div>
+
+            <!-- Strategy Selector Tabs -->
+            <div class="flex items-center gap-1 font-mono text-[9px]" id="strategy-tabs">
+              <button onclick="selectStrategy('strat_9')" id="tab-strat_9" class="btn-sharp-tab active">
+                Strat 9
+              </button>
+              <button onclick="selectStrategy('strat_8')" id="tab-strat_8" class="btn-sharp-tab">
+                Strat 8
+              </button>
+              <button onclick="selectStrategy('strat_1')" id="tab-strat_1" class="btn-sharp-tab">
+                Strat 1
+              </button>
+              <button onclick="selectStrategy('strat_2')" id="tab-strat_2" class="btn-sharp-tab">
+                Strat 2
+              </button>
+            </div>
+          </div>
+
+          <!-- Strategy Live vs Shadow Testing Breakdown Matrix -->
+          <div class="grid grid-cols-2 gap-1 text-xs font-mono mt-1">
+            <!-- Live Performance Card -->
+            <div class="p-1.5 rounded sub-glass border-teal-500/20">
+              <div class="flex items-center justify-between text-[7.5px] text-slate-400 uppercase tracking-wider">
+                <span>Live Fleet</span>
+                <span class="text-teal-300 font-bold" id="strat-live-badge">👑 CHAMPION</span>
+              </div>
+              <div class="mt-0.5 flex items-baseline justify-between">
+                <span class="text-base font-bold text-white font-mono leading-none" id="strat-live-wr">78.6%</span>
+                <span class="text-teal-300 font-semibold text-xs" id="strat-live-pnl">+$2,140.00</span>
+              </div>
+              <div class="flex justify-between text-[7.5px] text-slate-400 mt-1 pt-0.5 border-t border-white/[0.06]">
+                <span>Trades: <strong class="text-white" id="strat-live-record">11W - 3L (14)</strong></span>
+                <span>Exp: <strong class="text-teal-300" id="strat-live-exp">+2.45R</strong></span>
+              </div>
+            </div>
+
+            <!-- Pre-Live Shadow Benchmark Card -->
+            <div class="p-1.5 rounded sub-glass border-cyan-500/20">
+              <div class="flex items-center justify-between text-[7.5px] text-slate-400 uppercase tracking-wider">
+                <span>Pre-Live Shadow</span>
+                <span class="text-cyan-300 font-bold" id="strat-shadow-badge">30+ SAMPLES</span>
+              </div>
+              <div class="mt-0.5 flex items-baseline justify-between">
+                <span class="text-base font-bold text-cyan-300 font-mono leading-none" id="strat-shadow-wr">73.3%</span>
+                <span class="text-slate-300 font-semibold text-xs" id="strat-shadow-pf">PF: 3.12</span>
+              </div>
+              <div class="flex justify-between text-[7.5px] text-slate-400 mt-1 pt-0.5 border-t border-white/[0.06]">
+                <span>Samples: <strong class="text-white" id="strat-shadow-samples">45 Trades</strong></span>
+                <span>MFE: <strong class="text-cyan-300" id="strat-shadow-mfe">3.8R</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Graduation Milestone Pill -->
+          <div class="px-2 py-1 rounded sub-glass border-teal-400/20 flex items-center justify-between text-[8.5px] font-mono mt-1">
+            <div class="flex items-center gap-1 truncate">
+              <i data-lucide="check-circle-2" class="w-3 h-3 text-teal-400 shrink-0"></i>
+              <span class="text-slate-300 truncate" id="strat-grad-status">GRADUATED (30+ Samples, >60% WR, >2.0 PF)</span>
+            </div>
+            <span class="text-teal-300 font-semibold shrink-0" id="strat-grad-date">Sep 04, 2026</span>
+          </div>
+        </div>
+
+        <!-- Upper Tri-Gaussian Convergence Curve Canvas -->
+        <div class="my-0.5">
+          <div class="flex items-center justify-between mb-0.5 text-[7.5px] font-mono text-slate-400">
+            <div class="flex items-center gap-2">
+              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-slate-400 inline-block"></span> Prior (50%)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-cyan-400 inline-block"></span> Shadow (68%)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-teal-400 inline-block"></span> Live (76%)</span>
+            </div>
+            <span class="text-teal-300 font-semibold">Variance Δ: -62.5%</span>
+          </div>
+          <div class="w-full h-24 relative sub-glass p-1 rounded">
+            <canvas id="beliefCanvasUpper" class="w-full h-full"></canvas>
+          </div>
+        </div>
+
+        <!-- All Live Strategies Performance Table -->
+        <div class="pt-1 border-t border-white/[0.08]">
+          <div class="text-[8.5px] font-mono text-slate-400 mb-0.5 font-semibold">Strategy Tournament Matrix</div>
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-left font-mono text-[9px]">
+              <thead>
+                <tr class="text-slate-500 border-b border-white/[0.06]">
+                  <th class="pb-0.5 font-semibold">STRATEGY</th>
+                  <th class="pb-0.5 font-semibold text-right">LIVE (N)</th>
+                  <th class="pb-0.5 font-semibold text-right">SHADOW (N)</th>
+                  <th class="pb-0.5 font-semibold text-right">PF</th>
+                  <th class="pb-0.5 font-semibold text-right">STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="strat-matrix-tbody" class="divide-y divide-white/[0.04] text-slate-300">
+                <tr>
+                  <td class="py-0.5 text-white font-medium">Strat 9 (Judas)</td>
+                  <td class="text-right text-teal-300 font-bold">78.6% (14)</td>
+                  <td class="text-right text-cyan-300">73.3% (45)</td>
+                  <td class="text-right text-white">3.12</td>
+                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7.5px] font-semibold">👑 CHAMPION</span></td>
+                </tr>
+                <tr>
+                  <td class="py-0.5 text-white font-medium">Strat 8 (Turtle Soup)</td>
+                  <td class="text-right text-teal-300 font-bold">71.4% (14)</td>
+                  <td class="text-right text-cyan-300">68.8% (38)</td>
+                  <td class="text-right text-white">2.65</td>
+                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7.5px] font-semibold">👑 CHAMPION</span></td>
+                </tr>
+                <tr>
+                  <td class="py-0.5 text-white font-medium">Strat 1 (Asian Fade)</td>
+                  <td class="text-right text-teal-300 font-bold">66.7% (9)</td>
+                  <td class="text-right text-cyan-300">64.5% (31)</td>
+                  <td class="text-right text-white">2.20</td>
+                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[7.5px] font-semibold">⚡ PROBATION</span></td>
+                </tr>
+                <tr>
+                  <td class="py-0.5 text-slate-400">Strat 2 (MSS FVG)</td>
+                  <td class="text-right text-slate-500">—</td>
+                  <td class="text-right text-slate-300">61.5% (26)</td>
+                  <td class="text-right text-slate-300">1.95</td>
+                  <td class="text-right"><span class="px-1 py-0.5 rounded bg-slate-500/10 text-slate-300 border border-slate-500/20 text-[7.5px] font-semibold">🧪 SHADOW</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LENS 3 (Right 4 Cols): Agent Decision & Shadow Testing Call Inspector -->
+    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5">
+      <!-- Faint Abstracted Decision Network Texture -->
+      <div class="panel-texture" style="background-image: url('assets/branding-16.png'), url('/assets/branding-16.png'); background-position: 80% 20%;"></div>
+
+      <div class="relative z-10 flex flex-col gap-1.5">
+        <!-- Header with Filter Badges & Flat Status -->
+        <div class="flex items-center justify-between pb-1 border-b border-white/[0.08]">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Agent Decision & Shadow Testing Call Inspector</h2>
+          </div>
+          <div class="flex items-center gap-1 font-mono text-[8.5px]">
+            <span class="px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-400/30 font-semibold">⚡ LIVE</span>
+            <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-semibold">👻 SHADOW</span>
+            <span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-400/30">100% FLAT</span>
+          </div>
+        </div>
+
+        <!-- Scrollable Call List Container -->
+        <div class="space-y-1.5 custom-scroll overflow-y-auto h-[350px] pr-1" id="agent-calls-container">
+          <!-- Initial Sample Items -->
+          <div class="p-2 rounded sub-glass hover:border-cyan-400/40 transition-all">
+            <div class="flex items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-mono font-bold text-white text-xs">XAU/USD</span>
+                <span class="px-1 py-0.5 rounded text-[8px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">👻 SHADOW LAB</span>
+                <span class="text-xs text-slate-200 font-medium">Bayesian FVG 50% CE Reversal</span>
+              </div>
+              <div class="font-mono text-xs text-cyan-300 font-bold shrink-0">AI: 6.0/10</div>
+            </div>
+            <p class="text-[10px] text-slate-300 mt-1 leading-snug">
+              Consequent Encroachment 50% retest on 5m FVG. Confluence moderate but rejected by Live AI Gatekeeper (Score: 6.0 &lt; 8.0). Diverted to Shadow Lab A/B Tournament.
+            </p>
+            <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 mt-1 pt-1 border-t border-white/[0.06]">
+              <span>Verdict: <strong class="text-slate-200">SHADOW_OBSERVATION</strong> | Hurst: 0.612</span>
+              <span>02:08:02 UTC</span>
+            </div>
+          </div>
+
+          <div class="p-2 rounded sub-glass hover:border-teal-400/40 transition-all">
+            <div class="flex items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-mono font-bold text-white text-xs">ETH/USD</span>
+                <span class="px-1 py-0.5 rounded text-[8px] font-mono bg-teal-500/15 text-teal-300 border border-teal-400/30">⚡ LIVE PROBATION</span>
+                <span class="text-xs text-slate-200 font-medium">Strat 9 Judas Sweep Reversal</span>
+              </div>
+              <div class="font-mono text-xs text-teal-300 font-bold shrink-0">AI: 8.4/10</div>
+            </div>
+            <p class="text-[10px] text-slate-300 mt-1 leading-snug">
+              London Open Judas Inducement swept Asian Lows into 1h Bullish Orderblock. Multi-timeframe confluence confirmed by Gemini 2.5 Flash. Executed across fleet under $75 risk cap.
+            </p>
+            <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 mt-1 pt-1 border-t border-white/[0.06]">
+              <span>Verdict: <strong class="text-teal-300">FLOW_GO</strong> | Hurst: 0.612</span>
+              <span>11:28:38 UTC</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Emergency Action Button in Lens 3 Footer -->
+        <div class="pt-1.5 border-t border-white/[0.08]">
+          <button class="w-full btn-sharp-danger flex items-center justify-center gap-2" id="btn-flatten" onclick="triggerFleetFlatten()">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span>1-CLICK EMERGENCY FLATTEN</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- PANORAMIC REAL-TIME COGNITIVE DECISION PIPELINE & PARAMETER TREE (Middle Row) -->
+  <section class="liquid-glass mb-2 relative z-10">
+    <!-- Faint Abstracted Horizontal Horizon Texture -->
+    <div class="panel-texture" style="background-image: url('assets/branding-2.png'), url('/assets/branding-2.png'); background-position: center;"></div>
+
+    <div class="relative z-10">
+      <!-- Header with Live Thinking Ticker -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-white/[0.08]">
+        <div class="flex items-center gap-2">
+          <div class="relative flex items-center justify-center">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping absolute opacity-75"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Real-Time Cognitive Scan & Parameter Decision Tree</h2>
+              <span class="px-1.5 py-0.5 rounded text-[8.5px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-bold" id="pipeline-status">LIVE EVALUATION</span>
+            </div>
+            <div class="text-[9.5px] text-slate-400 font-mono">
+              Active Asset: <strong class="text-white font-bold" id="pipeline-symbol">BTC/USD</strong> | Cycle #<span id="pipeline-cycle">14,892</span> | Latency: <span class="text-teal-300 font-semibold" id="pipeline-latency">0.32s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent Internal Stream of Thought -->
+        <div class="flex-1 min-w-[300px] px-2.5 py-0.5 rounded sub-glass border-cyan-500/20 text-[9.5px] font-mono flex items-center gap-2">
+          <i data-lucide="brain-circuit" class="w-3.5 h-3.5 text-cyan-400 shrink-0 animate-pulse"></i>
+          <div class="text-slate-300 truncate" id="pipeline-thought">
+            Evaluating London Open Asian Lows sweep into 15m bullish order block with Bayesian posterior likelihood update...
+          </div>
+        </div>
+      </div>
+
+      <!-- 7-Stage Horizontal Decision Nodes -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-1.5 mt-1.5" id="decision-tree-nodes">
+        <!-- 1. Killzone -->
+        <div class="p-1.5 rounded sub-glass border-teal-500/30 flex flex-col justify-between hover:border-teal-400/40 transition-all">
+          <div class="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider flex justify-between items-center">
+            <span>1. Killzone</span>
+            <span class="text-teal-300 font-bold" id="dt-node-1-status">PASS ✓</span>
+          </div>
+          <div class="text-[10px] font-semibold text-white mt-0.5 truncate" id="dt-node-1-param">London / NY Window</div>
+          <div class="text-[8.5px] font-mono text-teal-300 mt-0.5" id="dt-node-1-metric">Spread: 0.28 ATR</div>
+        </div>
+
+        <!-- 2. Liquidity Sweep -->
+        <div class="p-1.5 rounded sub-glass border-teal-500/30 flex flex-col justify-between hover:border-teal-400/40 transition-all">
+          <div class="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider flex justify-between items-center">
+            <span>2. Liquidity Sweep</span>
+            <span class="text-teal-300 font-bold" id="dt-node-2-status">PASS ✓</span>
+          </div>
+          <div class="text-[10px] font-semibold text-white mt-0.5 truncate" id="dt-node-2-param">Judas Low Sweep</div>
+          <div class="text-[8.5px] font-mono text-teal-300 mt-0.5" id="dt-node-2-metric">Run: 1.4 ATR</div>
+        </div>
+
+        <!-- 3. Hurst Regime -->
+        <div class="p-1.5 rounded sub-glass border-teal-500/30 flex flex-col justify-between hover:border-teal-400/40 transition-all">
+          <div class="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider flex justify-between items-center">
+            <span>3. Hurst Filter</span>
+            <span class="text-teal-300 font-bold" id="dt-node-3-status">PASS ✓</span>
+          </div>
+          <div class="text-[10px] font-semibold text-white mt-0.5 truncate" id="dt-node-3-param">Trend Persistence</div>
+          <div class="text-[8.5px] font-mono text-teal-300 mt-0.5" id="dt-node-3-metric">H = 0.612</div>
+        </div>
+
+        <!-- 4. SMT Divergence -->
+        <div class="p-1.5 rounded sub-glass border-teal-500/30 flex flex-col justify-between hover:border-teal-400/40 transition-all">
+          <div class="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider flex justify-between items-center">
+            <span>4. SMT / Intermarket</span>
+            <span class="text-teal-300 font-bold" id="dt-node-4-status">PASS ✓</span>
+          </div>
+          <div class="text-[10px] font-semibold text-white mt-0.5 truncate" id="dt-node-4-param">DXY Inverse Div</div>
+          <div class="text-[8.5px] font-mono text-teal-300 mt-0.5" id="dt-node-4-metric">SMT: 0.72</div>
+        </div>
+
+        <!-- 5. Bayesian Update -->
+        <div class="p-1.5 rounded sub-glass border-teal-500/30 flex flex-col justify-between hover:border-teal-400/40 transition-all">
+          <div class="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider flex justify-between items-center">
+            <span>5. Bayesian Prior</span>
+            <span class="text-teal-300 font-bold" id="dt-node-5-status">PASS ✓</span>
+          </div>
+          <div class="text-[10px] font-semibold text-white mt-0.5 truncate" id="dt-node-5-param">0.50 → 0.684</div>
+          <div class="text-[8.5px] font-mono text-teal-300 mt-0.5" id="dt-node-5-metric">+36.8% Likelihood</div>
+        </div>
+
+        <!-- 6. AI Confluence -->
+        <div class="p-1.5 rounded sub-glass border-cyan-500/30 flex flex-col justify-between hover:border-cyan-400/40 transition-all">
+          <div class="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider flex justify-between items-center">
+            <span>6. Gemini AI</span>
+            <span class="text-cyan-300 font-bold" id="dt-node-6-status">FLOW_GO</span>
+          </div>
+          <div class="text-[10px] font-semibold text-white mt-0.5 truncate" id="dt-node-6-param">Score 8.4 / 10</div>
+          <div class="text-[8.5px] font-mono text-cyan-300 mt-0.5" id="dt-node-6-metric">Flash 2.5 Multi-TF</div>
+        </div>
+
+        <!-- 7. Fleet Risk Guard -->
+        <div class="p-1.5 rounded sub-glass border-teal-500/30 flex flex-col justify-between hover:border-teal-400/40 transition-all">
+          <div class="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider flex justify-between items-center">
+            <span>7. Risk Guardian</span>
+            <span class="text-teal-300 font-bold" id="dt-node-7-status">ARMED ✓</span>
+          </div>
+          <div class="text-[10px] font-semibold text-white mt-0.5 truncate" id="dt-node-7-param">$75 Risk / Acct</div>
+          <div class="text-[8.5px] font-mono text-teal-300 mt-0.5" id="dt-node-7-metric">2.5s Fleet Pacing</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTOM ROW: 8-Account Fleet Matrix & Sovereign Execution & Audit Stream (6 Cols / 6 Cols) -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-2 relative z-10">
+
+    <!-- 8-Account Fleet Synchronized Matrix Table (6 Cols) -->
+    <section class="lg:col-span-6 liquid-glass flex flex-col gap-1.5">
+      <!-- Faint Abstracted Matrix Texture -->
+      <div class="panel-texture" style="background-image: url('assets/branding-12.png'), url('/assets/branding-12.png'); background-position: 10% 90%;"></div>
+
+      <div class="relative z-10 flex flex-col gap-1.5">
+        <div class="flex items-center justify-between pb-1 border-b border-white/[0.08]">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-teal-400"></i>
+            <h2 class="text-xs font-semibold text-slate-100 tracking-tight">8-Account Synchronized Fleet Matrix</h2>
+          </div>
+          <div class="font-mono text-[9.5px] text-teal-300 font-bold px-2 py-0.5 rounded sub-glass" id="total-fleet-nav-pill">NAV: $202,648.67</div>
+        </div>
+
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left font-mono text-[9.5px]">
+            <thead>
+              <tr class="text-slate-500 border-b border-white/[0.08]">
+                <th class="pb-1 font-semibold">ACCOUNT</th>
+                <th class="pb-1 font-semibold">TIER</th>
+                <th class="pb-1 font-semibold text-right">BALANCE</th>
+                <th class="pb-1 font-semibold text-right">TARGET</th>
+                <th class="pb-1 font-semibold text-right">STATE</th>
+              </tr>
+            </thead>
+            <tbody id="fleet-table-body" class="divide-y divide-white/[0.04]">
+              <tr><td class="py-1 text-white font-medium">Account 1</td><td class="text-slate-400">$25k</td><td class="text-right text-teal-300 font-bold">$25,566.33</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr><td class="py-1 text-white font-medium">Account 2</td><td class="text-slate-400">$50k</td><td class="text-right text-white font-bold">$49,043.87</td><td class="text-right text-slate-400">$54,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr><td class="py-1 text-white font-medium">Account 3</td><td class="text-slate-400">$25k</td><td class="text-right text-white font-bold">$24,913.88</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr><td class="py-1 text-white font-medium">Account 4</td><td class="text-slate-400">$10k</td><td class="text-right text-white font-bold">$9,728.04</td><td class="text-right text-slate-400">$10,800</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr><td class="py-1 text-white font-medium">Account 5</td><td class="text-slate-400">$10k</td><td class="text-right text-white font-bold">$9,704.06</td><td class="text-right text-slate-400">$10,800</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr><td class="py-1 text-white font-medium">Account 6</td><td class="text-slate-400">$50k</td><td class="text-right text-white font-bold">$49,358.96</td><td class="text-right text-slate-400">$54,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr><td class="py-1 text-white font-medium">Account 7</td><td class="text-slate-400">$25k</td><td class="text-right text-white font-bold">$24,638.73</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr><td class="py-1 text-white font-medium">Account 8</td><td class="text-slate-400">$10k</td><td class="text-right text-white font-bold">$9,694.80</td><td class="text-right text-slate-400">$10,800</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 pt-1 border-t border-white/[0.06]">
+          <span>Click any row to focus Velocity Gauge & Hypotheticals</span>
+          <span class="text-teal-300 font-semibold">8/8 Synced</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sovereign Fleet Execution & Anti-Desync Safety Audit Stream (6 Cols, Scrollable) -->
+    <section class="lg:col-span-6 liquid-glass flex flex-col gap-1.5">
+      <!-- Faint Abstracted Execution Ledger Texture -->
+      <div class="panel-texture" style="background-image: url('assets/branding-20.png'), url('/assets/branding-20.png'); background-position: 85% 85%;"></div>
+
+      <div class="relative z-10 flex flex-col gap-1.5">
+        <div class="flex items-center justify-between pb-1 border-b border-white/[0.08]">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="terminal" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Sovereign Fleet Execution & Anti-Desync Safety Stream</h2>
+          </div>
+          <div class="flex items-center gap-1 font-mono text-[8.5px]">
+            <span class="px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-400/30 font-semibold">ZERO NAKED ORDERS</span>
+            <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-semibold">2.5s PACING</span>
+          </div>
+        </div>
+
+        <!-- Real-Time Telemetry & Signed Ledger Execution Feed -->
+        <div class="space-y-1 custom-scroll overflow-y-auto h-[230px] pr-1 font-mono text-[9.5px]" id="stream-container">
+          <div class="p-1.5 rounded sub-glass flex items-center justify-between hover:border-teal-400/30 transition-all">
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse shadow-[0_0_6px_#2DD4BF]"></span>
+              <span class="text-slate-400 text-[8.5px]">03:22:05</span>
+              <span class="px-1 py-0.5 rounded text-[7.5px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-400/30">FLEET RECONCILE</span>
+              <span class="text-slate-200 truncate">8/8 Accounts Verified Flat • $202,648.67 Total Fleet NAV</span>
+            </div>
+            <span class="text-teal-300 font-bold shrink-0 text-[8.5px]">0 ORPHANS</span>
+          </div>
+
+          <div class="p-1.5 rounded sub-glass flex items-center justify-between hover:border-teal-400/30 transition-all">
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+              <span class="text-slate-400 text-[8.5px]">11:28:38</span>
+              <span class="px-1 py-0.5 rounded text-[7.5px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-400/30">ETH/USD LONG</span>
+              <span class="text-slate-200 truncate">Bullish Judas Sweep (High Alpha) • AI Score: 8.0/10</span>
+            </div>
+            <span class="text-teal-300 font-bold shrink-0 text-[8.5px]">8 ACCTS SYNCED</span>
+          </div>
+
+          <div class="p-1.5 rounded sub-glass flex items-center justify-between hover:border-teal-400/30 transition-all">
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+              <span class="text-slate-400 text-[8.5px]">10:06:35</span>
+              <span class="px-1 py-0.5 rounded text-[7.5px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-400/30">XAU/USD LONG</span>
+              <span class="text-slate-200 truncate">Strategy 9 Judas Sweep Reversal • AI Score: 9.8/10</span>
+            </div>
+            <span class="text-teal-300 font-bold shrink-0 text-[8.5px]">8 ACCTS SYNCED</span>
+          </div>
+
+          <div class="p-1.5 rounded sub-glass flex items-center justify-between hover:border-cyan-400/30 transition-all">
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+              <span class="text-slate-400 text-[8.5px]">03:15:00</span>
+              <span class="px-1 py-0.5 rounded text-[7.5px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">PROP CONSISTENCY</span>
+              <span class="text-slate-200 truncate">Upcomers 20% Daily Profit Caps Enforced ($400/$800/$160)</span>
+            </div>
+            <span class="text-cyan-300 font-bold shrink-0 text-[8.5px]">COMPLIANT</span>
+          </div>
+
+          <div class="p-1.5 rounded sub-glass flex items-center justify-between hover:border-cyan-400/30 transition-all">
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+              <span class="text-slate-400 text-[8.5px]">03:00:00</span>
+              <span class="px-1 py-0.5 rounded text-[7.5px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">ANTI-DESYNC</span>
+              <span class="text-slate-200 truncate">Multi-Account Fleet Pacing Queue: 2.5s Adaptive Delay Active</span>
+            </div>
+            <span class="text-cyan-300 font-bold shrink-0 text-[8.5px]">ARMED</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 pt-1 border-t border-white/[0.06]">
+          <span>Hedging Protocol: PATCH /positions for SL/TP • DELETE for Flatten</span>
+          <span class="text-cyan-300 font-semibold">Ledger Active</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // UTC Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('utc-clock').textContent = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Tri-Gaussian Belief Convergence Canvas Renderer (Prior -> Shadow Empirical -> Live Converged)
+    function drawTriGaussianBeliefCurves(canvasId, priorMu = 0.50, priorSigma = 0.16, shadowMu = 0.68, shadowSigma = 0.09, liveMu = 0.76, liveSigma = 0.06) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 2;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Baseline
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, h - 8);
+      ctx.lineTo(w, h - 8);
+      ctx.stroke();
+
+      function plotCurve(mu, sigma, strokeColor, fillColor, isDashed = false, strokeWidth = 1.6) {
+        ctx.save();
+        if (isDashed) ctx.setLineDash([3, 3]);
+        
+        ctx.beginPath();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.moveTo(0, h - 8);
+
+        for (let x = 0; x < w; x++) {
+          const val = (x / w);
+          const y = Math.exp(-Math.pow(val - mu, 2) / (2 * sigma * sigma));
+          const canvasY = (h - 8) - (y * (h - 14));
+          ctx.lineTo(x, canvasY);
+        }
+
+        if (fillColor) {
+          ctx.lineTo(w, h - 8);
+          ctx.closePath();
+          const grad = ctx.createLinearGradient(0, 0, 0, h);
+          grad.addColorStop(0, fillColor);
+          grad.addColorStop(1, 'rgba(45, 212, 191, 0.00)');
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // Mean indicator line
+        const meanX = mu * w;
+        ctx.save();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.0;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(meanX, 4);
+        ctx.lineTo(meanX, h - 8);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 1. Prior Distribution (Grey / Dashed)
+      plotCurve(priorMu, priorSigma, 'rgba(148, 163, 184, 0.45)', null, true, 1.2);
+
+      // 2. Shadow Empirical Distribution (Cyan / Dashed)
+      plotCurve(shadowMu, shadowSigma, 'rgba(56, 189, 248, 0.75)', 'rgba(56, 189, 248, 0.08)', true, 1.5);
+
+      // 3. Live Converged Distribution (Teal Solid with refined glow)
+      plotCurve(liveMu, liveSigma, '#2DD4BF', 'rgba(45, 212, 191, 0.25)', false, 1.8);
+    }
+
+    let _selectedStrategyId = 'strat_9';
+
+    function selectStrategy(stratId) {
+      _selectedStrategyId = stratId;
+      
+      // Update Tab Styles
+      ['strat_9', 'strat_8', 'strat_1', 'strat_2'].forEach(id => {
+        const btn = document.getElementById(`tab-${id}`);
+        if (!btn) return;
+        btn.className = (id === stratId) ? "btn-sharp-tab active" : "btn-sharp-tab";
+      });
+
+      updateStrategyDisplay();
+    }
+
+    function updateStrategyDisplay() {
+      if (!_globalState || !_globalState.strategies) return;
+      const strat = _globalState.strategies.find(s => s.id === _selectedStrategyId) || _globalState.strategies[0];
+      if (!strat) return;
+
+      // Update Live Card
+      document.getElementById('strat-live-badge').textContent = strat.status.includes('CHAMPION') ? '👑 CHAMPION' : (strat.status.includes('LIVE') ? '⚡ PROBATION' : '🧪 SHADOW');
+      document.getElementById('strat-live-wr').textContent = strat.live_wr > 0 ? strat.live_wr.toFixed(1) + '%' : '—';
+      document.getElementById('strat-live-pnl').textContent = strat.live_pnl !== 0 ? (strat.live_pnl > 0 ? '+$' : '-$') + Math.abs(strat.live_pnl).toLocaleString('en-US', {minimumFractionDigits: 2}) : '$0.00';
+      document.getElementById('strat-live-record').textContent = strat.live_trades > 0 ? `${strat.live_wins}W - ${strat.live_losses}L (${strat.live_trades})` : '0 Trades';
+      document.getElementById('strat-live-exp').textContent = strat.live_expectancy_r > 0 ? `+${strat.live_expectancy_r.toFixed(2)}R` : '—';
+
+      // Update Shadow Benchmark Card
+      document.getElementById('strat-shadow-badge').textContent = `${strat.shadow_samples}+ SAMPLES`;
+      document.getElementById('strat-shadow-wr').textContent = strat.shadow_wr.toFixed(1) + '%';
+      document.getElementById('strat-shadow-pf').textContent = 'PF: ' + Number(strat.shadow_pf).toFixed(2);
+      document.getElementById('strat-shadow-samples').textContent = `${strat.shadow_samples} Trades`;
+      document.getElementById('strat-shadow-mfe').textContent = strat.shadow_mfe || '3.0R';
+
+      // Update Graduation Milestone
+      document.getElementById('strat-grad-status').textContent = strat.graduation_status;
+      document.getElementById('strat-grad-date').textContent = strat.graduation_date;
+
+      // Redraw Tri-Gaussian Curves
+      drawTriGaussianBeliefCurves(
+        'beliefCanvasUpper',
+        strat.prior_mu || 0.50,
+        strat.prior_sigma || 0.16,
+        strat.shadow_mu || 0.68,
+        strat.shadow_sigma || 0.09,
+        strat.live_mu || 0.76,
+        strat.live_sigma || 0.06
+      );
+    }
+
+    function redrawCanvas() {
+      updateStrategyDisplay();
+    }
+
+    window.addEventListener('resize', redrawCanvas);
+    setTimeout(redrawCanvas, 50);
+
+    // State & Multi-Account Store
+    let _globalState = null;
+    let _selectedAccountId = 'Account 1';
+
+    function selectAccount(accId) {
+      if (!accId) return;
+      if (accId === 'account1') accId = 'Account 1';
+      _selectedAccountId = accId;
+
+      // 1. Synchronize Dropdown in Hypotheticals Card
+      const selectEl = document.getElementById('hypo-acc-select');
+      if (selectEl) selectEl.value = accId;
+
+      // 2. Synchronize Account Tabs (A1 - A8)
+      for (let i = 1; i <= 8; i++) {
+        const tab = document.getElementById(`acc-tab-${i}`);
+        if (tab) {
+          tab.className = (`Account ${i}` === accId) ? "btn-sharp-tab active" : "btn-sharp-tab";
+        }
+      }
+
+      // 3. Highlight Selected Row in Fleet Table
+      for (let i = 1; i <= 8; i++) {
+        const row = document.getElementById(`fleet-row-${i}`);
+        if (row) {
+          if (`Account ${i}` === accId) {
+            row.className = "bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer transition-colors";
+          } else {
+            row.className = "hover:bg-white/[0.04] cursor-pointer transition-colors";
+          }
+        }
+      }
+
+      // 4. Update Gauge and Hypotheticals
+      updateGaugeDisplay();
+      updateHypotheticalsDisplay();
+    }
+
+    function updateGaugeDisplay() {
+      if (!_globalState) return;
+
+      let acc = null;
+      if (_globalState.fleet) {
+        acc = _globalState.fleet.find(a => a.id === _selectedAccountId);
+      }
+      const hData = _globalState.hypotheticals ? (_globalState.hypotheticals[_selectedAccountId] || _globalState.hypotheticals['Account 1'] || _globalState.hypotheticals['account1']) : null;
+
+      const isFunded = _selectedAccountId === 'Account 1';
+      const bal = acc ? acc.balance : (hData ? hData.current_balance : 25566.33);
+      const target = acc ? acc.target : (hData ? hData.target : 27000.00);
+      const profit = acc ? acc.profit : (hData ? hData.current_profit : 566.33);
+      const tier = acc ? acc.tier : (hData ? hData.tier : '$25k');
+      const dailyCap = hData ? hData.daily_cap : (tier.includes('50k') ? 800.0 : (tier.includes('10k') ? 160.0 : 400.0));
+
+      // 1. Text Below Gauge
+      const balStr = '$' + Number(bal).toLocaleString('en-US', {minimumFractionDigits: 2});
+      const targetStr = '$' + Number(target).toLocaleString('en-US');
+      document.getElementById('gauge-acc-display').innerHTML = `${balStr} <span class="text-teal-300 font-normal">→</span> ${targetStr}`;
+
+      const targetProfit = target - (bal - profit);
+      const subtitleLabel = isFunded
+        ? `${_selectedAccountId} (${tier} Funded) • Target Profit: +$${Number(targetProfit).toLocaleString('en-US')}`
+        : `${_selectedAccountId} (${tier} Eval) • Target Profit: +$${Number(targetProfit).toLocaleString('en-US')}`;
+      document.getElementById('gauge-acc-subtitle').textContent = subtitleLabel;
+
+      // 2. Metrics Rows
+      const profitEl = document.getElementById('gauge-profit');
+      if (profit >= 0) {
+        profitEl.textContent = '+$' + Number(profit).toLocaleString('en-US', {minimumFractionDigits: 2});
+        profitEl.className = 'font-mono font-bold text-teal-300 text-[10.5px]';
+      } else {
+        profitEl.textContent = '-$' + Math.abs(profit).toLocaleString('en-US', {minimumFractionDigits: 2});
+        profitEl.className = 'font-mono font-bold text-rose-400 text-[10.5px]';
+      }
+
+      document.getElementById('gauge-cap').textContent = '$' + Number(dailyCap).toLocaleString('en-US', {minimumFractionDigits: 2});
+
+      // 3. Progress Percentage & Radial Needle
+      let pct = 0;
+      if (targetProfit > 0) {
+        pct = Math.min(100, Math.max(0, (profit / targetProfit) * 100));
+      }
+      document.getElementById('gauge-progress-label').textContent = isFunded ? 'Payout Pct' : 'Pass Pct';
+      document.getElementById('gauge-pct').textContent = pct.toFixed(1) + '%';
+      document.getElementById('gauge-pct').className = pct > 0 ? 'font-mono text-cyan-300 font-bold text-[10.5px]' : 'font-mono text-slate-400 font-bold text-[10.5px]';
+
+      const offset = 283 - (pct / 100) * 140;
+      const arcEl = document.getElementById('gauge-arc');
+      if (arcEl) arcEl.style.strokeDashoffset = offset;
+
+      const angle = -180 + (pct / 100) * 180;
+      const rad = (angle * Math.PI) / 180;
+      const nx = 120 + 80 * Math.cos(rad);
+      const ny = 115 + 80 * Math.sin(rad);
+      const needle = document.getElementById('gauge-needle');
+      if (needle) {
+        needle.setAttribute('x2', nx);
+        needle.setAttribute('y2', ny);
+      }
+    }
+
+    function onWhatIfSlider(val) {
+      document.getElementById('whatif-val-display').textContent = '$' + val + ' / day';
+      if (!_globalState || !_globalState.hypotheticals) return;
+      const hData = _globalState.hypotheticals[_selectedAccountId] || _globalState.hypotheticals['Account 1'] || _globalState.hypotheticals['account1'];
+      if (!hData) return;
+
+      const needed = hData.profit_needed || 1433.67;
+      const dailyCap = hData.daily_cap || 400.0;
+      const dailyVal = parseFloat(val);
+      const days = Math.max(1, Math.ceil(needed / dailyVal));
+      
+      // Calculate target date skipping weekends
+      const d = new Date();
+      let added = 0;
+      while (added < days) {
+        d.setDate(d.getDate() + 1);
+        if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+      }
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const dateStr = monthNames[d.getMonth()] + ' ' + d.getDate();
+
+      const totalTargetProfit = hData.target - (hData.current_balance - hData.current_profit);
+      const pctOfTarget = totalTargetProfit > 0 ? ((dailyVal / totalTargetProfit) * 100).toFixed(1) : 0;
+      const isCompliant = dailyVal <= (dailyCap + 0.01);
+      
+      const badgeHtml = isCompliant 
+        ? `<span class="text-teal-300">✅ Compliant (${pctOfTarget}% of Target/d)</span>`
+        : `<span class="text-rose-400 font-bold">⚠️ Exceeds 20% Cap ($${dailyCap.toFixed(0)})</span>`;
+
+      document.getElementById('whatif-output').innerHTML = `${days} Days (${dateStr}) • ${badgeHtml}`;
+    }
+
+    function updateHypotheticalsDisplay() {
+      if (!_globalState || !_globalState.hypotheticals) return;
+      const hData = _globalState.hypotheticals[_selectedAccountId] || _globalState.hypotheticals['Account 1'] || _globalState.hypotheticals['account1'];
+      if (!hData) return;
+
+      document.getElementById('hypo-needed').textContent = '$' + Number(hData.profit_needed).toLocaleString('en-US', {minimumFractionDigits: 2});
+      document.getElementById('hypo-cap').textContent = '$' + Number(hData.daily_cap).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' / day';
+
+      // Update Slider Max & Value
+      const slider = document.getElementById('whatif-slider');
+      if (slider) {
+        slider.max = Math.max(800, Math.round(hData.daily_cap * 1.5));
+      }
+
+      if (hData.scenarios) {
+        // Fastest 20% Cap
+        if (hData.scenarios.fastest_cap) {
+          const s = hData.scenarios.fastest_cap;
+          document.getElementById('hypo-cap-days').textContent = s.days + ' Days';
+          document.getElementById('hypo-cap-rate').textContent = '+$' + Number(s.daily_pnl).toFixed(2) + '/d';
+          document.getElementById('hypo-cap-date').textContent = s.projected_date;
+        }
+        // Baseline
+        if (hData.scenarios.baseline) {
+          const s = hData.scenarios.baseline;
+          document.getElementById('hypo-base-days').textContent = s.days + ' Days';
+          document.getElementById('hypo-base-rate').textContent = '+$' + Number(s.daily_pnl).toFixed(2) + '/d';
+          document.getElementById('hypo-base-date').textContent = s.projected_date;
+        }
+        // Conservative
+        if (hData.scenarios.conservative) {
+          const s = hData.scenarios.conservative;
+          document.getElementById('hypo-cons-days').textContent = s.days + ' Days';
+          document.getElementById('hypo-cons-rate').textContent = '+$' + Number(s.daily_pnl).toFixed(2) + '/d';
+          document.getElementById('hypo-cons-date').textContent = s.projected_date;
+        }
+      }
+
+      const currentSliderVal = document.getElementById('whatif-slider')?.value || Math.round(hData.daily_cap * 0.6);
+      onWhatIfSlider(currentSliderVal);
+
+      // Update Strategy Matrix Table if data exists
+      if (_globalState.strategies && _globalState.strategies.length > 0) {
+        const tbody = document.getElementById('strat-matrix-tbody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          _globalState.strategies.forEach(s => {
+            const tr = document.createElement('tr');
+            const isLive = s.status.includes('CHAMPION') || s.status.includes('LIVE');
+            const wrLive = s.live_wr > 0 ? `${s.live_wr.toFixed(1)}% (${s.live_trades})` : '—';
+            const badgeClass = s.status.includes('CHAMPION') 
+              ? 'bg-teal-500/10 text-teal-300 border-teal-500/20' 
+              : (isLive ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' : 'bg-slate-500/10 text-slate-300 border-slate-500/20');
+            const badgeText = s.status.includes('CHAMPION') ? '👑 CHAMPION' : (isLive ? '⚡ PROBATION' : '🧪 SHADOW');
+            const nameColor = isLive ? 'text-white font-medium' : 'text-slate-400';
+            const wrColor = isLive ? 'text-teal-300 font-bold' : 'text-slate-500';
+
+            tr.innerHTML = `
+              <td class="py-0.5 ${nameColor}">${s.name}</td>
+              <td class="text-right ${wrColor}">${wrLive}</td>
+              <td class="text-right text-cyan-300">${s.shadow_wr.toFixed(1)}% (${s.shadow_samples})</td>
+              <td class="text-right text-white">${Number(s.shadow_pf).toFixed(2)}</td>
+              <td class="text-right"><span class="px-1 py-0.5 rounded border ${badgeClass} text-[7.5px] font-semibold">${badgeText}</span></td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      }
+    }
+
+    // SSE Connection Handler
+    function connectSSE() {
+      const evtSource = new EventSource('/api/stream');
+
+      evtSource.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          _globalState = data;
+          renderState(data);
+          updateGaugeDisplay();
+          updateHypotheticalsDisplay();
+          updateStrategyDisplay();
+        } catch (e) {
+          console.error("SSE parse error:", e);
+        }
+      };
+
+      evtSource.onerror = function() {
+        document.getElementById('daemon-status').textContent = 'RECONNECTING';
+        document.getElementById('daemon-status').className = 'text-rose-400 font-semibold';
+        evtSource.close();
+        setTimeout(connectSSE, 3000);
+      };
+    }
+
+    function renderState(data) {
+      document.getElementById('daemon-status').textContent = data.daemon_status || 'NOMINAL';
+      document.getElementById('daemon-status').className = 'text-teal-300 font-semibold';
+      document.getElementById('tick-latency').textContent = (data.latency_ms || 0.4) + 'ms';
+
+      // 0. Cognitive Pipeline Real-Time Decision Tree
+      if (data.cognitive_pipeline) {
+        const cp = data.cognitive_pipeline;
+        document.getElementById('pipeline-symbol').textContent = cp.active_symbol || 'BTC/USD';
+        document.getElementById('pipeline-cycle').textContent = (cp.total_cycles || 14892).toLocaleString();
+        document.getElementById('pipeline-latency').textContent = (cp.cycle_time_ms ? (cp.cycle_time_ms / 1000).toFixed(2) : '0.32') + 's';
+        document.getElementById('pipeline-status').textContent = cp.overall_status || 'LIVE EVALUATION';
+        document.getElementById('pipeline-thought').textContent = cp.latest_thought || 'Evaluating liquidity structure and Bayesian prior updates...';
+
+        if (cp.stages && cp.stages.length >= 7) {
+          for (let i = 0; i < 7; i++) {
+            const st = cp.stages[i];
+            const idx = i + 1;
+            const statusEl = document.getElementById(`dt-node-${idx}-status`);
+            const paramEl = document.getElementById(`dt-node-${idx}-param`);
+            const metricEl = document.getElementById(`dt-node-${idx}-metric`);
+            if (statusEl && st) {
+              statusEl.textContent = st.status;
+              statusEl.className = st.status_color === 'teal' ? 'text-teal-300 font-bold' : 'text-cyan-300 font-bold';
+            }
+            if (paramEl && st) paramEl.textContent = st.param;
+            if (metricEl && st) metricEl.textContent = st.metric;
+          }
+        }
+      }
+
+      // 1. 8-Account Fleet Table with Click-to-Select
+      if (data.fleet) {
+        const tbody = document.getElementById('fleet-table-body');
+        tbody.innerHTML = '';
+        data.fleet.forEach((acc, idx) => {
+          const tr = document.createElement('tr');
+          const isSelected = acc.id === _selectedAccountId;
+          const balColor = acc.profit >= 0 ? 'text-teal-300 font-bold' : 'text-slate-300 font-bold';
+          const rowClass = isSelected 
+            ? 'bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer transition-colors' 
+            : 'hover:bg-white/[0.04] cursor-pointer transition-colors';
+          tr.id = `fleet-row-${idx + 1}`;
+          tr.className = rowClass;
+          tr.onclick = () => selectAccount(acc.id);
+          tr.innerHTML = `
+            <td class="py-1 pl-1.5 text-white font-medium flex items-center gap-1.5">
+              ${isSelected ? '<span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>' : ''}
+              <span>${acc.id}</span>
+            </td>
+            <td class="text-slate-400">${acc.tier}</td>
+            <td class="text-right ${balColor}">$${Number(acc.balance).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+            <td class="text-right text-slate-400">$${Number(acc.target).toLocaleString('en-US')}</td>
+            <td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px] font-semibold">${acc.status}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+        document.getElementById('total-fleet-nav-pill').textContent = 'NAV: $' + Number(data.total_fleet_nav).toLocaleString('en-US', {minimumFractionDigits: 2});
+      }
+
+      // 2. Dynamic Agent Calls & Shadow Lab Inspector
+      if (data.agent_calls && data.agent_calls.length > 0) {
+        const container = document.getElementById('agent-calls-container');
+        container.innerHTML = '';
+        data.agent_calls.forEach(call => {
+          const isLive = call.mode.includes('LIVE');
+          const badgeClass = isLive 
+            ? 'bg-teal-500/15 text-teal-300 border-teal-400/30' 
+            : 'bg-cyan-500/15 text-cyan-300 border-cyan-400/30';
+          const scoreColor = isLive ? 'text-teal-300' : 'text-cyan-300';
+          const hoverBorder = isLive ? 'hover:border-teal-400/40' : 'hover:border-cyan-400/40';
+
+          const card = document.createElement('div');
+          card.className = `p-2 rounded sub-glass ${hoverBorder} transition-all`;
+          card.innerHTML = `
+            <div class="flex items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-mono font-bold text-white text-xs">${call.symbol}</span>
+                <span class="px-1.5 py-0.5 rounded text-[8px] font-mono border ${badgeClass}">${call.mode}</span>
+                <span class="text-xs text-slate-200 font-medium">${call.pattern}</span>
+              </div>
+              <div class="font-mono text-xs ${scoreColor} font-bold shrink-0">AI: ${Number(call.ai_score).toFixed(1)}/10</div>
+            </div>
+            <p class="text-[10px] text-slate-300 mt-1 leading-snug">
+              ${call.reasoning}
+            </p>
+            <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 mt-1 pt-1 border-t border-white/[0.06]">
+              <span>Verdict: <strong class="text-slate-200">${call.verdict}</strong> | Hurst: ${Number(call.hurst).toFixed(3)}</span>
+              <span>${call.time} UTC</span>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      }
+
+      // 3. Sovereign Fleet Execution & Safety Audit Stream
+      if (data.stream_logs && data.stream_logs.length > 0) {
+        const streamContainer = document.getElementById('stream-container');
+        if (streamContainer) {
+          streamContainer.innerHTML = '';
+          data.stream_logs.forEach(log => {
+            const isTeal = log.color === 'teal';
+            const dotColor = isTeal ? 'bg-teal-400' : 'bg-cyan-400';
+            const pulseClass = log.type === 'HEARTBEAT' ? 'animate-pulse shadow-[0_0_6px_#2DD4BF]' : '';
+            const badgeClass = isTeal 
+              ? 'bg-teal-500/15 text-teal-300 border border-teal-400/30' 
+              : 'bg-cyan-500/15 text-cyan-300 border border-cyan-400/30';
+            const statusColor = isTeal ? 'text-teal-300 font-bold' : 'text-cyan-300 font-bold';
+
+            const div = document.createElement('div');
+            div.className = `p-1.5 rounded sub-glass flex items-center justify-between hover:border-teal-400/30 transition-all font-mono text-[9.5px]`;
+            div.innerHTML = `
+              <div class="flex items-center gap-1.5 truncate">
+                <span class="w-1.5 h-1.5 rounded-full ${dotColor} ${pulseClass}"></span>
+                <span class="text-slate-400 text-[8.5px]">${log.time}</span>
+                <span class="px-1 py-0.5 rounded text-[7.5px] font-semibold ${badgeClass}">${log.tag}</span>
+                <span class="text-slate-200 truncate">${log.msg}</span>
+              </div>
+              <span class="${statusColor} shrink-0 text-[8.5px]">${log.status}</span>
+            `;
+            streamContainer.appendChild(div);
+          });
+        }
+      }
+
+      lucide.createIcons();
+    }
+
+    // Texture Theme & Dark Overlay Control
+    function setTextureMode(mode) {
+      const root = document.documentElement;
+      const modes = ['dark', 'subtle', 'vivid', 'off'];
+      
+      // Update buttons
+      modes.forEach(m => {
+        const btn = document.getElementById(`btn-tex-${m}`);
+        if (btn) {
+          btn.className = (m === mode) ? "btn-sharp active" : "btn-sharp";
+        }
+      });
+
+      if (mode === 'dark') {
+        // High contrast dark obsidian overlay (Default & Recommended)
+        root.style.setProperty('--ambient-opacity-1', '0.12');
+        root.style.setProperty('--ambient-opacity-2', '0.10');
+        root.style.setProperty('--dark-overlay-opacity', '0.88');
+        root.style.setProperty('--panel-tex-opacity', '0.08');
+      } else if (mode === 'subtle') {
+        root.style.setProperty('--ambient-opacity-1', '0.18');
+        root.style.setProperty('--ambient-opacity-2', '0.15');
+        root.style.setProperty('--dark-overlay-opacity', '0.78');
+        root.style.setProperty('--panel-tex-opacity', '0.12');
+      } else if (mode === 'vivid') {
+        root.style.setProperty('--ambient-opacity-1', '0.28');
+        root.style.setProperty('--ambient-opacity-2', '0.24');
+        root.style.setProperty('--dark-overlay-opacity', '0.62');
+        root.style.setProperty('--panel-tex-opacity', '0.20');
+      } else if (mode === 'off') {
+        root.style.setProperty('--ambient-opacity-1', '0.0');
+        root.style.setProperty('--ambient-opacity-2', '0.0');
+        root.style.setProperty('--dark-overlay-opacity', '1.0');
+        root.style.setProperty('--panel-tex-opacity', '0.0');
+      }
+
+      try {
+        localStorage.setItem('glass_hud_theme_mode', mode);
+      } catch (e) {}
+    }
+
+    // Initialize theme mode & real-time SSE stream on page load
+    try {
+      const savedMode = localStorage.getItem('glass_hud_theme_mode') || 'dark';
+      setTextureMode(savedMode);
+    } catch (e) {
+      setTextureMode('dark');
+    }
+
+    connectSSE();
+
+    // Sovereign 1-Click Flatten Handler
+    function triggerFleetFlatten() {
+      if (!confirm("⚠️ SOVEREIGN INTENT PROTOCOL: Execute 1-Click Fleet Flatten across all 8 TradeLocker accounts?")) {
+        return;
+      }
+      const btn = document.getElementById('btn-flatten');
+      btn.innerHTML = `<span>FLATTENING FLEET...</span>`;
+      btn.style.opacity = "0.5";
+
+      fetch('/api/action/flatten', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          alert("✅ Sovereign Command Executed: " + (data.message || "Fleet Flattened"));
+          btn.innerHTML = `<i data-lucide="zap" class="w-3.5 h-3.5 text-rose-400"></i><span>1-CLICK EMERGENCY FLATTEN</span>`;
+          btn.style.opacity = "1";
+          lucide.createIcons();
+        })
+        .catch(err => {
+          alert("❌ Execution failed: " + err);
+          btn.innerHTML = `<i data-lucide="zap" class="w-3.5 h-3.5 text-rose-400"></i><span>1-CLICK EMERGENCY FLATTEN</span>`;
+          btn.style.opacity = "1";
+          lucide.createIcons();
+        });
+    }
+  </script>
+</body>
+</html>
