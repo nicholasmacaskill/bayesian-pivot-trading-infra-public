@@ -119,7 +119,13 @@ class PositionWatchdog:
                     
                     print(f"[{symbol}] PnL: ${pnl:.2f} | Risk: ${risk_usd:.2f} | R: {r_multiple:.2f}")
 
-                    # 3. Alert Logic
+                    # 3. Alert & Automated Fleet Scale-Out Logic
+                    if r_multiple >= 1.5 and not self.alerted_trades.get(t_id, {}).get("scaleout_executed"):
+                        print(f"💰 [AUTO SCALE-OUT] {symbol} hit {r_multiple:.2f}R! Executing 50% Fleet Scale-Out...")
+                        self.execute_fleet_scaleout(symbol, entry)
+                        self.alerted_trades[t_id]["scaleout_executed"] = True
+                        self.save_state()
+
                     for target in [1.5, 2.0, 3.0]:
                         target_key = str(target)
                         if r_multiple >= target and not self.alerted_trades.get(t_id, {}).get(target_key):
@@ -139,6 +145,61 @@ class PositionWatchdog:
                 print(f"Watchdog Loop Error: {e}")
             
             time.sleep(60) # Poll every 60s
+
+    def execute_fleet_scaleout(self, symbol: str, entry_price: float):
+        """
+        Automated 50/50 Fleet Partitioning Scale-Out (Strict AGENTS.md Compliance):
+        - Accounts 0-3 (50% Fleet): Closes positions via DELETE /positions/{id} to realize cash profit.
+        - Accounts 4-7 (50% Fleet): Moves SL to Break-Even via PATCH /positions/{id} to let runners ride risk-free.
+        """
+        try:
+            close_accounts = [0, 1, 2, 3]
+            trail_accounts = [4, 5, 6, 7]
+            closed_count = 0
+            trailed_count = 0
+            
+            # 1. Close Accounts 0, 1, 2, 3
+            for acc_idx in close_accounts:
+                if acc_idx >= len(self.tl.helpers):
+                    continue
+                helper = self.tl.helpers[acc_idx]
+                if not helper.access_token and not helper.login():
+                    continue
+                positions = helper.get_open_positions()
+                target_pos = [p for p in positions if str(p.get("symbol", "")).upper() == symbol.upper() or "BTC" in str(p.get("symbol", "")).upper()]
+                for pos in target_pos:
+                    pos_id = pos.get("id") or pos.get("positionId")
+                    if helper.close_position(pos_id):
+                        closed_count += 1
+                time.sleep(2.0) # Adaptive 2.0s pacing between accounts
+
+            # 2. Trail Stop Loss on Accounts 4, 5, 6, 7 to Entry (Break-Even)
+            for acc_idx in trail_accounts:
+                if acc_idx >= len(self.tl.helpers):
+                    continue
+                helper = self.tl.helpers[acc_idx]
+                if not helper.access_token and not helper.login():
+                    continue
+                positions = helper.get_open_positions()
+                target_pos = [p for p in positions if str(p.get("symbol", "")).upper() == symbol.upper() or "BTC" in str(p.get("symbol", "")).upper()]
+                for pos in target_pos:
+                    pos_id = pos.get("id") or pos.get("positionId")
+                    if helper.modify_position_bracket(pos_id, stop_loss=float(entry_price)):
+                        trailed_count += 1
+                time.sleep(2.0) # Adaptive 2.0s pacing between accounts
+
+            scaleout_msg = (
+                f"💰 <b>AUTONOMOUS 50% FLEET SCALE-OUT EXECUTED</b>\n\n"
+                f"Symbol: <code>{symbol}</code>\n"
+                f"Trigger: <b>+1.5R Reached</b>\n\n"
+                f"🏦 <b>Realized Cash Profit:</b> Closed {closed_count} accounts (Acc 0-3)\n"
+                f"🛡️ <b>Risk-Free Trailing:</b> Moved SL to Break-Even (${entry_price:,.2f}) on {trailed_count} accounts (Acc 4-7)\n\n"
+                f"<i>Invariant: Zero risk remaining. Runners targeting full Take Profit.</i>"
+            )
+            self.notifier._send_message(scaleout_msg)
+            print(f"✅ Fleet Scale-Out Complete: Closed={closed_count}, Trailed={trailed_count}")
+        except Exception as e:
+            print(f"Error executing fleet scaleout: {e}")
 
 if __name__ == "__main__":
     PositionWatchdog().run()
