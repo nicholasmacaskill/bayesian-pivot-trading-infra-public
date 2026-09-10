@@ -7,6 +7,8 @@ secrets.json
 # Database
 *.db
 *.sqlite
+*.db-shm
+*.db-wal
 data/charts/
 public_export/
 *.out
@@ -76,6 +78,7 @@ src/sovereign_core/
 *.mp3
 *.png
 !README_images/*.png
+!src/ui/assets/*.png
 
 # Repomix & Codebase Exports
 repomix-output*

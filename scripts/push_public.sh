@@ -21,6 +21,17 @@ git checkout -b "$TMP_BRANCH"
 REMOVE_FILES=(
   # Core IP — scanner logic
   "src/engines/smc_scanner.py"         # Replaced by stub in public mirror
+  "src/engines/alpha_sweep_scanner.py"
+  "src/engines/champion_challenger_lab.py"
+  "src/engines/judas_inducement_engine.py"
+  "src/engines/psychology_engine.py"
+  "src/engines/execution_shadow_engine.py"
+  "src/engines/biometric_engine.py"
+  "src/engines/counterfactual_tracker.py"
+  "src/engines/inducement_tracker.py"
+  "src/engines/multi_account_funnel.py"
+  "src/engines/qa_quant_agent.py"
+  "src/sovereign_core/"
   "src/engines/sovereign_engine/patterns.py"
   "src/engines/sovereign_engine/scanners.py"
   "src/engines/sovereign_engine/analyzer.py"
@@ -43,8 +54,14 @@ REMOVE_FILES=(
 
   # Runner orchestration
   "src/runners/local_scanner.py"
+  "src/runners/alpha_sweep_runner.py"
+  "src/runners/shadow_leaderboard.py"
   "src/runners/forensic_audit.py"
   "src/runners/sovereign_ctl.py"
+
+  # Tools & Cron
+  "tools/cookie_guardian/"
+  "cron/"
 
   # Strategy blueprints (replaced by philosophy doc)
   "strategies/strategy_2_mean_reversion.md"
@@ -79,7 +96,17 @@ done
 cat > .gitignore.public << 'EOF'
 # Private implementation files — not published in public mirror
 src/engines/smc_scanner_impl.py
+src/engines/alpha_sweep_scanner.py
+src/engines/champion_challenger_lab.py
+src/engines/judas_inducement_engine.py
+src/engines/psychology_engine.py
+src/engines/execution_shadow_engine.py
+src/engines/biometric_engine.py
+src/engines/counterfactual_tracker.py
+src/engines/inducement_tracker.py
+src/engines/multi_account_funnel.py
 src/engines/sovereign_engine/
+src/sovereign_core/
 src/engines/ai_audit_engine.py
 src/engines/ai_validator_impl.py
 src/engines/correlation_gate.py
@@ -88,8 +115,12 @@ src/engines/intermarket_engine.py
 src/engines/execution_audit.py
 src/engines/trade_ledger.py
 src/runners/local_scanner.py
+src/runners/alpha_sweep_runner.py
+src/runners/shadow_leaderboard.py
 src/runners/forensic_audit.py
 src/runners/sovereign_ctl.py
+tools/cookie_guardian/
+cron/
 strategies/future_ideas.md
 strategies/strategy_2_*.md
 strategies/strategy_3_*.md
