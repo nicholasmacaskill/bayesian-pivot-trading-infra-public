@@ -19,12 +19,9 @@ except Exception:
 
 class Config:
     # Trading Parameters
-    SYMBOLS = ['BTC/USD', 'ETH/USD', 'XAU/USD']  # BTC, ETH, and Gold Active
-
-
-    
-    # Tier 2: High Alpha Altcoins (Judas Sweeps Only)
-    ALT_SYMBOLS = []
+    SYMBOLS = ['BTC/USD', 'ETH/USD', 'XAU/USD']  # BTC, ETH, and Gold Active (Live Fleet Execution)
+    SHADOW_SYMBOLS = ['SOL/USD']                 # 100% Zero-Risk Shadow Tracking (A/B Tournament Lab)
+    ALT_SYMBOLS = ['SOL/USD']
     
     TIMEFRAME = '5m'
     HTF_TIMEFRAME = '1h'
@@ -64,15 +61,15 @@ class Config:
     DAILY_TRADE_LIMIT = 2
     TARGET_RR = 3.0
 
-    # ── Strategy 9: Judas Inducement Hunter (Quarantined to Shadow Lab) ───────
+    # ── Strategy 9: Judas Inducement Hunter (Tier-1 Probationary Live Graduation) ───
     STRATEGY_9_ENABLED = True
     STRATEGY_9_MIN_WICK_PCT = 70.0      # 70% Minimum Rejection Wick
     STRATEGY_9_MIN_ATR_MULT = 1.8       # 1.8x - 2.0x 20-period ATR Range
     STRATEGY_9_MIN_VOL_MULT = 1.8       # 1.8x 20-period Average Volume
-    STRATEGY_9_TARGET_RR = 3.0          # 3.0R Fixed Asymmetric Target
-    STRATEGY_9_RISK_USD = 75.0          # Fixed dollar risk per trade ($75)
+    STRATEGY_9_TARGET_RR = 3.0          # 3.0R Fixed Asymmetric Target ($225 gain / account)
+    STRATEGY_9_RISK_USD = 75.0          # Fixed dollar risk per trade ($75 / account)
     STRATEGY_9_BYPASS_GENERIC_AI = False # Requires full 8.0+ AI Validator gate
-    STRATEGY_9_AUTO_EXECUTE = False     # $0 Real Risk — Shadow Observation Only
+    STRATEGY_9_AUTO_EXECUTE = True      # ✅ GRADUATED: Live Fleet Auto-Execution Enabled
 
     
     # Prop Firm Execution Profiles
@@ -142,7 +139,7 @@ class Config:
     SYNC_AUTH_KEY = os.environ.get("SYNC_AUTH_KEY", "")
     
     # ── TWO-TRANCHE "PROBE & SCALE" AUTO-EXECUTION ENGINE ──
-    LIVE_AUTO_EXECUTION = True                    # ENABLED: Automated trade execution on high-conviction setups
+    LIVE_AUTO_EXECUTION = True                    # ARMED: Live Fleet Auto-Execution Active
     AUTO_PROBE_RISK_SCALE = 1.00                  # 100% full lot size entry with structural stop width
     SCALE_IN_TRANCHE_2_SCALE = 0.00               # Scale-outs used instead of scale-ins
     AUTO_EXECUTION_MIN_SCORE = 8.0                # Minimum AI conviction score required for auto-execution
@@ -176,6 +173,7 @@ class Config:
     
     # Strategy Mode
     STRATEGY_MODE = "VOLUME_OPERATOR"
+    VARIANT_SIZING_SHADOW_MODE = True  # Locks live fleet to Flat 1.0x Base Risk; tests dynamic/variant multipliers in shadow tournament
     AI_THRESHOLD_LONG = 8.0   # Leveled to match shorts (data shows longs avg $360 win vs $221)
     AI_THRESHOLD_SHORT = 8.0
     LONG_RISK_MULTIPLIER = 1.0  # Full size — longs earn it (55.1% win rate, +$5,849 net)
@@ -188,9 +186,9 @@ class Config:
     SYNC_PRICE_DELTA_MAX = 0.005     # 0.5% (Loosened for crypto volatility)
     SYNC_LATENCY_SEC_MAX = 120        # 2 Minutes
     SLIPPAGE_ATR_RATIO_MAX = 1.5      # Spread / ATR(14)
-    HURST_CHAOS_RANGE = (0.45, 0.55)  # Must be rejected as CHOP / RANDOM
+    HURST_CHAOS_RANGE = (0.42, 0.55)  # Must be rejected as CHOP / RANDOM
     HURST_MIN_MEMORY = 0.55          # Trending threshold
-    HURST_MAX_RANDOM = 0.45          # Mean-reverting threshold
+    HURST_MAX_RANDOM = 0.42          # Mean-reverting threshold (Tightened from 0.45 to prevent borderline chop)
     
     # ── AI Risk Logic & Tiered Profit Protection ─────────────
     ROI_OPTIMIZATION_ENABLED = True
@@ -224,6 +222,11 @@ class Config:
     
     # ── Tiered Risk Scaling (Dynamic Fractional Kelly Sizing) ──
     DYNAMIC_RISK_SCALING_ENABLED = True
+    TIER_CAPS_ENABLED = True            # Enforce hard dollar risk ceilings per account tier
+    TIER_MAX_RISK_10K = 30.0            # Hard $30.00 max risk per trade on $10k accounts (0.30%)
+    TIER_MAX_RISK_25K = 75.0            # Hard $75.00 max risk per trade on $25k accounts (0.30%)
+    TIER_MAX_RISK_50K = 150.0           # Hard $150.00 max risk per trade on $50k accounts (0.30%)
+    
     BASELINE_RISK_PCT = 0.005           # 0.50% Standard Risk (Default across all accounts)
     A_PLUS_RISK_PCT = 0.0085            # 0.85% Scaled Risk (For A+ high-win-rate confluence setups)
     A_PLUS_MIN_SCORE = 9.0              # AI Score threshold (>= 9.0 / 10.0 or >= 90 / 100)

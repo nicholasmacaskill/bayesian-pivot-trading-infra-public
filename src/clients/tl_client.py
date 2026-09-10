@@ -468,7 +468,8 @@ class TradeLockerHelper:
         """Safely closes an open position on TradeLocker using DELETE endpoint."""
         if not self.access_token and not self.login():
             return False
-        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+        acc_part = f"/accounts/{self.account_id}" if self.account_id else ""
+        url = f"{self.base_url}/backend-api/trade{acc_part}/positions/{position_id}"
         try:
             resp = requests.delete(url, headers=self._get_headers(auth=True), timeout=10)
             if resp.status_code in [200, 204]:
@@ -751,6 +752,16 @@ class TradeLockerClient:
                 # Exact Dynamic Fractional Dollar Risk Calculation
                 # Sizing: Lots = (Equity * Target Risk Pct) / Stop Loss Distance
                 target_risk_usd = equity * target_risk_pct
+
+                # Enforce Hard Tier-Specific Dollar Risk Ceilings
+                if getattr(Config, 'TIER_CAPS_ENABLED', True):
+                    if equity <= 15000.0:
+                        tier_cap = getattr(Config, 'TIER_MAX_RISK_10K', 30.0)
+                    elif equity <= 35000.0:
+                        tier_cap = getattr(Config, 'TIER_MAX_RISK_25K', 75.0)
+                    else:
+                        tier_cap = getattr(Config, 'TIER_MAX_RISK_50K', 150.0)
+                    target_risk_usd = min(target_risk_usd, tier_cap)
                 
                 # Calculate exact stop loss distance
                 if stop_loss is not None and entry_price is not None:
