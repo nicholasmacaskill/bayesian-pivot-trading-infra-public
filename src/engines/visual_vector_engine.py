@@ -265,6 +265,8 @@ class VisualVectorEngine:
                     if not v_blob:
                         continue
                     db_vector = np.frombuffer(v_blob, dtype=np.float32)
+                    if len(db_vector) != len(query_vector):
+                        continue
                     db_norm = np.linalg.norm(db_vector)
                     if db_norm < 1e-6:
                         continue
