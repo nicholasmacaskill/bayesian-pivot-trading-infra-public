@@ -69,6 +69,9 @@ scanner_backtest_results.json
 data/combinatorial_results.csv
 data/smc_alpha.db.bak
 data/smc_scanner.lock
+data/daily_setup_lock.json*
+data/live_fleet_balances.json
+data/trade_cooldowns.json
 
 # Proprietary IP: DO NOT REMOVE
 src/sovereign_core/
