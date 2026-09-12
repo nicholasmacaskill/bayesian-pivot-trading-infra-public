@@ -11,6 +11,7 @@ from src.engines.shadow_substitution_engine import ShadowSubstitutionEngine
 from src.engines.counterfactual_tracker import CounterfactualTracker
 from src.engines.liquidity_heatmap_engine import LiquidityHeatmapEngine
 from src.engines.retail_trap_engine import RetailStopTrapEngine
+from src.engines.visual_vector_engine import VisualVectorEngine
 from src.clients.tl_client import TradeLockerClient
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ class AlphaSweepScanner(SMCScanner):
         self.counterfactual_tracker = CounterfactualTracker()
         self.heatmap_engine = LiquidityHeatmapEngine()
         self.retail_trap_engine = RetailStopTrapEngine()
+        self.visual_vector_engine = VisualVectorEngine()
         self.tl = TradeLockerClient()
         self._active_trade_brackets = {}
         self._position_tiers = {}
@@ -37,7 +39,13 @@ class AlphaSweepScanner(SMCScanner):
             self.live_orderflow.start()
         except Exception as of_err:
             logger.debug(f"LiveOrderflowFeed auto-start skipped: {of_err}")
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Live Orderflow Feed, Liquidity Heatmap, Retail Trap Shadow Engine & TradeLocker Fleet Client.")
+        try:
+            from src.engines.auction_market_engine import AuctionMarketEngine
+            self.auction_engine = AuctionMarketEngine()
+        except Exception as ame_err:
+            logger.debug(f"AuctionMarketEngine init error: {ame_err}")
+            self.auction_engine = None
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Live Orderflow Feed, Liquidity Heatmap, Retail Trap Shadow Engine, Auction Market Engine & TradeLocker Fleet Client.")
 
     def is_premium_killzone(self, dt=None):
         """
@@ -676,6 +684,34 @@ class AlphaSweepScanner(SMCScanner):
         # 7. Septenary Hunt: 50% Consequent Encroachment FVG Fill (100% Zero-Risk Shadow Tracking)
         if not setup:
             setup = self.check_fvg_50pct_ce_midpoint_shadow(symbol, df_5m, df_1h, killzone)
+
+        # 8. Octonary Hunt: Non-ICT Quantitative Microstructure Contenders (100% Zero-Risk Shadow Tracking)
+        if not setup and getattr(self, 'auction_engine', None):
+            try:
+                non_ict_setups = self.auction_engine.evaluate_all_shadow_contenders(
+                    symbol=symbol,
+                    df_5m=df_5m,
+                    df_1h=df_1h,
+                    live_orderflow=getattr(self, 'live_orderflow', None)
+                )
+                if non_ict_setups:
+                    best_non_ict = non_ict_setups[0]
+                    atr_calc = float((df_5m['high'] - df_5m['low']).rolling(14).mean().iloc[-1])
+                    setup = {
+                        'pattern_type': best_non_ict['pattern'],
+                        'strategy_id': best_non_ict['strategy_id'],
+                        'direction': best_non_ict['direction'],
+                        'price': best_non_ict['entry'],
+                        'level': best_non_ict.get('vah', best_non_ict.get('val', best_non_ict['entry'])),
+                        'stop_loss': best_non_ict['stop_loss'],
+                        'take_profit': best_non_ict['target'],
+                        'atr': atr_calc,
+                        'regime': 'AUCTION_DISCOVERY',
+                        'hurst': 0.40,
+                        'is_shadow_only': True
+                    }
+            except Exception as non_ict_err:
+                logger.debug(f"Non-ICT shadow hunt error: {non_ict_err}")
             
         if setup:
             pattern_type = setup.get('pattern_type', 'TURTLE_SOUP_LIQUIDITY_SWEEP')
@@ -779,20 +815,101 @@ class AlphaSweepScanner(SMCScanner):
                     shadow_score = max(shadow_score - 1.5, 3.0)
             except Exception as liq_err:
                 logger.warning(f"Liquidity heatmap audit error: {liq_err}")
+                is_dense_liq = False  # Safe default: treat as low-density on error
+                liq_density = 0.0
+                liq_msg = "Heatmap audit unavailable"
+                dynamic_tp = None
 
-            # ── DYNAMIC ASYMMETRIC SMT & RELATIVE STRENGTH GATE ──
-            # Measures live ETH/BTC ratio vs 20-period SMA to determine whether BTC is leading or ETH is leading.
-            rs_leader = self.get_relative_strength_leader()
-            if rs_leader == 'BTC_LEADER':
-                # BTC Dominance: BTC is leader, ETH is laggard.
-                is_counter_regime = (symbol == "ETH/USD" and setup['direction'] == "LONG") or (symbol == "BTC/USD" and setup['direction'] == "SHORT")
-                regime_msg = "BTC Dominance"
-            else:
-                # Altseason: ETH is leader, BTC is laggard.
-                is_counter_regime = (symbol == "BTC/USD" and setup['direction'] == "LONG") or (symbol == "ETH/USD" and setup['direction'] == "SHORT")
-                regime_msg = "Altseason (ETH Lead)"
+            # ── NON-ICT MODULAR CONFLUENCE BOOSTERS (AMT, AVWAP, ORDER FLOW ABSORPTION) ──
+            if getattr(self, 'auction_engine', None):
+                try:
+                    boost, boost_reasons = self.auction_engine.get_confluence_boost(
+                        symbol=symbol,
+                        direction=setup['direction'],
+                        entry_price=entry_price,
+                        df_5m=df_5m,
+                        df_1h=df_1h,
+                        live_orderflow=getattr(self, 'live_orderflow', None)
+                    )
+                    if boost > 0:
+                        shadow_score = min(shadow_score + boost, 10.0)
+                        logger.info(f"🏛️ [AUCTION & MICROSTRUCTURE CONFLUENCE] +{boost:.1f} Score Boost: {', '.join(boost_reasons)} -> New Score: {shadow_score:.1f}/10")
+                except Exception as conf_err:
+                    logger.debug(f"Auction confluence boost error: {conf_err}")
 
-            ai_validator_threshold = 9.0 if is_counter_regime else getattr(Config, 'AI_VALIDATOR_MIN_SCORE', 7.5)
+            # ── HARD DENSITY GATE: Low-density sweeps are forced to shadow-only ──
+            # A density < 6.0 means price swept a random local swing, not an
+            # institutional stop cluster. No live capital is ever risked on noise.
+            is_low_density_sweep = not is_dense_liq
+
+            # ── VISUAL VECTOR GEOMETRIC SIMILARITY (SHADOW METADATA — NEVER GATES) ──
+            # Computes a 64-dim geometric feature vector from the live 5m candle geometry
+            # and performs cosine similarity search against all historical outcomes.
+            # This NEVER blocks a trade — it only logs data for future validation.
+            # Promote to a hard gate only after 4–6 weeks of shadow data confirms predictive value.
+            vec_result = {
+                'recommendation': 'NEUTRAL',
+                'confidence': 0.0,
+                'win_rate': 50.0,
+                'avg_r': 0.0,
+                'key_reason': 'Visual vector initializing'
+            }
+            try:
+                query_vec = self.visual_vector_engine.extract_geometric_features(df_5m, setup=setup)
+                vec_result = self.visual_vector_engine.evaluate_visual_precedent(
+                    query_vec, symbol=symbol, direction=setup['direction']
+                )
+                logger.info(
+                    f"🔮 [VISUAL VECTOR] {symbol} {setup['direction']}: {vec_result['key_reason']} "
+                    f"| WinRate: {vec_result['win_rate']:.0f}% | AvgR: {vec_result['avg_r']:.2f}R "
+                    f"| Confidence: {vec_result['confidence']:.1%}"
+                )
+                # Store current geometry for future training (outcome will be stamped back by retraining loop)
+                import uuid
+                sig_id_for_vec = str(uuid.uuid4())[:12]
+                self.visual_vector_engine.store_embedding(
+                    signal_id=sig_id_for_vec,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    symbol=symbol,
+                    pattern=setup.get('pattern_type', 'SMC_SETUP'),
+                    direction=setup['direction'],
+                    outcome='PENDING',  # Retraining loop stamps final outcome
+                    realized_r=0.0,
+                    pnl=0.0,
+                    vector=query_vec,
+                    session=killzone or 'UNKNOWN',
+                    notes=f"density={liq_density:.1f} | shadow_score={shadow_score:.1f}"
+                )
+            except Exception as vve_err:
+                logger.debug(f"Visual vector evaluation skipped (non-blocking): {vve_err}")
+
+            # ── HIGHER-TIMEFRAME (1H) MACRO TREND & REGIME GATE ──
+            # Replaces the old synthetic ETH/BTC ratio with direct 1H EMA & market structure alignment.
+            # Trend-aligned setups require standard conviction (>= 7.5); counter-trend setups require high conviction (>= 8.5).
+            is_counter_regime = False
+            regime_msg = "1H Neutral Structure"
+            try:
+                if df_1h is not None and len(df_1h) >= 20:
+                    ema50_1h = df_1h['close'].ewm(span=min(50, len(df_1h))).mean().iloc[-1]
+                    current_close_1h = df_1h['close'].iloc[-1]
+                    if current_close_1h < ema50_1h:
+                        # 1H Bearish Trend: Shorts are aligned, Longs are counter-trend
+                        if setup['direction'] == "LONG":
+                            is_counter_regime = True
+                            regime_msg = "1H Bearish Trend (Counter-Trend Long)"
+                        else:
+                            regime_msg = "1H Bearish Trend (Aligned Short)"
+                    elif current_close_1h > ema50_1h:
+                        # 1H Bullish Trend: Longs are aligned, Shorts are counter-trend
+                        if setup['direction'] == "SHORT":
+                            is_counter_regime = True
+                            regime_msg = "1H Bullish Trend (Counter-Trend Short)"
+                        else:
+                            regime_msg = "1H Bullish Trend (Aligned Long)"
+            except Exception as htf_err:
+                logger.debug(f"HTF Trend alignment check fallback: {htf_err}")
+
+            ai_validator_threshold = 8.5 if is_counter_regime else getattr(Config, 'AI_VALIDATOR_MIN_SCORE', 7.5)
             
             # ── PRE-COMPUTED ZERO-LATENCY AI RAG CONFLUENCE GATE ──
             dynamic_risk_mult = 1.0
@@ -818,7 +935,14 @@ class AlphaSweepScanner(SMCScanner):
             passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved
             
             is_symbol_shadow = is_shadow or (symbol in getattr(Config, 'SHADOW_SYMBOLS', []))
-            is_archetype_shadow = (pattern_type not in ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"]) or setup.get('is_shadow_only', False) or (killzone == "NY_AFTERNOON_SHADOW") or is_symbol_shadow
+            # is_low_density_sweep: sweep hit a noise level with density < 6.0 — never risk live capital
+            is_archetype_shadow = (
+                (pattern_type not in ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"])
+                or setup.get('is_shadow_only', False)
+                or (killzone == "NY_AFTERNOON_SHADOW")
+                or is_symbol_shadow
+                or is_low_density_sweep  # Hard density gate: noise sweeps → shadow only
+            )
             is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator)
             
             ai_score_val = shadow_score
@@ -836,6 +960,10 @@ class AlphaSweepScanner(SMCScanner):
                     vwap_z = shadow_report.get('session_vwap', {}).get('z_score', 0)
                     kalman_st = shadow_report.get('kalman_mss', {}).get('state', 'NEUTRAL')
                     ai_reasoning = f"[👻 SHADOW TRADE - DIDN'T PASS AI VALIDATOR (Score: {shadow_score:.1f}/10 < {ai_validator_threshold})] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Failed confluences: CVD={cvd_detail}, VWAP_Z={vwap_z:.2f}, Kalman={kalman_st}."
+            elif is_low_density_sweep:
+                tag_label = "shadow trade, low-density noise sweep"
+                pattern_str = f"[👻 SHADOW - LOW DENSITY SWEEP ({liq_density:.1f}/10)] {base_pattern_str}"
+                ai_reasoning = f"[👻 SHADOW LAB (LOW DENSITY SWEEP)] {pattern_type.replace('_', ' ')} of level {setup['level']:.2f} has insufficient stop cluster density ({liq_density:.1f}/10 < 6.0). Not a verified institutional POI. Quarantined to $0 risk."
             elif is_symbol_shadow:
                 tag_label = "shadow asset quarantine ($0 live risk)"
                 pattern_str = f"[👻 SHADOW LAB - {symbol}] {base_pattern_str}"
@@ -847,7 +975,7 @@ class AlphaSweepScanner(SMCScanner):
             else:
                 tag_label = "live master weapon"
                 pattern_str = base_pattern_str
-                ai_reasoning = f"[👑 LIVE MASTER WEAPON] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10."
+                ai_reasoning = f"[👑 LIVE MASTER WEAPON] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10. 🔮 Vec: {vec_result['recommendation']} ({vec_result['win_rate']:.0f}% WR, {vec_result['avg_r']:.1f}R avg)."
             
             # Prepare scan payload
             scan_payload = {
@@ -863,7 +991,16 @@ class AlphaSweepScanner(SMCScanner):
                 "killzone": killzone,
                 "hurst": setup['hurst'],
                 "smt_strength": 0.0,
-                "formations": f"Sweep of {setup['level']:.2f} | AI Score: {shadow_score:.1f}/10 | {tag_label}"
+                "formations": f"Sweep of {setup['level']:.2f} | AI Score: {shadow_score:.1f}/10 | {tag_label}",
+                # ── Visual Vector Shadow Metadata (for future gate validation) ──
+                "vec_recommendation": vec_result.get('recommendation', 'NEUTRAL'),
+                "vec_win_rate": round(vec_result.get('win_rate', 50.0), 1),
+                "vec_avg_r": round(vec_result.get('avg_r', 0.0), 2),
+                "vec_confidence": round(vec_result.get('confidence', 0.0), 3),
+                "vec_key_reason": vec_result.get('key_reason', 'N/A'),
+                # ── Heatmap metadata ──
+                "liq_density": round(liq_density, 1),
+                "is_dense_liq": is_dense_liq,
             }
             
             ai_result = {
@@ -881,7 +1018,14 @@ class AlphaSweepScanner(SMCScanner):
             if is_shadow_strategy:
                 setup['is_shadow_only'] = True
                 acct_label = f"{pattern_type}_SHADOW"
-                rejection_reasons = ["SHADOW_TRADE_DIDNT_PASS_AI_VALIDATOR"] if not passed_ai_validator else ["SHADOW_STRATEGY_ZERO_LIVE_CAPITAL_RISK"]
+                if not passed_ai_validator:
+                    rejection_reasons = ["SHADOW_TRADE_DIDNT_PASS_AI_VALIDATOR"]
+                elif is_low_density_sweep:
+                    rejection_reasons = [f"LOW_DENSITY_LIQUIDITY_SWEEP_{liq_density:.1f}/10"]
+                else:
+                    rejection_reasons = ["SHADOW_STRATEGY_ZERO_LIVE_CAPITAL_RISK"]
+                # Append visual vector recommendation for future analysis
+                rejection_reasons.append(f"VEC_{vec_result.get('recommendation', 'NEUTRAL')}_{vec_result.get('win_rate', 50.0):.0f}pct_WR")
                 try:
                     self.counterfactual_tracker.register_shadow_trade(
                         setup={

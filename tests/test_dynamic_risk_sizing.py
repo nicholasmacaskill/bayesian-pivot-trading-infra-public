@@ -12,16 +12,16 @@ class TestDynamicRiskSizing(unittest.TestCase):
     """
     Unit tests for Dynamic Quality-Adjusted Risk Sizing & Fractional Kelly Scaling.
     Verifies that:
-    1. Standard setups execute at 0.50% baseline risk.
-    2. A+ Confluence setups scale up to 0.85% risk.
+    1. Standard setups execute at tier-capped defensive risk.
+    2. Distance-to-Default (DtD) buffer runway limits risk proportionally.
     3. The 1.00% hard safety ceiling is strictly enforced.
     4. Two-tranche scale-out splits adapt correctly to the dynamic lot sizing.
     """
 
     def setUp(self):
         self.mock_helper = MagicMock(spec=TradeLockerHelper)
-        self.mock_helper.email = "s79qv3xetj@upcomers.com"
-        self.mock_helper.balance = 25788.92
+        self.mock_helper.email = "eval_user@upcomers.com"
+        self.mock_helper.balance = 25000.00
         self.mock_helper.access_token = "mock_token"
         self.mock_helper.place_order.return_value = {"orderId": "12345"}
         
@@ -29,10 +29,11 @@ class TestDynamicRiskSizing(unittest.TestCase):
         self.client.helpers = [self.mock_helper]
 
     @patch("src.core.execution_firewall.ExecutionFirewall.audit_trade_request", return_value=(True, "Approved"))
-    def test_tier_cap_sizing_enforcement(self, mock_firewall):
-        """On $25k account tier, risk is strictly clamped to $75.00 max ($75 / $300 = 0.25 lots)."""
+    @patch("src.core.execution_firewall.ExecutionFirewall.is_account_eligible", return_value=(True, "ELIGIBLE"))
+    def test_tier_cap_sizing_enforcement(self, mock_eligible, mock_firewall):
+        """On $25k eval account tier, risk is strictly clamped to $50.00 max ($50 / $300 = 0.17 lots)."""
         # Entry 80,000, SL 79,700 -> stop_dist = $300
-        # Equity = $25,788.92 -> Tier cap = $75.00 -> exact_lots = 75.00 / 300 = 0.25 lots
+        # Equity = $25,000 -> Tier cap = $50.00 -> exact_lots = 50.00 / 300 = 0.17 lots
         res = self.client.execute_trade_across_all_accounts(
             symbol="BTC/USD",
             side="buy",
@@ -41,24 +42,25 @@ class TestDynamicRiskSizing(unittest.TestCase):
             take_profit=80900.0,
             ai_score=8.4,
             has_smt=False,
-            session="ASIAN_RANGE",
+            session="LONDON_KILLZONE",
             hurst_exponent=0.55
         )
         self.assertTrue(res["success"])
-        # On Account 1 (Scale-Out), 0.25 lots splits into Tranche 1 (0.12 lots) & Tranche 2 (0.13 lots)
+        # On Account index 0 (Scale-Out), 0.17 lots splits into Tranche 1 (0.09 lots) & Tranche 2 (0.08 lots)
         self.assertEqual(self.mock_helper.place_order.call_count, 2)
         args_t1 = self.mock_helper.place_order.call_args_list[0][1]
         args_t2 = self.mock_helper.place_order.call_args_list[1][1]
-        self.assertEqual(args_t1["qty"], 0.12)
-        self.assertEqual(args_t2["qty"], 0.13)
-        self.assertEqual(round(args_t1["qty"] + args_t2["qty"], 2), 0.25)
+        self.assertEqual(args_t1["qty"], 0.09)
+        self.assertEqual(args_t2["qty"], 0.08)
+        self.assertEqual(round(args_t1["qty"] + args_t2["qty"], 2), 0.17)
 
     @patch("src.core.execution_firewall.ExecutionFirewall.audit_trade_request", return_value=(True, "Approved"))
-    def test_10k_tier_cap_sizing(self, mock_firewall):
-        """On $10k account tier, risk is strictly clamped to $30.00 max ($30 / $300 = 0.10 lots)."""
+    @patch("src.core.execution_firewall.ExecutionFirewall.is_account_eligible", return_value=(True, "ELIGIBLE"))
+    def test_10k_tier_cap_sizing(self, mock_eligible, mock_firewall):
+        """On $10k account tier, DtD buffer limits risk to 8% of remaining buffer ($17.07 / $300 = 0.06 lots)."""
         self.mock_helper.balance = 9713.35
         # Entry 80,000, SL 79,700 -> stop_dist = $300
-        # Equity = $9,713.35 -> Tier cap = $30.00 -> exact_lots = 30.00 / 300 = 0.10 lots
+        # Equity = $9,713.35, Floor = $9,500.0 -> Buffer = $213.35 -> DtD risk = 213.35 * 0.08 = $17.07 -> 0.06 lots
         res = self.client.execute_trade_across_all_accounts(
             symbol="BTC/USD",
             side="buy",
@@ -73,14 +75,15 @@ class TestDynamicRiskSizing(unittest.TestCase):
         self.assertTrue(res["success"])
         args_t1 = self.mock_helper.place_order.call_args_list[0][1]
         args_t2 = self.mock_helper.place_order.call_args_list[1][1]
-        self.assertEqual(round(args_t1["qty"] + args_t2["qty"], 2), 0.10)
+        self.assertEqual(round(args_t1["qty"] + args_t2["qty"], 2), 0.06)
 
     @patch("src.core.execution_firewall.ExecutionFirewall.audit_trade_request", return_value=(True, "Approved"))
-    def test_unconstrained_dynamic_scaling(self, mock_firewall):
-        """When tier caps are disabled, fractional Kelly scales up unconstrained to 0.85%."""
+    @patch("src.core.execution_firewall.ExecutionFirewall.is_account_eligible", return_value=(True, "ELIGIBLE"))
+    def test_unconstrained_dynamic_scaling_clamped_by_safety_ceiling(self, mock_eligible, mock_firewall):
+        """When tier caps are disabled, unconstrained sizing is still clamped by hard safety ceiling MAX_LOT_SIZE_PER_ORDER (0.25 lots)."""
         setattr(Config, 'TIER_CAPS_ENABLED', False)
         try:
-            # Equity = $25,788.92 -> 0.85% risk = $219.21 -> exact_lots = 219.21 / 300 = 0.73 lots
+            # Equity = $25,000 -> unconstrained sizing would be 0.73 lots, but MAX_LOT_SIZE_PER_ORDER clamps to 0.25 max
             res = self.client.execute_trade_across_all_accounts(
                 symbol="BTC/USD",
                 side="buy",
@@ -95,7 +98,7 @@ class TestDynamicRiskSizing(unittest.TestCase):
             self.assertTrue(res["success"])
             args_t1 = self.mock_helper.place_order.call_args_list[0][1]
             args_t2 = self.mock_helper.place_order.call_args_list[1][1]
-            self.assertEqual(round(args_t1["qty"] + args_t2["qty"], 2), 0.73)
+            self.assertEqual(round(args_t1["qty"] + args_t2["qty"], 2), 0.25)
         finally:
             setattr(Config, 'TIER_CAPS_ENABLED', True)
 

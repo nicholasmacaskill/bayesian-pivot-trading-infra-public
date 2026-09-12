@@ -73,17 +73,17 @@ class ChampionChallengerLab:
     def _load_or_create_variants(self) -> Dict[str, StrategyVariant]:
         """Loads existing tournament variants or registers defaults."""
         defaults = {
-            # Strategy 9: Judas Inducement Hunter
+            # Strategy 9: Judas Inducement Hunter (GRADUATED CHAMPION)
             "STRAT_9_CHAMPION": StrategyVariant(
                 variant_id="STRAT_9_CHAMPION",
                 strategy_id="STRATEGY_9_JUDAS_INDUCEMENT",
                 variant_type="CHAMPION",
                 parameters={
-                    "min_wick_pct": 70.0,
-                    "min_atr_mult": 1.8,
-                    "min_vol_mult": 1.8,
-                    "stop_buffer_atr": 0.25,
-                    "target_rr": 3.0
+                    "min_wick_pct": 60.0,
+                    "min_atr_mult": 1.5,
+                    "min_vol_mult": 1.5,
+                    "stop_buffer_atr": 0.35,
+                    "target_rr": 2.5
                 },
                 created_at=datetime.now(timezone.utc).isoformat()
             ),
@@ -280,6 +280,56 @@ class ChampionChallengerLab:
                     "reload_discount_pct": 0.50, # 50% retracement of initial push
                     "reload_stop_buffer_atr": 0.20,
                     "target_rr": 3.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # ──────────────────────────────────────────────────────────────────
+            # NON-ICT SMART MONEY CHALLENGERS (Shadow Lab $0 Live Capital Risk)
+            # ──────────────────────────────────────────────────────────────────
+            "STRAT_AMT_VALUE_REJECTION": StrategyVariant(
+                variant_id="STRAT_AMT_VALUE_REJECTION",
+                strategy_id="AUCTION_MARKET_THEORY_VALUE_REJECTION",
+                variant_type="CHALLENGER",
+                parameters={
+                    "is_shadow_only": True,
+                    "value_area_pct": 0.70,
+                    "min_rejection_rr": 1.8,
+                    "target_rr": 2.5
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_AVWAP_SIGMA_SNAPBACK": StrategyVariant(
+                variant_id="STRAT_AVWAP_SIGMA_SNAPBACK",
+                strategy_id="ANCHORED_VWAP_SIGMA_REVERSION",
+                variant_type="CHALLENGER",
+                parameters={
+                    "is_shadow_only": True,
+                    "anchor_period": "WEEKLY_SESSION",
+                    "min_sigma_extension": 1.95,
+                    "target_rr": 2.5
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_DELTA_ABSORPTION": StrategyVariant(
+                variant_id="STRAT_DELTA_ABSORPTION",
+                strategy_id="ORDERFLOW_DELTA_ICEBERG_ABSORPTION",
+                variant_type="CHALLENGER",
+                parameters={
+                    "is_shadow_only": True,
+                    "min_delta_pct": 0.40,
+                    "min_wick_pct": 60.0,
+                    "target_rr": 2.5
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            "STRAT_WYCKOFF_VSA_SPRING": StrategyVariant(
+                variant_id="STRAT_WYCKOFF_VSA_SPRING",
+                strategy_id="WYCKOFF_VSA_SPRING_UPTHRUST",
+                variant_type="CHALLENGER",
+                parameters={
+                    "is_shadow_only": True,
+                    "max_recovery_vol_mult": 1.4,
+                    "target_rr": 2.5
                 },
                 created_at=datetime.now(timezone.utc).isoformat()
             )

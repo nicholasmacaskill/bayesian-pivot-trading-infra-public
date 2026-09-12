@@ -143,7 +143,13 @@ class UnifiedSovereignSupervisor:
                             continue
                         
                         qty = pos.get('qty', 0)
-                        contract_size = 100000 if "USD" in symbol and "BTC" not in symbol else 1
+                        clean_sym = symbol.replace("/", "").replace("_", "").upper()
+                        if any(c in clean_sym for c in ["BTC", "ETH", "SOL", "GALA", "CRYPTO"]):
+                            contract_size = 1.0
+                        elif any(m in clean_sym for m in ["XAU", "GOLD", "SILVER", "XAG"]):
+                            contract_size = 100.0
+                        else:
+                            contract_size = 100000.0  # Standard Forex
                         risk_usd = abs(entry - sl) * qty * contract_size
                         if risk_usd > 0:
                             r_multiple = pnl / risk_usd
@@ -217,12 +223,8 @@ class UnifiedSovereignSupervisor:
 
     # ── WORKER 4: Software as Glass Observability HUD ──
     def run_glass_hud_worker(self):
-        logger.info("💎 [Worker: Glass HUD] Starting Software as Glass Observability Server on http://127.0.0.1:8899...")
-        try:
-            from src.ui.glass_server import run_glass_hud_server
-            run_glass_hud_server(host="127.0.0.1", port=8899)
-        except Exception as e:
-            logger.error(f"Glass HUD Server error: {e}")
+        logger.info("💎 [Worker: Glass HUD] Dashboard server SHUT OFF by user request.")
+        return
 
     def start(self):
         logger.info("👑 =========================================================")
@@ -248,17 +250,20 @@ class UnifiedSovereignSupervisor:
 
 if __name__ == "__main__":
     import argparse
+    from src.core.process_lock import MasterProcessLock
+
     parser = argparse.ArgumentParser(description="Unified Sovereign Supervisor")
     parser.add_argument("--test", action="store_true", help="Run a single test cycle and exit")
     args = parser.parse_args()
 
-    supervisor = UnifiedSovereignSupervisor()
-    if args.test:
-        logger.info("Running single test cycle across all workers...")
-        supervisor.get_adaptive_scan_interval()
-        from src.engines.alpha_sweep_scanner import AlphaSweepScanner
-        s = AlphaSweepScanner()
-        s.scan_symbol("BTC/USD")
-        logger.info("Test cycle completed successfully.")
-    else:
-        supervisor.start()
+    with MasterProcessLock(runner_name="UnifiedSovereignSupervisor"):
+        supervisor = UnifiedSovereignSupervisor()
+        if args.test:
+            logger.info("Running single test cycle across all workers...")
+            supervisor.get_adaptive_scan_interval()
+            from src.engines.alpha_sweep_scanner import AlphaSweepScanner
+            s = AlphaSweepScanner()
+            s.scan_symbol("BTC/USD")
+            logger.info("Test cycle completed successfully.")
+        else:
+            supervisor.start()

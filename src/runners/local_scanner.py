@@ -214,6 +214,7 @@ class LocalScannerRunner:
         # ─────────────────────────────────────────────────────────────────────
 
         self.last_market_pulse = 0
+        self._last_heartbeat_time = 0
         self._cycle_count = 0
         self._last_signal_time = None
         self._last_scan_results = [] # Track results for /scan report
@@ -934,11 +935,11 @@ class LocalScannerRunner:
                 is_prime_window = self.scanner.is_asian_fade_window()
                 result = None
                 
-                # 1. Strategy 9: Judas Outlier Inducement Hunter (Unbottlenecked Fast-Lane)
+                # 1. Strategy 9: Judas Outlier Inducement Hunter (AI-Gated Institutional Verification)
                 if getattr(Config, 'STRATEGY_9_ENABLED', True):
                     strat9_setup = self.judas_engine.evaluate_dataframe(df_tmp, symbol=symbol)
                     if strat9_setup:
-                        logger.info(f"⚡ [STRATEGY 9 FAST-LANE] Executing Judas Inducement on {symbol} ({strat9_setup['direction']})")
+                        logger.info(f"🎯 [STRATEGY 9 CANDIDATE] Evaluating Judas Inducement on {symbol} ({strat9_setup['direction']})")
                         _entry = strat9_setup['entry_price']
                         _sl = strat9_setup['stop_loss']
                         _tp = strat9_setup['take_profit']
@@ -946,15 +947,43 @@ class LocalScannerRunner:
                         direction = strat9_setup['direction']
                         exec_side = "buy" if direction == "LONG" else "sell"
 
-                        # Send dedicated Telegram Alert
-                        self.notifier._send_message(self.judas_engine.format_telegram_alert(strat9_setup))
+                        # Compute Real Hurst Exponent for Regime Verification
+                        hurst_val = self.calculate_hurst(df_tmp['close']) if hasattr(self, 'calculate_hurst') else 0.60
+                        
+                        # Real Gemini AI Validation
+                        live_score = 0.0
+                        try:
+                            ai_result = validate_setup(
+                                strat9_setup,
+                                self.sentiment_engine.get_market_sentiment(symbol),
+                                self.sentiment_engine.get_whale_confluence(),
+                                df=df_tmp,
+                                exchange=self.scanner.exchange if hasattr(self.scanner, 'exchange') else None,
+                                hurst_exponent=hurst_val,
+                                guard_trust_score=self.guard.get_trust_score()
+                            )
+                            live_eval = ai_result.get('live_execution', ai_result)
+                            live_score = float(live_eval.get('score', 0.0))
+                            logger.info(f"🤖 [STRATEGY 9 AI AUDIT] {symbol} AI Score: {live_score:.1f}/10 (Hurst: {hurst_val:.3f})")
+                        except Exception as ai_err:
+                            logger.warning(f"Strategy 9 AI validation error for {symbol}: {ai_err}")
+                            live_score = 0.0
 
-                        # Execute Live on TradeLocker if auto-execution enabled and inside valid weekday killzone
+                        strat9_setup['ai_score'] = live_score
+                        strat9_setup['confidence_score'] = live_score
+
                         now_utc = datetime.now(timezone.utc)
                         is_weekend = now_utc.weekday() in [5, 6]  # Saturday (5), Sunday (6)
-                        if is_weekend:
-                            logger.info(f"🚫 [WEEKEND CHOP LOCK] Strategy 9 on {symbol} quarantined to $0 Shadow tracking (Zero Live Risk on Weekends).")
+                        
+                        # Institutional Gate: Score must be >= 8.5/10.0 and Hurst >= 0.55
+                        min_score = getattr(Config, 'AI_CONVICTION_THRESHOLD', 8.5)
+                        if live_score < min_score or hurst_val < 0.55 or is_weekend:
+                            logger.info(f"🛡️ [STRATEGY 9 FILTERED] Score {live_score:.1f} < {min_score} or Hurst {hurst_val:.3f} < 0.55 -> Routed to $0 Shadow Simulation.")
+                            if hasattr(self, 'counterfactual_tracker'):
+                                self.counterfactual_tracker.log_shadow_trade(strat9_setup, reason="Sub-Threshold AI Score / Range Chop")
                         elif getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', False) and getattr(Config, 'LIVE_AUTO_EXECUTION', False):
+                            # Send dedicated Telegram Alert for verified execution
+                            self.notifier._send_message(self.judas_engine.format_telegram_alert(strat9_setup))
                             try:
                                 exec_res = self.tl.execute_trade_across_all_accounts(
                                     symbol=symbol,
@@ -964,25 +993,25 @@ class LocalScannerRunner:
                                     take_profit=_tp,
                                     risk_scale=1.00,
                                     tranche_label="STRATEGY_9_JUDAS",
-                                    ai_score=strat9_setup.get('ai_score', 9.2),
+                                    ai_score=live_score,
                                     has_smt=True,
                                     session="LONDON_KILLZONE" if now_utc.hour in range(7, 10) else "NY_KILLZONE",
-                                    hurst_exponent=0.60
+                                    hurst_exponent=hurst_val
                                 )
                                 trade_success = exec_res.get("success", False)
                                 if trade_success:
                                     logger.info(f"✅ Strategy 9 Trade placed across {exec_res.get('filled_count', 0)} accounts on TradeLocker: {exec_side.upper()} on {symbol} (SL: ${_sl:,.2f}, TP: ${_tp:,.2f})")
                                     self.notifier._send_message(f"⚡ <b>STRATEGY 9 AUTO-EXECUTION SUCCESS:</b> Placed <a href='https://t.me/bayesianpivot_bot'>{exec_side.upper()}</a> on {symbol} across {exec_res.get('filled_count', 0)} accounts (SL: <b>${_sl:,.2f}</b>, TP: <b>${_tp:,.2f}</b>)")
                                 else:
-                                    logger.error(f"❌ Strategy 9 Trade rejected by TradeLocker broker client.")
+                                    logger.error(f"❌ Strategy 9 Trade rejected by TradeLocker broker client or 10-Gate Firewall.")
                             except Exception as exec_err:
                                 logger.error(f"❌ Strategy 9 execution error: {exec_err}", exc_info=True)
 
                         # Sign and log to ledger
                         if self.ledger:
-                            self.ledger.sign_signal(strat9_setup, strat9_setup['confidence_score'])
+                            self.ledger.sign_signal(strat9_setup, live_score)
 
-                        # Proceed directly to next symbol to preserve execution priority
+                        # Proceed to next symbol to preserve execution priority
                         continue
 
 
@@ -1332,7 +1361,9 @@ class LocalScannerRunner:
 
             if setups_found == 0:
                 btc_bias = self.scanner.get_detailed_bias("BTC/USD", index_context=market_context)
-                log_scan({'timestamp': datetime.now(timezone.utc).isoformat(), 'symbol': 'HEARTBEAT', 'pattern': 'System Active', 'bias': btc_bias, 'direction': 'NEUTRAL', 'verdict': 'SCAN_HEARTBEAT'}, {'score': 0, 'reasoning': 'Active Polling'})
+                if time.time() - self._last_heartbeat_time > 900:
+                    log_scan({'timestamp': datetime.now(timezone.utc).isoformat(), 'symbol': 'HEARTBEAT', 'pattern': 'System Active', 'bias': btc_bias, 'direction': 'NEUTRAL', 'verdict': 'SCAN_HEARTBEAT'}, {'score': 0, 'reasoning': 'Active Polling'})
+                    self._last_heartbeat_time = time.time()
                 # Opinionated Bias: 15-minute Market Pulse (Terminal Consciousness)
                 if (time.time() - self.last_market_pulse > 900) or ("STRONG" in btc_bias):
                     self.scanner.log_market_pulse("BTC/USD")
@@ -1353,7 +1384,7 @@ class LocalScannerRunner:
             for t in open_positions:
                 c.execute("INSERT INTO journal (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0.0, 'Synced Active Trade', 'SYSTEM') ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'OPEN'", (t['entry_time'], t['id'], t['symbol'], t['side'], t['pnl'], t['price']))
             for t in history:
-                c.execute("INSERT INTO journal (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy) VALUES (?, ?, ?, ?, ?, ?, 'CLOSED', 0.0, 'Synced History', 'ROGUE') ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'CLOSED'", (t['close_time'], t['id'], t['symbol'], t['side'], t['pnl'], t.get('price', 0)))
+                c.execute("INSERT INTO journal (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy) VALUES (?, ?, ?, ?, ?, ?, 'CLOSED', 0.0, 'Synced History', 'FLEET_SYNC') ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'CLOSED'", (t['close_time'], t['id'], t['symbol'], t['side'], t['pnl'], t.get('price', 0)))
                 # Release correlation slot if this was a system trade
                 if self.ledger:
                     sig_id = self.ledger.get_signal_id_by_trade_id(t['id'])
@@ -1406,5 +1437,8 @@ class LocalScannerRunner:
                 time.sleep(5)
 
 if __name__ == "__main__":
-    runner = LocalScannerRunner()
-    runner.main_loop()
+    from src.core.process_lock import MasterProcessLock
+
+    with MasterProcessLock(runner_name="LocalScannerRunner"):
+        runner = LocalScannerRunner()
+        runner.main_loop()

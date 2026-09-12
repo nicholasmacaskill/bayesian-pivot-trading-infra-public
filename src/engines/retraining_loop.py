@@ -162,22 +162,22 @@ class RetrainingLoop:
             """).fetchall()
             all_data.extend([dict(r) for r in alpha_rows])
 
-            # 4. Fetch Legacy System Trades (Historical 6-Month Baseline)
-            legacy_sys_rows = conn.execute("""
+            # 4. Fetch Automated Fleet System Trades (Live Production Baseline)
+            fleet_sys_rows = conn.execute("""
                 SELECT timestamp,
                        CASE WHEN symbol LIKE '%BTC%' THEN 'BTC/USD' WHEN symbol LIKE '%ETH%' THEN 'ETH/USD' ELSE 'BTC/USD' END as symbol,
                        CASE WHEN side IN ('BUY', 'LONG') THEN 'LONG' ELSE 'SHORT' END as direction,
-                       COALESCE(deviations, 'Legacy SMC System Trade') as pattern,
-                       COALESCE(ai_grade, 7.0) as ai_score,
+                       COALESCE(deviations, 'Automated Fleet SMC Trade') as pattern,
+                       COALESCE(ai_grade, 7.5) as ai_score,
                        CASE WHEN pnl > 0 THEN 'WIN' ELSE 'LOSS' END as outcome,
                        pnl, trade_id as signal_id, 1.0 as volume_spike, 'N/A' as true_smt,
-                       COALESCE(notes, 'Legacy v1.0 System') as shadow_regime, 0 as is_discretionary,
-                       'LEGACY_v1_SYSTEM' as source_era
+                       COALESCE(notes, 'Fleet Production Trade') as shadow_regime, 0 as is_discretionary,
+                       'FLEET_PRODUCTION' as source_era
                 FROM journal
-                WHERE strategy = 'SYSTEM' AND status = 'CLOSED'
+                WHERE strategy IN ('SYSTEM', 'FLEET_SYNC') AND status = 'CLOSED'
                 ORDER BY timestamp DESC
             """).fetchall()
-            all_data.extend([dict(r) for r in legacy_sys_rows])
+            all_data.extend([dict(r) for r in fleet_sys_rows])
 
             # 5. Fetch Legacy Rogue / Desync Trades (Anti-Patterns / Failure Lessons)
             rogue_journal_rows = conn.execute("""

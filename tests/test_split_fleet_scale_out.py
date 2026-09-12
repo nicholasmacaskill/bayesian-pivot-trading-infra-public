@@ -22,13 +22,13 @@ class TestSplitFleetScaleOut(unittest.TestCase):
         self.assertIn(6, Config.FULL_RUNNER_ACCOUNT_INDICES)
         self.assertIn(7, Config.FULL_RUNNER_ACCOUNT_INDICES)
         
-        self.assertEqual(Config.SCALE_OUT_TP1_R, 1.5)
+        self.assertEqual(Config.SCALE_OUT_TP1_R, 2.0)
         self.assertEqual(Config.SCALE_OUT_TP1_PCT, 0.50)
 
     @patch.object(TradeLockerHelper, 'place_order')
     @patch.object(TradeLockerHelper, 'login')
     def test_two_tranche_dispatch_on_scale_out_accounts(self, mock_login, mock_place_order):
-        """Verify scale-out accounts place two tranches (TP1 @ 1.5R, TP2 @ full TP) and runner accounts place 1 order."""
+        """Verify scale-out accounts place two tranches (TP1 @ 2.0R, TP2 @ full TP) and runner accounts place 1 order."""
         mock_login.return_value = True
         mock_place_order.return_value = {"orderId": "ord_123"}
 
@@ -58,14 +58,14 @@ class TestSplitFleetScaleOut(unittest.TestCase):
             )
 
         self.assertTrue(res["success"])
-        # Helper 0 (Scale-Out) should have called place_order TWICE (Tranche 1 @ 1.5R and Tranche 2 @ 3.0R)
+        # Helper 0 (Scale-Out) should have called place_order TWICE (Tranche 1 @ 2.0R and Tranche 2 @ 3.0R)
         self.assertEqual(helper0.place_order.call_count, 2)
         call1 = helper0.place_order.call_args_list[0][1]
         call2 = helper0.place_order.call_args_list[1][1]
         
         # Sizing on 25k @ 0.5% ($125 risk) / 200 pts = 0.62 lots
-        # Tranche 1: 0.31 lots, TP1 = 77800 - (1.5 * 200) = 77500.0
-        self.assertEqual(call1["take_profit"], 77500.0)
+        # Tranche 1: 0.31 lots, TP1 = 77800 - (2.0 * 200) = 77400.0
+        self.assertEqual(call1["take_profit"], 77400.0)
         # Tranche 2: 0.31 lots, TP2 = 77200.0 (Full TP)
         self.assertEqual(call2["take_profit"], 77200.0)
 

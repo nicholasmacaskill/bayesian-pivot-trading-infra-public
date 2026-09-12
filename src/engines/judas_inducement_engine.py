@@ -125,7 +125,7 @@ class JudasInducementEngine:
                 return None
             take_profit = round(entry_price - (risk_dist * self.target_rr), 2)
 
-        # 6. Session Timing Context
+        # 6. Session Timing Context (Quarantine Asian Session from Live Capital)
         ts = curr_bar.get('timestamp')
         if isinstance(ts, str):
             dt = pd.to_datetime(ts)
@@ -136,12 +136,17 @@ class JudasInducementEngine:
 
         utc_hour = dt.hour
         session_tag = "OFF_HOURS"
-        if 0 <= utc_hour <= 4:
+        if 0 <= utc_hour <= 5:
             session_tag = "ASIAN_RANGE"
-        elif 6 <= utc_hour <= 10:
+            logger.info(f"🚫 [STRATEGY 9] Asian session {utc_hour:02d}:00 UTC quarantined from live execution (0-Risk Shadow only).")
+            return None
+        elif 7 <= utc_hour <= 10:
             session_tag = "LONDON_KILLZONE"
-        elif 12 <= utc_hour <= 16:
+        elif 13 <= utc_hour <= 17:
             session_tag = "NY_KILLZONE"
+        else:
+            logger.info(f"🚫 [STRATEGY 9] Hour {utc_hour:02d}:00 UTC outside prime London/NY killzones.")
+            return None
 
         # 7. Exact Lot Sizing Calculator
         lots = self.calculate_lot_size(symbol, entry_price, risk_dist, self.risk_usd)
@@ -165,13 +170,13 @@ class JudasInducementEngine:
             'atr_20': round(atr_20, 2),
             'session_tag': session_tag,
             'timestamp': str(dt),
-            'is_fast_lane': True,
-            'bypass_ai_gate': True,
-            'confidence_score': 9.8  # Direct mathematical conviction
+            'is_fast_lane': False,
+            'bypass_ai_gate': False,
+            'requires_ai_audit': True
         }
 
         logger.info(
-            f"🎯 [Strategy 9] QUALIFIED: {symbol} {direction} at ${entry_price:,.2f} | "
+            f"🎯 [Strategy 9] CANDIDATE QUALIFIED: {symbol} {direction} at ${entry_price:,.2f} | "
             f"Wick: {primary_wick_pct:.1f}% | Range: {range_atr_mult:.2f}x ATR | "
             f"SL: ${stop_loss:,.2f} | TP: ${take_profit:,.2f} (3.0R) | Session: {session_tag}"
         )

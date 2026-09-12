@@ -49,30 +49,31 @@
     }
 
     :root {
-      --ambient-opacity-1: 0.12;
-      --ambient-opacity-2: 0.10;
-      --dark-overlay-opacity: 0.88;
-      --panel-tex-opacity: 0.08;
+      --ambient-opacity-1: 0.10;
+      --ambient-opacity-2: 0.08;
+      --dark-overlay-opacity: 0.90;
+      --panel-tex-opacity: 0.06;
     }
 
+    /* 🌌 Jack R. / RonDesignLab Canvas Dot Matrix Background */
     body {
-      background-color: #060B12;
+      background-color: #0c0d12;
       background-image: 
-        radial-gradient(1200px circle at 50% -10%, rgba(20, 184, 166, 0.10) 0%, transparent 65%),
-        radial-gradient(950px circle at 85% 75%, rgba(56, 189, 248, 0.06) 0%, transparent 60%),
-        radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-      background-size: 100% 100%, 100% 100%, 24px 24px;
+        radial-gradient(rgba(255, 255, 255, 0.085) 1.2px, transparent 1.2px),
+        radial-gradient(1200px circle at 50% -5%, rgba(45, 212, 191, 0.06) 0%, transparent 65%),
+        radial-gradient(950px circle at 85% 75%, rgba(56, 189, 248, 0.04) 0%, transparent 60%);
+      background-size: 22px 22px, 100% 100%, 100% 100%;
       color: #E2E8F0;
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      padding: 10px 14px;
+      padding: 12px 16px;
       position: relative;
       overflow-x: hidden;
     }
 
-    /* 🌌 Abstracted BayesianPivot Global Background Texture & Dark Overlay System */
+    /* Global Ambient Backdrop */
     .global-ambient-backdrop {
       position: fixed;
       inset: 0;
@@ -81,7 +82,7 @@
       pointer-events: none;
       z-index: -1;
       overflow: hidden;
-      background-color: #060B12;
+      background-color: #0c0d12;
     }
 
     .ambient-layer-1 {
@@ -94,7 +95,7 @@
       background-size: cover;
       background-position: center;
       opacity: var(--ambient-opacity-1);
-      filter: blur(22px) saturate(140%) brightness(65%);
+      filter: blur(28px) saturate(140%) brightness(55%);
       mix-blend-mode: screen;
       transition: opacity 0.4s ease;
     }
@@ -109,65 +110,49 @@
       background-size: cover;
       background-position: center;
       opacity: var(--ambient-opacity-2);
-      filter: blur(26px) saturate(130%) brightness(60%);
+      filter: blur(32px) saturate(130%) brightness(50%);
       mix-blend-mode: screen;
       transition: opacity 0.4s ease;
     }
 
-    /* 🌑 Deep Dark Obsidian Vignette Overlay - Keeps text and panels crystal clear */
     .ambient-dark-overlay {
       position: absolute;
       inset: 0;
       background: 
-        radial-gradient(ellipse at 50% 30%, rgba(6, 11, 18, 0.65) 0%, rgba(6, 11, 18, 0.92) 75%, #060B12 100%),
-        linear-gradient(180deg, rgba(6, 11, 18, 0.40) 0%, rgba(6, 11, 18, 0.85) 60%, rgba(6, 11, 18, 0.98) 100%);
-      box-shadow: inset 0 0 160px 40px rgba(0, 0, 0, 0.95);
+        radial-gradient(ellipse at 50% 30%, rgba(12, 13, 18, 0.70) 0%, rgba(12, 13, 18, 0.94) 75%, #0c0d12 100%),
+        linear-gradient(180deg, rgba(12, 13, 18, 0.45) 0%, rgba(12, 13, 18, 0.88) 60%, rgba(12, 13, 18, 0.98) 100%);
+      box-shadow: inset 0 0 180px 50px rgba(0, 0, 0, 0.95);
       opacity: var(--dark-overlay-opacity);
       pointer-events: none;
       transition: opacity 0.4s ease;
     }
 
-    /* 💎 Precision-Milled Crystalline Glossy Glass Panels - High-Contrast Dark Obsidian */
+    /* 💎 RonDesignLab Translucent Generative Node Card Style */
     .liquid-glass {
-      background: 
-        radial-gradient(120% 50% at 50% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.01) 35%, transparent 65%),
-        linear-gradient(
-          135deg,
-          rgba(15, 25, 38, 0.92) 0%,
-          rgba(9, 16, 26, 0.95) 50%,
-          rgba(6, 11, 18, 0.98) 100%
-        );
+      background: rgba(18, 20, 27, 0.82);
       backdrop-filter: blur(28px) saturate(180%) brightness(100%);
       -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(100%);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 8px;
-      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.085);
+      border-radius: 20px !important;
+      padding: 14px 16px;
       position: relative;
-      overflow: hidden;
       box-shadow: 
-        inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.50),
-        inset 1px 0 0 0 rgba(255, 255, 255, 0.12),
-        inset -1px 0 0 0 rgba(255, 255, 255, 0.08),
-        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.85),
-        0 0 0 1px rgba(255, 255, 255, 0.03),
-        0 16px 36px -8px rgba(0, 0, 0, 0.95),
-        0 0 20px -8px rgba(20, 184, 166, 0.10);
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.7),
+        0 24px 48px -12px rgba(0, 0, 0, 0.82),
+        0 0 0 1px rgba(0, 0, 0, 0.35);
+      transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .liquid-glass:hover {
-      border-color: rgba(56, 189, 248, 0.35);
+      border-color: rgba(255, 255, 255, 0.15);
       box-shadow: 
-        inset 0 1px 1px 0 rgba(255, 255, 255, 0.65),
-        inset 1px 0 0 0 rgba(56, 189, 248, 0.25),
-        inset -1px 0 0 0 rgba(56, 189, 248, 0.10),
-        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.85),
-        0 0 0 1px rgba(56, 189, 248, 0.15),
-        0 18px 40px -8px rgba(0, 0, 0, 0.98),
-        0 0 24px -6px rgba(56, 189, 248, 0.18);
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
+        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.7),
+        0 28px 56px -12px rgba(0, 0, 0, 0.92),
+        0 0 30px -8px rgba(45, 212, 191, 0.12);
     }
 
-    /* 🔮 Subtle Abstracted Panel Background Texture Layer */
     .panel-texture {
       position: absolute;
       inset: 0;
@@ -177,29 +162,26 @@
       background-repeat: no-repeat;
       background-size: cover;
       opacity: var(--panel-tex-opacity);
-      filter: blur(16px) saturate(120%) brightness(70%);
+      filter: blur(20px) saturate(120%) brightness(60%);
       mix-blend-mode: screen;
       transition: opacity 0.3s ease;
     }
 
-    .liquid-glass:hover .panel-texture {
-      opacity: calc(var(--panel-tex-opacity) * 1.4);
-    }
-
+    /* Specular Top Rim Highlight */
     .liquid-glass::before {
       content: '';
       position: absolute;
       top: 0;
       left: 0;
       right: 0;
-      height: 28%;
+      height: 24%;
       background: linear-gradient(
         180deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.01) 55%,
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.01) 60%,
         transparent 100%
       );
-      border-radius: 8px 8px 0 0;
+      border-radius: 20px 20px 0 0;
       pointer-events: none;
       z-index: 2;
     }
@@ -208,59 +190,85 @@
       content: '';
       position: absolute;
       top: 0;
-      left: 6%;
-      right: 6%;
+      left: 10%;
+      right: 10%;
       height: 1px;
       background: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(255, 255, 255, 0.15) 10%,
-        rgba(255, 255, 255, 0.50) 45%,
-        rgba(56, 189, 248, 0.35) 65%,
-        rgba(45, 212, 191, 0.20) 85%,
+        rgba(255, 255, 255, 0.15) 15%,
+        rgba(255, 255, 255, 0.45) 50%,
+        rgba(45, 212, 191, 0.25) 80%,
         transparent 100%
       );
       pointer-events: none;
       z-index: 2;
     }
 
-    /* Micro-Glass Sub-Panels */
+    /* 🌑 Sunken Dark Micro-Wells (PicGen Parameter Boxes) */
     .sub-glass {
-      background: rgba(8, 15, 24, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 5px;
+      background: rgba(11, 13, 18, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.065);
+      border-radius: 12px !important;
       box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.40),
-        0 2px 6px rgba(0, 0, 0, 0.40);
+        inset 0 1px 2px rgba(0, 0, 0, 0.65),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+        0 1px 2px rgba(255, 255, 255, 0.03);
       position: relative;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .sub-glass:hover {
-      background: rgba(12, 22, 34, 0.85);
-      border-color: rgba(255, 255, 255, 0.15);
+      background: rgba(14, 17, 24, 0.95);
+      border-color: rgba(255, 255, 255, 0.12);
     }
 
-    /* 🗡️ Ultra-Sharp Precision Glass Buttons */
+    /* 🟢 PicGen Neon Mint Action Button (`[ Generate ]` Style) */
+    .btn-generate {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: linear-gradient(180deg, #10B981 0%, #059669 100%);
+      color: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 
+        0 0 16px rgba(16, 185, 129, 0.40),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+
+    .btn-generate:hover {
+      background: linear-gradient(180deg, #34D399 0%, #10B981 100%);
+      box-shadow: 
+        0 0 22px rgba(52, 211, 153, 0.55),
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.5);
+      transform: translateY(-0.5px);
+    }
+
+    /* 🔘 Chiclet Micro-Buttons & Tabs */
     .btn-sharp {
       position: relative;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       font-size: 9.5px;
       font-weight: 600;
-      letter-spacing: 0.03em;
-      padding: 3px 8px;
-      border-radius: 3px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(8, 15, 24, 0.80);
+      letter-spacing: 0.02em;
+      padding: 4px 10px;
+      border-radius: 9px !important;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(14, 16, 22, 0.85);
       color: #94A3B8;
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.40),
-        0 1px 3px rgba(0, 0, 0, 0.40);
-      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
@@ -268,87 +276,114 @@
 
     .btn-sharp:hover {
       color: #FFFFFF;
-      border-color: rgba(56, 189, 248, 0.45);
-      background: linear-gradient(180deg, rgba(56, 189, 248, 0.12) 0%, rgba(56, 189, 248, 0.02) 100%), rgba(12, 22, 34, 0.90);
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
-        0 0 8px -2px rgba(56, 189, 248, 0.35);
-    }
-
-    .btn-sharp:active {
-      transform: translateY(0.5px) scale(0.98);
-      box-shadow: 
-        inset 0 1px 2px rgba(0, 0, 0, 0.60),
-        0 0 0 1px rgba(56, 189, 248, 0.30);
+      border-color: rgba(255, 255, 255, 0.18);
+      background: rgba(22, 25, 34, 0.95);
     }
 
     .btn-sharp.active, .btn-sharp[data-active="true"] {
-      color: #2DD4BF;
-      border-color: rgba(45, 212, 191, 0.55);
-      background: linear-gradient(180deg, rgba(20, 184, 166, 0.22) 0%, rgba(20, 184, 166, 0.05) 100%), rgba(8, 22, 30, 0.95);
+      color: #FFFFFF;
+      border-color: rgba(45, 212, 191, 0.45);
+      background: rgba(15, 34, 40, 0.95);
       box-shadow: 
-        inset 0 1px 0 0 rgba(45, 212, 191, 0.45),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.50),
-        0 0 10px -2px rgba(45, 212, 191, 0.40);
+        inset 0 1px 0 0 rgba(45, 212, 191, 0.35),
+        0 0 12px -2px rgba(45, 212, 191, 0.35);
     }
 
-    /* Sharp Micro-Tabs (A1-A8 & Strat 9/8/1/2) */
+    /* Rounded Micro-Tabs */
     .btn-sharp-tab {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       font-size: 8.5px;
       font-weight: 600;
-      padding: 2px 6px;
-      border-radius: 3px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(8, 15, 24, 0.80);
+      padding: 3px 8px;
+      border-radius: 8px !important;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(12, 14, 20, 0.85);
       color: #94A3B8;
-      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
       cursor: pointer;
     }
 
     .btn-sharp-tab:hover {
       color: #FFFFFF;
-      border-color: rgba(56, 189, 248, 0.40);
-      background: rgba(14, 26, 40, 0.90);
+      border-color: rgba(255, 255, 255, 0.18);
+      background: rgba(20, 23, 32, 0.95);
     }
 
     .btn-sharp-tab.active {
       color: #2DD4BF;
-      border-color: rgba(45, 212, 191, 0.55);
-      background: rgba(13, 34, 42, 0.95);
-      box-shadow: inset 0 1px 0 0 rgba(45, 212, 191, 0.40), 0 0 8px -2px rgba(45, 212, 191, 0.35);
+      border-color: rgba(45, 212, 191, 0.45);
+      background: rgba(15, 36, 42, 0.95);
+      box-shadow: inset 0 1px 0 0 rgba(45, 212, 191, 0.35), 0 0 10px -2px rgba(45, 212, 191, 0.30);
     }
 
-    /* Sharp Emergency Flatten Button */
+    /* Danger Button */
     .btn-sharp-danger {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.06em;
-      padding: 7px 12px;
-      border-radius: 4px;
-      border: 1px solid rgba(244, 63, 94, 0.45);
-      background: linear-gradient(180deg, rgba(244, 63, 94, 0.18) 0%, rgba(244, 63, 94, 0.05) 100%), rgba(28, 10, 16, 0.88);
+      letter-spacing: 0.04em;
+      padding: 8px 16px;
+      border-radius: 12px !important;
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      background: linear-gradient(180deg, rgba(244, 63, 94, 0.20) 0%, rgba(244, 63, 94, 0.06) 100%), rgba(24, 11, 16, 0.92);
       color: #FDA4AF;
       box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.60),
-        0 2px 8px rgba(244, 63, 94, 0.18);
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
+        0 2px 10px rgba(244, 63, 94, 0.20);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       cursor: pointer;
     }
 
     .btn-sharp-danger:hover {
       color: #FFFFFF;
-      border-color: rgba(244, 63, 94, 0.85);
-      background: linear-gradient(180deg, rgba(244, 63, 94, 0.35) 0%, rgba(244, 63, 94, 0.12) 100%), rgba(42, 12, 22, 0.95);
+      border-color: rgba(244, 63, 94, 0.70);
+      background: linear-gradient(180deg, rgba(244, 63, 94, 0.35) 0%, rgba(244, 63, 94, 0.14) 100%), rgba(38, 12, 22, 0.98);
       box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
-        0 0 16px -2px rgba(244, 63, 94, 0.50);
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.35),
+        0 0 20px rgba(244, 63, 94, 0.40);
     }
 
-    .btn-sharp-danger:active {
-      transform: translateY(1px) scale(0.98);
+    /* 🔌 Node Ports (Connection Pins on Card Borders) */
+    .node-port {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      border-radius: 9999px;
+      background: #0c0d12;
+      border: 2px solid #2DD4BF;
+      box-shadow: 0 0 8px #2DD4BF;
+      z-index: 20;
+    }
+    .node-port-left {
+      left: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .node-port-right {
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .node-port-rose {
+      border-color: #FB7185;
+      box-shadow: 0 0 8px #FB7185;
+    }
+    .node-port-cyan {
+      border-color: #38BDF8;
+      box-shadow: 0 0 8px #38BDF8;
+    }
+
+    /* Floating Showcase Preview Tool Dock */
+    .preview-tool-dock {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(14, 16, 22, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
     }
 
     /* Custom Slim Scrollbars */
@@ -358,11 +393,11 @@
     }
     .custom-scroll::-webkit-scrollbar-track {
       background: rgba(0, 0, 0, 0.35);
-      border-radius: 3px;
+      border-radius: 4px;
     }
     .custom-scroll::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.30);
-      border-radius: 3px;
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 4px;
     }
     .custom-scroll::-webkit-scrollbar-thumb:hover {
       background: rgba(45, 212, 191, 0.60);
@@ -413,10 +448,14 @@
   </header>
 
   <!-- 3 Primary Observability Lenses (Top Row) -->
-  <main class="grid grid-cols-1 lg:grid-cols-12 gap-2 mb-2 relative z-10">
+  <main class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 mb-2.5 relative z-10">
+
 
     <!-- LENS 1 (Left 4 Cols): Upcomers 20% consistency velocity (All 8 Accounts) -->
-    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5">
+    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5 relative">
+      <!-- 🔌 Node Cable Port (Output to Strategy Engine) -->
+      <div class="node-port node-port-right" title="Output to Matrix"></div>
+
       <!-- Faint Abstracted Refraction Texture -->
       <div class="panel-texture" style="background-image: url('assets/branding-3.png'), url('/assets/branding-3.png'); background-position: 85% 15%;"></div>
 
@@ -428,16 +467,14 @@
               <i data-lucide="gauge" class="w-3.5 h-3.5 text-teal-400"></i>
               <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Upcomers 20% Velocity</h2>
             </div>
-            <!-- Account Switcher Mini-Tabs (A1 - A8) -->
+            <!-- Account Switcher Mini-Tabs (A1 - A7 Active, A5 & A8 Blown Removed) -->
             <div class="flex items-center gap-1 font-mono text-[9px]" id="gauge-account-tabs">
               <button onclick="selectAccount('Account 1')" id="acc-tab-1" class="btn-sharp-tab active">A1</button>
               <button onclick="selectAccount('Account 2')" id="acc-tab-2" class="btn-sharp-tab">A2</button>
               <button onclick="selectAccount('Account 3')" id="acc-tab-3" class="btn-sharp-tab">A3</button>
               <button onclick="selectAccount('Account 4')" id="acc-tab-4" class="btn-sharp-tab">A4</button>
-              <button onclick="selectAccount('Account 5')" id="acc-tab-5" class="btn-sharp-tab">A5</button>
               <button onclick="selectAccount('Account 6')" id="acc-tab-6" class="btn-sharp-tab">A6</button>
               <button onclick="selectAccount('Account 7')" id="acc-tab-7" class="btn-sharp-tab">A7</button>
-              <button onclick="selectAccount('Account 8')" id="acc-tab-8" class="btn-sharp-tab">A8</button>
             </div>
           </div>
 
@@ -465,7 +502,7 @@
             <!-- Dynamic Text Below Gauge -->
             <div class="text-center">
               <div class="text-base font-bold tracking-tight text-white font-mono leading-tight" id="gauge-acc-display">
-                $25,566.33 <span class="text-teal-300 font-normal">→</span> $27,000
+                $25,286.07 <span class="text-teal-300 font-normal">→</span> $27,000
               </div>
               <div class="text-[8.5px] text-slate-400 font-mono" id="gauge-acc-subtitle">
                 Account 1 ($25k Funded) • Target Profit: +$2,000.00
@@ -477,7 +514,7 @@
           <div class="grid grid-cols-3 gap-1 pt-1 border-t border-white/[0.08]">
             <div class="p-1 rounded sub-glass text-center">
               <div class="text-[7.5px] text-slate-400 uppercase tracking-wider">Net Realized</div>
-              <div class="font-mono font-bold text-teal-300 text-[10.5px]" id="gauge-profit">+$566.33</div>
+              <div class="font-mono font-bold text-teal-300 text-[10.5px]" id="gauge-profit">+$286.07</div>
             </div>
             <div class="p-1 rounded sub-glass text-center">
               <div class="text-[7.5px] text-slate-400 uppercase tracking-wider">20% Cap / Day</div>
@@ -485,7 +522,7 @@
             </div>
             <div class="p-1 rounded sub-glass text-center">
               <div class="text-[7.5px] text-slate-400 uppercase tracking-wider" id="gauge-progress-label">Payout Pct</div>
-              <div class="font-mono text-cyan-300 font-bold text-[10.5px]" id="gauge-pct">28.3%</div>
+              <div class="font-mono text-cyan-300 font-bold text-[10.5px]" id="gauge-pct">14.3%</div>
             </div>
           </div>
         </div>
@@ -501,11 +538,9 @@
               <option value="Account 1">Account 1 ($25k Funded)</option>
               <option value="Account 2">Account 2 ($50k Eval)</option>
               <option value="Account 3">Account 3 ($25k Eval)</option>
-              <option value="Account 4">Account 4 ($10k Eval)</option>
-              <option value="Account 5">Account 5 ($10k Eval)</option>
+              <option value="Account 4">Account 4 ($10k Eval - Quarantined)</option>
               <option value="Account 6">Account 6 ($50k Eval)</option>
               <option value="Account 7">Account 7 ($25k Eval)</option>
-              <option value="Account 8">Account 8 ($10k Eval)</option>
             </select>
           </div>
 
@@ -586,28 +621,39 @@
     </section>
 
     <!-- LENS 2 (Center 4 Cols): Strategy Intelligence & Invariant Blueprints Matrix -->
-    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5">
+    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5 relative">
+      <!-- 🔌 Node Cable Ports (Input from Lens 1, Output to Lens 3) -->
+      <div class="node-port node-port-left" title="Input from Velocity Lens"></div>
+      <div class="node-port node-port-right node-port-cyan" title="Output to Inspector Lens"></div>
+
       <!-- Faint Abstracted Neural Distribution Texture -->
       <div class="panel-texture" style="background-image: url('assets/branding-8.png'), url('/assets/branding-8.png'); background-position: center;"></div>
 
       <div class="relative z-10 flex flex-col gap-1.5">
         <div>
-          <!-- Header with Sub-View Switcher -->
+          <!-- Header with Sub-View Switcher & Generate Pill -->
           <div class="flex flex-wrap items-center justify-between gap-1 pb-1 border-b border-white/[0.08]">
-            <div>
-              <h2 class="text-xs font-semibold text-slate-100 tracking-tight flex items-center gap-1.5">
-                <span>Strategy Intelligence & Tournament Matrix</span>
-                <span class="px-1 py-0.2 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[7px] font-mono font-bold">LIVE FLEET SUITE</span>
-              </h2>
-              <div class="text-[8px] text-slate-400 font-mono flex items-center gap-1">
-                <span>9 Core Institutional</span>
-                <span>•</span>
-                <span class="text-cyan-300" id="lens2-subview-label">Core Fleet Matrix (9)</span>
+            <div class="flex items-center gap-2">
+              <div>
+                <h2 class="text-xs font-semibold text-slate-100 tracking-tight flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_#2DD4BF]"></span>
+                  <span>Strategy Tournament Node</span>
+                </h2>
+                <div class="text-[8px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                  <span>9 Core</span>
+                  <span>•</span>
+                  <span class="text-cyan-300" id="lens2-subview-label">Core Fleet Matrix (9)</span>
+                </div>
               </div>
+              <!-- RonDesignLab Style Action Pill -->
+              <button class="btn-generate" onclick="selectStrategy('strat_9')">
+                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                <span>ARMED</span>
+              </button>
             </div>
 
             <!-- Sub-View Segmented Switcher -->
-            <div class="flex items-center gap-0.5 font-mono text-[8px]" id="lens2-subview-switcher">
+            <div class="flex items-center gap-1 font-mono text-[8px]" id="lens2-subview-switcher">
               <button onclick="setLens2SubView('core')" id="subview-btn-core" class="btn-sharp-tab active">
                 Core (9)
               </button>
@@ -841,7 +887,10 @@
     </section>
 
     <!-- LENS 3 (Right 4 Cols): Agent Decision & Shadow Testing Call Inspector -->
-    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5">
+    <section class="lg:col-span-4 liquid-glass flex flex-col gap-1.5 relative">
+      <!-- 🔌 Node Cable Port (Input from Strategy Node) -->
+      <div class="node-port node-port-left node-port-cyan" title="Input from Strategy Node"></div>
+
       <!-- Faint Abstracted Decision Network Texture -->
       <div class="panel-texture" style="background-image: url('assets/branding-16.png'), url('/assets/branding-16.png'); background-position: 80% 20%;"></div>
 
@@ -849,13 +898,13 @@
         <!-- Header with Filter Badges & Flat Status -->
         <div class="flex items-center justify-between pb-1 border-b border-white/[0.08]">
           <div class="flex items-center gap-1.5">
-            <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
-            <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Agent Decision & Shadow Testing Call Inspector</h2>
+            <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#38BDF8]"></span>
+            <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Agent Telemetry & Decision Inspector</h2>
           </div>
           <div class="flex items-center gap-1 font-mono text-[8.5px]">
-            <span class="px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-400/30 font-semibold">⚡ LIVE</span>
-            <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-semibold">👻 SHADOW</span>
-            <span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-400/30">100% FLAT</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-400/30 font-semibold">⚡ LIVE</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 font-semibold">👻 SHADOW</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-300 border border-teal-400/30">100% FLAT</span>
           </div>
         </div>
 
@@ -1031,9 +1080,9 @@
         <div class="flex items-center justify-between pb-1 border-b border-white/[0.08]">
           <div class="flex items-center gap-1.5">
             <i data-lucide="shield-check" class="w-3.5 h-3.5 text-teal-400"></i>
-            <h2 class="text-xs font-semibold text-slate-100 tracking-tight">8-Account Synchronized Fleet Matrix</h2>
+            <h2 class="text-xs font-semibold text-slate-100 tracking-tight">Active Synchronized Fleet Matrix (6 Accounts Active)</h2>
           </div>
-          <div class="font-mono text-[9.5px] text-teal-300 font-bold px-2 py-0.5 rounded sub-glass" id="total-fleet-nav-pill">NAV: $202,648.67</div>
+          <div class="font-mono text-[9.5px] text-teal-300 font-bold px-2 py-0.5 rounded sub-glass" id="total-fleet-nav-pill">NAV: $181,626.06</div>
         </div>
 
         <div class="overflow-x-auto custom-scroll">
@@ -1048,21 +1097,27 @@
               </tr>
             </thead>
             <tbody id="fleet-table-body" class="divide-y divide-white/[0.04]">
-              <tr><td class="py-1 text-white font-medium">Account 1</td><td class="text-slate-400">$25k</td><td class="text-right text-teal-300 font-bold">$25,566.33</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
-              <tr><td class="py-1 text-white font-medium">Account 2</td><td class="text-slate-400">$50k</td><td class="text-right text-white font-bold">$49,043.87</td><td class="text-right text-slate-400">$54,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
-              <tr><td class="py-1 text-white font-medium">Account 3</td><td class="text-slate-400">$25k</td><td class="text-right text-white font-bold">$24,913.88</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
-              <tr><td class="py-1 text-white font-medium">Account 4</td><td class="text-slate-400">$10k</td><td class="text-right text-white font-bold">$9,728.04</td><td class="text-right text-slate-400">$10,800</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
-              <tr><td class="py-1 text-white font-medium">Account 5</td><td class="text-slate-400">$10k</td><td class="text-right text-white font-bold">$9,704.06</td><td class="text-right text-slate-400">$10,800</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
-              <tr><td class="py-1 text-white font-medium">Account 6</td><td class="text-slate-400">$50k</td><td class="text-right text-white font-bold">$49,358.96</td><td class="text-right text-slate-400">$54,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
-              <tr><td class="py-1 text-white font-medium">Account 7</td><td class="text-slate-400">$25k</td><td class="text-right text-white font-bold">$24,638.73</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
-              <tr><td class="py-1 text-white font-medium">Account 8</td><td class="text-slate-400">$10k</td><td class="text-right text-white font-bold">$9,694.80</td><td class="text-right text-slate-400">$10,800</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px]">NOMINAL</span></td></tr>
+              <tr class="bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer transition-colors"><td class="py-1 pl-1.5 text-white font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span><span>Account 1</span></td><td class="text-slate-400">$25k</td><td class="text-right text-teal-300 font-bold">$25,286.07</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px] font-semibold">LIVE ACTIVE</span></td></tr>
+              <tr class="hover:bg-white/[0.04] cursor-pointer transition-colors"><td class="py-1 pl-1.5 text-white font-medium"><span>Account 2</span></td><td class="text-slate-400">$50k</td><td class="text-right text-slate-300 font-bold">$48,567.27</td><td class="text-right text-slate-400">$54,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px] font-semibold">LIVE ACTIVE</span></td></tr>
+              <tr class="hover:bg-white/[0.04] cursor-pointer transition-colors"><td class="py-1 pl-1.5 text-white font-medium"><span>Account 3</span></td><td class="text-slate-400">$25k</td><td class="text-right text-slate-300 font-bold">$24,615.74</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px] font-semibold">LIVE ACTIVE</span></td></tr>
+              <tr class="hover:bg-white/[0.04] cursor-pointer transition-colors"><td class="py-1 pl-1.5 text-white font-medium"><span>Account 6</span></td><td class="text-slate-400">$50k</td><td class="text-right text-slate-300 font-bold">$48,801.06</td><td class="text-right text-slate-400">$54,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px] font-semibold">LIVE ACTIVE</span></td></tr>
+              <tr class="hover:bg-white/[0.04] cursor-pointer transition-colors"><td class="py-1 pl-1.5 text-white font-medium"><span>Account 7</span></td><td class="text-slate-400">$25k</td><td class="text-right text-slate-300 font-bold">$24,260.35</td><td class="text-right text-slate-400">$27,000</td><td class="text-right"><span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[8.5px] font-semibold">LIVE ACTIVE</span></td></tr>
             </tbody>
           </table>
         </div>
 
+        <!-- Decommissioned Accounts Excluded Callout -->
+        <div class="p-1.5 rounded bg-rose-500/10 border border-rose-500/20 text-[8px] font-mono text-rose-300 flex items-center justify-between" id="decommissioned-callout">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="shield-alert" class="w-3 h-3 text-rose-400"></i>
+            <span><strong>DECOMMISSIONED:</strong> Accounts 4, 5 & 8 Quarantined (Liquidation Only) • Excluded from Active Fleet ($0 Live Risk)</span>
+          </div>
+          <span class="font-bold">3 Excluded</span>
+        </div>
+
         <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 pt-1 border-t border-white/[0.06]">
           <span>Click any row to focus Velocity Gauge & Hypotheticals</span>
-          <span class="text-teal-300 font-semibold">8/8 Synced</span>
+          <span class="text-teal-300 font-semibold">5/5 Active Synced</span>
         </div>
       </div>
     </section>
@@ -1138,7 +1193,19 @@
         </div>
 
         <div class="flex items-center justify-between text-[8.5px] font-mono text-slate-400 pt-1 border-t border-white/[0.06]">
-          <span>Hedging Protocol: PATCH /positions for SL/TP • DELETE for Flatten</span>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="shield" class="w-3 h-3 text-teal-400"></i>
+            <span>Execution Protocol: PATCH /positions • DELETE /positions</span>
+          </div>
+          <!-- 🎛️ RonDesignLab Floating Preview Dock -->
+          <div class="preview-tool-dock">
+            <button class="px-2 py-0.5 rounded-full text-[8px] font-semibold text-slate-400 hover:text-white hover:bg-white/10 transition-colors">1m</button>
+            <button class="px-2 py-0.5 rounded-full text-[8px] font-bold text-teal-300 bg-teal-500/20 border border-teal-500/30">5m</button>
+            <button class="px-2 py-0.5 rounded-full text-[8px] font-semibold text-slate-400 hover:text-white hover:bg-white/10 transition-colors">15m</button>
+            <span class="text-slate-600">|</span>
+            <button class="px-2 py-0.5 rounded-full text-[8px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-0.5"><span>2x</span> <i data-lucide="chevron-down" class="w-2.5 h-2.5"></i></button>
+            <button class="px-2 py-0.5 rounded-full text-[8px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-0.5"><span>PNG</span> <i data-lucide="download" class="w-2.5 h-2.5"></i></button>
+          </div>
           <span class="text-cyan-300 font-semibold">Ledger Active</span>
         </div>
       </div>
@@ -1291,33 +1358,87 @@
     let _globalState = null;
     let _selectedAccountId = 'Account 1';
 
+    function renderAccountSelectors(fleet) {
+      if (!fleet || !fleet.length) return;
+
+      // 1. Render Mini-Tabs (Only active non-blown accounts)
+      const tabsContainer = document.getElementById('gauge-account-tabs');
+      if (tabsContainer) {
+        tabsContainer.innerHTML = '';
+        fleet.forEach(acc => {
+          const accNum = acc.id.replace('Account ', '');
+          const btn = document.createElement('button');
+          btn.id = `acc-tab-${accNum}`;
+          btn.className = (acc.id === _selectedAccountId) ? "btn-sharp-tab active" : "btn-sharp-tab";
+          btn.textContent = `A${accNum}`;
+          btn.onclick = () => selectAccount(acc.id);
+          tabsContainer.appendChild(btn);
+        });
+      }
+
+      // 2. Render Dropdown Options
+      const selectEl = document.getElementById('hypo-acc-select');
+      if (selectEl) {
+        const prevVal = selectEl.value;
+        selectEl.innerHTML = '';
+        fleet.forEach(acc => {
+          const opt = document.createElement('option');
+          opt.value = acc.id;
+          const isFunded = acc.id === 'Account 1';
+          const statusSuffix = acc.status.includes('QUARANTINED') ? ' - Quarantined' : '';
+          opt.textContent = `${acc.id} (${acc.tier} ${isFunded ? 'Funded' : 'Eval'}${statusSuffix})`;
+          selectEl.appendChild(opt);
+        });
+
+        // Ensure selection matches valid account
+        const exists = fleet.some(a => a.id === _selectedAccountId);
+        if (exists) {
+          selectEl.value = _selectedAccountId;
+        } else {
+          _selectedAccountId = fleet[0].id;
+          selectEl.value = _selectedAccountId;
+        }
+      }
+    }
+
     function selectAccount(accId) {
-      if (!accId) return;
-      if (accId === 'account1') accId = 'Account 1';
+      if (_globalState && _globalState.fleet && _globalState.fleet.length > 0) {
+        const exists = _globalState.fleet.some(a => a.id === accId);
+        if (!exists) {
+          accId = _globalState.fleet[0].id;
+        }
+      } else {
+        if (!accId || accId === 'Account 5' || accId === 'Account 8') accId = 'Account 1';
+      }
       _selectedAccountId = accId;
 
       // 1. Synchronize Dropdown in Hypotheticals Card
       const selectEl = document.getElementById('hypo-acc-select');
       if (selectEl) selectEl.value = accId;
 
-      // 2. Synchronize Account Tabs (A1 - A8)
-      for (let i = 1; i <= 8; i++) {
-        const tab = document.getElementById(`acc-tab-${i}`);
-        if (tab) {
-          tab.className = (`Account ${i}` === accId) ? "btn-sharp-tab active" : "btn-sharp-tab";
-        }
+      // 2. Synchronize Account Tabs
+      if (_globalState && _globalState.fleet) {
+        _globalState.fleet.forEach(acc => {
+          const accNum = acc.id.replace('Account ', '');
+          const tab = document.getElementById(`acc-tab-${accNum}`);
+          if (tab) {
+            tab.className = (acc.id === accId) ? "btn-sharp-tab active" : "btn-sharp-tab";
+          }
+        });
       }
 
       // 3. Highlight Selected Row in Fleet Table
-      for (let i = 1; i <= 8; i++) {
-        const row = document.getElementById(`fleet-row-${i}`);
-        if (row) {
-          if (`Account ${i}` === accId) {
-            row.className = "bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer transition-colors";
-          } else {
-            row.className = "hover:bg-white/[0.04] cursor-pointer transition-colors";
+      if (_globalState && _globalState.fleet) {
+        _globalState.fleet.forEach((acc, idx) => {
+          const row = document.getElementById(`fleet-row-${idx + 1}`);
+          if (row) {
+            if (acc.id === accId) {
+              row.className = "bg-teal-500/10 border-l-2 border-teal-400 cursor-pointer transition-colors";
+            } else {
+              row.className = "hover:bg-white/[0.04] cursor-pointer transition-colors";
+            }
           }
-        }
+        });
       }
 
       // 4. Update Gauge and Hypotheticals
@@ -1335,9 +1456,9 @@
       const hData = _globalState.hypotheticals ? (_globalState.hypotheticals[_selectedAccountId] || _globalState.hypotheticals['Account 1'] || _globalState.hypotheticals['account1']) : null;
 
       const isFunded = _selectedAccountId === 'Account 1';
-      const bal = acc ? acc.balance : (hData ? hData.current_balance : 25566.33);
+      const bal = acc ? acc.balance : (hData ? hData.current_balance : 25286.07);
       const target = acc ? acc.target : (hData ? hData.target : 27000.00);
-      const profit = acc ? acc.profit : (hData ? hData.current_profit : 566.33);
+      const profit = acc ? acc.profit : (hData ? hData.current_profit : 286.07);
       const tier = acc ? acc.tier : (hData ? hData.tier : '$25k');
       const dailyCap = hData ? hData.daily_cap : (tier.includes('50k') ? 800.0 : (tier.includes('10k') ? 160.0 : 400.0));
 
@@ -1615,8 +1736,10 @@
         }
       }
 
-      // 1. 8-Account Fleet Table with Click-to-Select
+      // 1. Dynamic Active Fleet Table & Selectors (Blown Accounts Excluded)
       if (data.fleet) {
+        renderAccountSelectors(data.fleet);
+
         const tbody = document.getElementById('fleet-table-body');
         tbody.innerHTML = '';
         data.fleet.forEach((acc, idx) => {
