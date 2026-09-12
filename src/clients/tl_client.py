@@ -759,30 +759,42 @@ class TradeLockerClient:
         import json
         import os
         from datetime import datetime, timezone
-        from filelock import FileLock
-        
         lock_file_path = "data/daily_setup_lock.json"
         try:
             os.makedirs("data", exist_ok=True)
-            lock = FileLock("data/daily_setup_lock.json.lock")
-            with lock.acquire(timeout=5):
+            try:
+                from filelock import FileLock
+                has_filelock = True
+            except ImportError:
+                has_filelock = False
+
+            def _update_setup_lock():
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                data = {"date": today_str, "setups_fired": 0}
                 if os.path.exists(lock_file_path):
-                    with open(lock_file_path, "r") as lf:
-                        data = json.load(lf)
-                else:
-                    data = {"date": today_str, "setups_fired": 0}
-                    
+                    try:
+                        with open(lock_file_path, "r") as lf:
+                            data = json.load(lf)
+                    except Exception:
+                        pass
                 if data.get("date") != today_str:
                     data = {"date": today_str, "setups_fired": 0}
-                    
                 if data.get("setups_fired", 0) >= 2:
                     logger.critical("🛡️ [ATOMIC LOCK] Daily Setup Limit (2) reached. Rejecting fleet dispatch.")
-                    return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
-                    
+                    return False
                 data["setups_fired"] = data.get("setups_fired", 0) + 1
                 with open(lock_file_path, "w") as lf:
                     json.dump(data, lf)
+                return True
+
+            if has_filelock:
+                lock = FileLock("data/daily_setup_lock.json.lock")
+                with lock.acquire(timeout=5):
+                    if not _update_setup_lock():
+                        return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
+            else:
+                if not _update_setup_lock():
+                    return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
         except Exception as e:
             logger.error(f"Failed to acquire atomic setup lock: {e}")
             return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
