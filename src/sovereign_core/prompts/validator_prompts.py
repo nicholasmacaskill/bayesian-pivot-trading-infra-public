@@ -36,7 +36,7 @@ Evaluate this setup according to its specific Strategy Archetype:
 1. ARCHETYPE: LIQUIDITY SWEEP & JUDAS FADE (Strategy 9, Turtle Soup, Asian Fade)
    - Edge: Trapping retail breakout traders at key highs/lows.
    - Core Criteria: Rejection wick absorbing liquidity, volume flush, clean mean-reverting exhaustion.
-   - Do NOT penalize for counter-trend entries or lack of HTF trend alignment.
+   - Counter-Trend Rule: If Higher Timeframe Bias is NEUTRAL (ranging market), sweeps in either direction are permitted. However, if HTF Bias is actively directional (BULLISH or BEARISH), counter-trend sweeps are strictly penalized as toxic knife-catches unless confirmed by a 1H Market Structure Shift (MSS) or extreme exhaustion.
 
 2. ARCHETYPE: TREND EXPANSION & DISPLACEMENT (Strategy 2, Order Blocks)
    - Edge: Institutional accumulation and directional trend continuation.

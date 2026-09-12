@@ -106,24 +106,22 @@ class AIPermissionMap:
             bias == "NEUTRAL"
         )
         
-        is_hard_counter = (
-            (bias == "BULLISH" and direction in ("SELL", "SHORT") and conviction >= 8.5) or
-            (bias == "BEARISH" and direction in ("BUY", "LONG") and conviction >= 8.5)
+        is_counter_trend = (
+            (bias == "BULLISH" and direction in ("SELL", "SHORT")) or
+            (bias == "BEARISH" and direction in ("BUY", "LONG"))
         )
 
-        if is_hard_counter:
-            return False, 0.0, f"Hard conflict with 1H AI Macro Bias ({bias}, Conviction {conviction}/10)"
+        # Enforce Hard Counter-Trend Ban during active HTF directional bias
+        if is_counter_trend:
+            return False, 0.0, f"Hard Counter-Trend Block: {direction} prohibited during active 1H/4H {bias} bias (Conviction {conviction}/10)"
 
         # 3. Dynamic Sizing Multiplier (Asymmetric Risk)
         if is_aligned and conviction >= 8.5 and rag_sim >= 70.0:
             risk_mult = 1.0  # High-conviction full allocation
             msg = f"Full High-Alpha Confluence (AI: {conviction}/10, RAG: {rag_sim}%, Bias: {bias})"
-        elif is_aligned:
-            risk_mult = 0.5  # Standard probe size
-            msg = f"Standard Confluence (AI: {conviction}/10, Bias: {bias})"
         else:
-            risk_mult = 0.25 # Soft counter-bias cautious probe
-            msg = f"Soft Counter-Bias Probe (AI Bias: {bias})"
+            risk_mult = 0.5  # Standard probe size (aligned with trend or neutral)
+            msg = f"Standard Confluence (AI: {conviction}/10, Bias: {bias})"
 
         return True, risk_mult, msg
 
