@@ -177,7 +177,7 @@ class ExecutionFirewall:
                     return False, f"Daily Setup Limit hit ({data.get('setups_fired')} setups locked in memory). Trading locked for 24h."
         except Exception as e:
             return False, f"Setup limit check failed: {e}"
-        return True, "OK"""
+        return True, "OK"
         
 
     @staticmethod
@@ -196,12 +196,25 @@ class ExecutionFirewall:
         return True, "OK"
 
     @staticmethod
-    def check_trending_regime_lock(hurst_exponent: float) -> Tuple[bool, str]:
+    def check_trending_regime_lock(hurst_exponent: float, strategy_mode: str = "") -> Tuple[bool, str]:
         """
-        INVARIANT 12: Hurst Regime Filter. Blocks Mean-Reversion traps.
+        INVARIANT 12: Regime-Aware Hurst Governor. Decouples trend logic from mean-reversion.
         """
-        if hurst_exponent is not None and hurst_exponent < 0.45:
-            return False, f"Regime Governor: Hurst Exponent ({hurst_exponent:.2f}) < 0.45. Mean-reverting chop detected."
+        if hurst_exponent is None:
+            return True, "OK"
+            
+        strategy_lower = strategy_mode.lower() if strategy_mode else ""
+        is_mean_reverting = any(x in strategy_lower for x in ["turtle soup", "range fade", "sweep", "judas"])
+
+        if is_mean_reverting:
+            # Mean-reverting strategies fail in strong persistent trends
+            if hurst_exponent > 0.60:
+                return False, f"Regime Governor: Hurst ({hurst_exponent:.2f}) > 0.60. Too strongly trending for a mean-reverting strategy."
+        else:
+            # Trend-following strategies fail in choppy/random regimes
+            if hurst_exponent < 0.45:
+                return False, f"Regime Governor: Hurst ({hurst_exponent:.2f}) < 0.45. Mean-reverting chop detected, blocking trend setup."
+                
         return True, "OK"
 
     @staticmethod
