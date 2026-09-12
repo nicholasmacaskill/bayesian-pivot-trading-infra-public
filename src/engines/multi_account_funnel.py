@@ -340,7 +340,7 @@ class MultiAccountFunnelManager:
         setup: dict,
         account_key: str,
         hurst: float = 0.58,
-        smt_strength: float = 0.20,
+        smt_strength: float = 0.0,
         slippage_ratio: float = 1.0,
         cal_safe: bool = True,
         corr_ok: bool = True,

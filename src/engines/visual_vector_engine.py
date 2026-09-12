@@ -28,7 +28,7 @@ class VisualVectorEngine:
     Stores and queries chart vectors using vectorized cosine similarity.
     """
 
-    VECTOR_DIM = 64  # Standardized dense geometric & pattern feature dimension
+    VECTOR_DIM = 48  # Standardized dense geometric & pattern feature dimension
 
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path or Config.DB_PATH

@@ -38,6 +38,9 @@ def track_response_tokens(response, model_name="gemini-2.5-flash"):
             notifier._send_message(msg)
             _warning_sent = True
             logger.warning(f"Daily token budget ceiling exceeded: ${current_cost:.4f}")
+            raise RuntimeError(f"TOKEN BUDGET EXHAUSTED: ${current_cost:.4f} / ${DAILY_BUDGET_USD:.2f}")
             
     except Exception as e:
+        if isinstance(e, RuntimeError) and "TOKEN BUDGET" in str(e):
+            raise
         logger.error(f"Failed to track tokens: {e}")

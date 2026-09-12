@@ -102,8 +102,8 @@ class SetupMemory:
             pnl_status = "WIN" if trade.get('pnl', 0) > 0 else "LOSS"
             context += (
                 f"{i}. [{trade.get('symbol')}] Result: {pnl_status} (${trade.get('pnl')}). "
-                f"AI Grade: {trade.get('ai_grade')}/10. "
-                f"Feedback: {trade.get('notes') or 'No notes.'}\n"
+                f"AI Grade: {(trade.get('ai_grade') or trade.get('ai_score'))}/10. "
+                f"Feedback: {(trade.get('notes') or trade.get('ai_reasoning')) or 'No notes.'}\n"
             )
         
         return context

@@ -92,6 +92,9 @@ class AIPermissionMap:
         rag_sim = perm.get("rag_similarity", 50.0)
         auth_archetypes = perm.get("authorized_archetypes", [])
 
+        if perm.get("is_stale"):
+            return False, 0.0, "AI Permission is STALE (older than 4 hours). Execution blocked."
+
         # 1. Archetype Authorization
         if pattern_type not in auth_archetypes:
             return False, 0.0, f"Archetype {pattern_type} not in authorized list {auth_archetypes}"
