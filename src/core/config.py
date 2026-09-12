@@ -18,17 +18,17 @@ except Exception:
 
 
 class Config:
-    # Trading Parameters
-    SYMBOLS = ['BTC/USD', 'ETH/USD', 'XAU/USD']  # BTC, ETH, and Gold Active (Live Fleet Execution)
-    SHADOW_SYMBOLS = ['SOL/USD']                 # 100% Zero-Risk Shadow Tracking (A/B Tournament Lab)
-    ALT_SYMBOLS = ['SOL/USD']
+    # Target Instruments
+    SYMBOLS = ['BTC/USD', 'XAU/USD']             # BTC + Gold Active (Live Fleet Execution - Graduated)
+    SHADOW_SYMBOLS = ['ETH/USD', 'SOL/USD']      # 100% Zero-Risk Shadow Tracking (A/B Tournament Lab)
+    ALT_SYMBOLS = ['ETH/USD', 'SOL/USD']
     
     TIMEFRAME = '5m'
     HTF_TIMEFRAME = '1h'
     
     # Risk Management
     RISK_PER_TRADE = 0.007  # 0.7% (Default)
-    FIXED_RISK_USD = 100.0  # Defensive Mode: Hard cap at $100 per trade
+    FIXED_RISK_USD = 75.0   # Quantitative Sweet Spot: $75 per trade (0.30% on $25k)
     MAX_RISK_USD = 150.0    # Strict absolute risk cap per trade
     MAX_PROFIT_USD = 400.0  # Strict absolute profit cap per trade
     MAX_NOTIONAL_VALUE_USD = 50000.0  # Hard cap: max position value per trade
@@ -54,6 +54,19 @@ class Config:
         "XAU/USD": 5.0,     # Capped at 5.0 Lots Gold
         "SOL/USD": 416.0,   # ~$50k notional at $120
     }
+
+    # ── Fleet-Wide Concurrency, Anti-Stacking & Cooldown Safety Gates ──
+    MAX_CONCURRENT_FLEET_POSITIONS = 2  # Hard cap: Max 2 concurrent open positions across the entire fleet
+    MAX_POSITIONS_PER_ACCOUNT = 2       # Strict Hard Cap: No individual account can ever have more than 2 open position tickets
+    MAX_CONCURRENT_PER_SYMBOL = 1       # Zero stacking: Max 1 position per asset across the entire fleet
+    SYMBOL_COOLDOWN_MINUTES = 30        # Mandatory 30-minute persistent debounce cooldown per symbol
+    MAX_LOT_SIZE_PER_ORDER = {
+        "BTC/USD": 0.25,    # Max 0.25 BTC lots per order
+        "ETH/USD": 5.0,     # Max 5.00 ETH lots per order (Prevents 15+ lot spikes)
+        "XAU/USD": 2.0,     # Max 2.00 Gold lots per order
+        "SOL/USD": 50.0,    # Max 50.0 SOL lots per order
+    }
+
     MAX_DRAWDOWN_LIMIT = 0.05    # 5.0% Total Trailing Drawdown Lockout (Strict Hard Ceiling)
     DAILY_DRAWDOWN_LIMIT = 0.015 # 1.5% Daily Drawdown Lockout (Ultra-Defensive)
 
@@ -67,20 +80,19 @@ class Config:
 
     # ── Tier-Specific Dollar Risk Ceilings (Distance-to-Default Protected) ──
     TIER_CAPS_ENABLED = True
-    TIER_MAX_RISK_10K = 25.0     # Max $25 risk per trade on $10k accounts (0.25%)
-    TIER_MAX_RISK_25K = 65.0     # Max $65 risk per trade on $25k accounts (0.26%)
-    TIER_MAX_RISK_50K = 125.0    # Max $125 risk per trade on $50k accounts (0.25%)
 
+    MAX_CONSECUTIVE_DAILY_LOSSES = 2  # Hard Circuit Breaker: Max 2 consecutive losses per day before 24h lockout
     DAILY_TRADE_LIMIT = 2
     TARGET_RR = 3.0
 
-    # ── Strategy 9: Judas Inducement Hunter (Tier-1 Probationary Live Graduation) ───
+    # ── Strategy 9: Judas Inducement Hunter (GRADUATED CHAMPION: 80% WR / 10.0 PF) ───
     STRATEGY_9_ENABLED = True
-    STRATEGY_9_MIN_WICK_PCT = 70.0      # 70% Minimum Rejection Wick
-    STRATEGY_9_MIN_ATR_MULT = 1.8       # 1.8x - 2.0x 20-period ATR Range
-    STRATEGY_9_MIN_VOL_MULT = 1.8       # 1.8x 20-period Average Volume
-    STRATEGY_9_TARGET_RR = 3.0          # 3.0R Fixed Asymmetric Target ($225 gain / account)
-    STRATEGY_9_RISK_USD = 75.0          # Fixed dollar risk per trade ($75 / account)
+    STRATEGY_9_MIN_WICK_PCT = 60.0      # 60% Minimum Rejection Wick (Graduated from Challenger)
+    STRATEGY_9_MIN_ATR_MULT = 1.5       # 1.5x 20-period ATR Range (Graduated from Challenger)
+    STRATEGY_9_MIN_VOL_MULT = 1.5       # 1.5x 20-period Average Volume (Graduated from Challenger)
+    STRATEGY_9_TARGET_RR = 2.5          # 2.5R Fixed Target (Proven 10.0 Profit Factor)
+    STRATEGY_9_STOP_BUFFER_ATR = 0.35   # 0.35 ATR stop buffer for breathing room
+    STRATEGY_9_RISK_USD = 40.0          # Base dollar risk per trade ($40 on $25k, $80 on $50k)
     STRATEGY_9_BYPASS_GENERIC_AI = False # Requires full 8.0+ AI Validator gate
     STRATEGY_9_AUTO_EXECUTE = True      # ✅ GRADUATED: Live Fleet Auto-Execution Enabled
 
@@ -230,27 +242,33 @@ class Config:
     # Index 7: Account 8 ($10k Account)
     FULL_RUNNER_ACCOUNT_INDICES = [1, 5, 6, 7]
     
-    SCALE_OUT_TP1_R = 1.5           # Take Profit 1 level = +1.5R
+    SCALE_OUT_TP1_R = 2.0           # Take Profit 1 level = +2.0R (Expands Realized R:R)
     SCALE_OUT_TP1_PCT = 0.50        # 50% size closed at TP1
     
     # ── Tiered Risk Scaling (Dynamic Fractional Kelly Sizing) ──
-    DYNAMIC_RISK_SCALING_ENABLED = True
+    DYNAMIC_RISK_SCALING_ENABLED = False
     TIER_CAPS_ENABLED = True            # Enforce hard dollar risk ceilings per account tier
-    TIER_MAX_RISK_10K = 30.0            # Hard $30.00 max risk per trade on $10k accounts (0.30%)
-    TIER_MAX_RISK_25K = 75.0            # Hard $75.00 max risk per trade on $25k accounts (0.30%)
-    TIER_MAX_RISK_50K = 150.0           # Hard $150.00 max risk per trade on $50k accounts (0.30%)
+    TIER_MAX_RISK_10K = 10.0            # Defensive: Hard $10.00 max risk per trade on $10k accounts (0.10%)
+    TIER_MAX_RISK_25K = 40.0            # Calibrated Target: Hard $40.00 max risk per trade on $25k accounts (Accelerated 4-week timeline)
+    TIER_MAX_RISK_50K = 80.0            # Calibrated Target: Hard $80.00 max risk per trade on $50k accounts (Accelerated 4-week timeline)
     
-    BASELINE_RISK_PCT = 0.005           # 0.50% Standard Risk (Default across all accounts)
-    A_PLUS_RISK_PCT = 0.0085            # 0.85% Scaled Risk (For A+ high-win-rate confluence setups)
+    BASELINE_RISK_PCT = 0.0020          # 0.20% Defensive Base Risk (Lowered from 0.50% for DtD protection)
+    A_PLUS_RISK_PCT = 0.0040            # 0.40% Scaled Risk (Lowered from 0.85% for A+ setups)
     A_PLUS_MIN_SCORE = 9.0              # AI Score threshold (>= 9.0 / 10.0 or >= 90 / 100)
     A_PLUS_REQUIRE_SMT = True           # Requires verified SMT divergence
     A_PLUS_REQUIRE_KILLZONE = True      # Requires London (07-10z) or NY (12-20z) Killzone
     A_PLUS_MIN_HURST = 0.58             # Requires trending regime (Hurst >= 0.58)
-    MAX_SINGLE_TRADE_RISK_CEILING = 0.010 # 1.00% Hard Safety Ceiling per trade
+    MAX_SINGLE_TRADE_RISK_CEILING = 0.0050 # 0.50% Hard Safety Ceiling per trade (Halved from 1.00%)
 
     AI_TRUST_TIER_AGGRESSIVE = 90      # Score 90+ -> 0.85% - 1.0% Risk
     AI_TRUST_TIER_CONSERVATIVE = 75    # Score 75-89 -> 0.5% Risk
     AI_TRUST_TIER_MINIMUM = 75         # < 75 -> 0% Risk (Monitor)
+    
+    # ── Upcomers 20% Consistency & Payout Configuration ──
+    CONSISTENCY_RULE_PCT = 0.20             # Max 20% of total profit allowed on any single trading day
+    ACCOUNT_1_PROFIT_TARGET = 2000.0        # Account 1 Target Net Profit ($27,000 balance on $25k base)
+    ACCOUNT_1_DAILY_PROFIT_CAP = 380.0      # Safety cap: Never exceed $380 in a single day (below the $400 20% threshold)
+    ACCOUNT_1_MIN_TRADING_DAYS = 5          # Minimum trading days required for payout eligibility (target 15-25 days)
     # ──────────────────────────────────────────────────────────
     
     # Exit Parameters (Scalp Optimized)
