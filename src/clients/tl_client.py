@@ -911,13 +911,13 @@ class TradeLockerClient:
                         else:
                             # Dynamic ratchet scaling based on remaining buffer above floor:
                             if helper.email == getattr(Config, 'FUNDED_ACCOUNT_1_EMAIL', 's79qv3xetj@upcomers.com'):
-                                # Account 1: $25 base -> $45 when buffer > $600 -> $65 when buffer > $1,200
+                                # Account 1: $35 base -> $50 when buffer > $600 -> $70 when buffer > $1,200
                                 if remaining_buffer > 1200.0:
-                                    target_risk_usd = 65.0
+                                    target_risk_usd = 70.0
                                 elif remaining_buffer > 600.0:
-                                    target_risk_usd = 45.0
+                                    target_risk_usd = 50.0
                                 else:
-                                    target_risk_usd = 25.0
+                                    target_risk_usd = 35.0
                             elif equity <= 35000.0:
                                 # $25k Tier (Accounts 3, 7): Base $35 / $50 -> scales to $65 / $80 at buffer > $1,000
                                 if remaining_buffer > 1000.0:

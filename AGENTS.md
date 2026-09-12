@@ -54,7 +54,7 @@
     * Target Net Profit: **+$2,000.00** (Payout Unlock Balance: **$27,000.00**).
     * Max Single-Day Profit: **$400.00** (20% ceiling; system clamped to **$380.00**).
     * Current Status & Decoupled Starting Risk:
-      * **Account 1 (`s79qv3xetj`):** Balance ~$25,286 (+$286 in profit; Floor locked at $25,000). **Base Risk: $25.00** (Defensive: **11.4 losses runway** on $286 buffer; scales to $45 at buffer > $600, $65 at buffer > $1,200).
+      * **Account 1 (`s79qv3xetj`):** Balance ~$25,286 (+$286 in profit; Floor locked at $25,000). **Base Risk: $35.00** (Accelerated: **8.2 losses runway** on $286 buffer; scales to $50 at buffer > $600, $70 at buffer > $1,200).
       * **Account 7 (`875do5esrd`):** Balance ~$24,260 (-$740 DD; Floor $23,750). **Base Risk: $35.00** (Balanced: **14.5 losses runway** on $510 buffer).
       * **Account 3 (`q20gxm287x`):** Balance ~$24,616 (-$384 DD; Floor $23,750). **Base Risk: $50.00** (Growth: **17.3 losses runway** on $865 buffer).
   * **$50k Tier (Accounts 2, 6):**

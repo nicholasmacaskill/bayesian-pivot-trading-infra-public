@@ -254,7 +254,7 @@ class Config:
     
     # ── Per-Account Calibrated Risk Ceiling (Decoupled by Buffer Runway) ──
     ACCOUNT_RISK_CAPS = {
-        "s79qv3xetj@upcomers.com": 25.0,  # Account 1: Ultra-Defensive $25.00 (11.4 losses runway on $286 buffer)
+        "s79qv3xetj@upcomers.com": 35.0,  # Account 1: Accelerated $35.00 (8.2 losses runway on $286 buffer)
         "875do5esrd@upcomers.com": 35.0,  # Account 7: Balanced $35.00 (14.5 losses runway on $510 buffer)
         "q20gxm287x@upcomers.com": 50.0,  # Account 3: Growth $50.00 (17.3 losses runway on $865 buffer)
         "498svcbpfi@upcomers.com": 70.0,  # Account 2: Standard $50k $70.00 (15.2 losses runway on $1,067 buffer)
