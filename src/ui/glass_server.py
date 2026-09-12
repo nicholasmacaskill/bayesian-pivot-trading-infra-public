@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import logging
@@ -7,6 +8,9 @@ import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timezone
 from typing import Dict, Any, List
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, ROOT_DIR)
 from src.core.config import Config
 
 logger = logging.getLogger("GlassHUDServer")
@@ -16,10 +20,10 @@ _CACHED_STATE = {
     "latency_ms": 0.4,
     "daemon_status": "NOMINAL",
     "account1": {
-        "balance": 25566.33,
+        "balance": 25286.07,
         "target": 27000.00,
         "base": 25000.00,
-        "profit": 566.33,
+        "profit": 286.07,
         "daily_cap": 400.00,
         "daily_profit": 0.00,
         "consistency_pct": 20.0,
@@ -38,17 +42,19 @@ _CACHED_STATE = {
         "posterior_std": 0.08
     },
     "fleet": [
-        {"id": "Account 1", "acc_num": "1", "tier": "$25k", "balance": 25566.33, "target": 27000.00, "profit": 566.33, "positions": 0, "status": "NOMINAL"},
-        {"id": "Account 2", "acc_num": "1", "tier": "$50k", "balance": 49043.87, "target": 54000.00, "profit": -956.13, "positions": 0, "status": "NOMINAL"},
-        {"id": "Account 3", "acc_num": "1", "tier": "$25k", "balance": 24913.88, "target": 27000.00, "profit": -86.12, "positions": 0, "status": "NOMINAL"},
-        {"id": "Account 4", "acc_num": "1", "tier": "$10k", "balance": 9728.04,  "target": 10800.00, "profit": -271.96, "positions": 0, "status": "NOMINAL"},
-        {"id": "Account 5", "acc_num": "1", "tier": "$10k", "balance": 9704.06,  "target": 10800.00, "profit": -295.94, "positions": 0, "status": "NOMINAL"},
-        {"id": "Account 6", "acc_num": "1", "tier": "$50k", "balance": 49358.96, "target": 54000.00, "profit": -641.04, "positions": 0, "status": "NOMINAL"},
-        {"id": "Account 7", "acc_num": "1", "tier": "$25k", "balance": 24638.73, "target": 27000.00, "profit": -361.27, "positions": 0, "status": "NOMINAL"},
-        {"id": "Account 8", "acc_num": "1", "tier": "$10k", "balance": 9694.80,  "target": 10800.00, "profit": -305.20, "positions": 0, "status": "NOMINAL"},
+        {"id": "Account 1", "acc_num": "1", "tier": "$25k", "balance": 25286.07, "target": 27000.00, "profit": 286.07, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+        {"id": "Account 2", "acc_num": "1", "tier": "$50k", "balance": 48567.27, "target": 54000.00, "profit": -1432.73, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+        {"id": "Account 3", "acc_num": "1", "tier": "$25k", "balance": 24615.74, "target": 27000.00, "profit": -384.26, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+        {"id": "Account 6", "acc_num": "1", "tier": "$50k", "balance": 48801.06, "target": 54000.00, "profit": -1198.94, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+        {"id": "Account 7", "acc_num": "1", "tier": "$25k", "balance": 24260.35, "target": 27000.00, "profit": -739.65, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
     ],
-    "total_fleet_nav": 202648.67,
-    "open_positions_count": 0,
+    "decommissioned_fleet": [
+        {"id": "Account 4", "acc_num": "1", "tier": "$10k", "balance": 9636.17, "status": "DECOMMISSIONED (LIQUIDATION ONLY)", "reason": "Blown / Liquidation Only - Removed from active fleet"},
+        {"id": "Account 5", "acc_num": "1", "tier": "$10k", "balance": 9631.37, "status": "DECOMMISSIONED (LIQUIDATION ONLY)", "reason": "Blown / Liquidation Only - Removed from active fleet"},
+        {"id": "Account 8", "acc_num": "1", "tier": "$10k", "balance": 9627.98, "status": "DECOMMISSIONED (LIQUIDATION ONLY)", "reason": "Blown / Liquidation Only - Removed from active fleet"},
+    ],
+    "total_fleet_nav": 171738.25,
+    "open_positions_count": 3,
     "hypotheticals": {},
     "cognitive_pipeline": {},
     "strategies": [
@@ -586,7 +592,39 @@ def fetch_dynamic_strategies(cursor) -> List[Dict[str, Any]]:
         gross_loss = max(1.0, float(sh_losses) * 100.0)
         shadow_pf = round(gross_win / gross_loss, 2) if gross_loss > 0 else 2.50
 
+        # Regime breakdown query
+        try:
+            cursor.execute(f"""
+                SELECT 
+                    coalesce(regime_type, 'UNKNOWN'),
+                    count(*),
+                    count(CASE WHEN outcome = 'HIT_TP' THEN 1 END),
+                    count(CASE WHEN outcome = 'HIT_SL' THEN 1 END),
+                    avg(simulated_r)
+                FROM counterfactual_trades 
+                WHERE {where_clauses}
+                GROUP BY coalesce(regime_type, 'UNKNOWN')
+            """)
+            regime_rows = cursor.fetchall()
+            regime_breakdown = []
+            for r_row in regime_rows:
+                r_type = r_row[0]
+                r_samples = r_row[1]
+                r_wins = r_row[2]
+                r_losses = r_row[3]
+                r_avg_r = round(float(r_row[4] or 0.0), 2)
+                r_wr = round((r_wins / max(1, r_wins + r_losses)) * 100.0, 1) if (r_wins + r_losses) > 0 else 0.0
+                regime_breakdown.append({
+                    "regime": r_type,
+                    "samples": r_samples,
+                    "win_rate": r_wr,
+                    "expected_r": r_avg_r
+                })
+        except Exception:
+            regime_breakdown = []
+
         strategies.append({
+            "regime_breakdown": regime_breakdown,
             "id": sid,
             "code": code,
             "name": name,
@@ -808,29 +846,80 @@ def update_live_state():
                 })
             _CACHED_STATE["shadow_trades"] = shadow
 
-            # 3.5 Sync Dynamic Live Fleet Balances, Quarantine Statuses & NAV
-            fleet_data = [
-                {"id": "Account 1", "acc_num": "1", "tier": "$25k", "balance": 25438.48, "target": 27000.00, "profit": 438.48, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
-                {"id": "Account 2", "acc_num": "1", "tier": "$50k", "balance": 48766.63, "target": 54000.00, "profit": -1233.37, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
-                {"id": "Account 3", "acc_num": "1", "tier": "$25k", "balance": 24775.19, "target": 27000.00, "profit": -224.81, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
-                {"id": "Account 4", "acc_num": "1", "tier": "$10k", "balance": 9673.68,  "target": 10800.00, "profit": -326.32, "positions": 0, "status": "QUARANTINED (FROZEN)", "color": "rose"},
-                {"id": "Account 5", "acc_num": "1", "tier": "$10k", "balance": 9648.63,  "target": 10800.00, "profit": -351.37, "positions": 0, "status": "QUARANTINED (FROZEN)", "color": "rose"},
-                {"id": "Account 6", "acc_num": "1", "tier": "$50k", "balance": 49080.17, "target": 54000.00, "profit": -919.83, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
-                {"id": "Account 7", "acc_num": "1", "tier": "$25k", "balance": 24499.89, "target": 27000.00, "profit": -500.11, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
-                {"id": "Account 8", "acc_num": "1", "tier": "$10k", "balance": 9639.23,  "target": 10800.00, "profit": -360.77, "positions": 0, "status": "QUARANTINED (FROZEN)", "color": "rose"},
-            ]
+            # 3.5 Sync Dynamic Live Fleet Balances, Active Accounts & Exclude Blown Accounts
+            fleet_data = []
+            decommissioned_data = []
+            balances_path = os.path.join(ROOT_DIR, "data", "live_fleet_balances.json")
+            if os.path.exists(balances_path):
+                try:
+                    with open(balances_path, "r") as f:
+                        raw_balances = json.load(f)
+                    
+                    for acc_id in ["Account 1", "Account 2", "Account 3", "Account 4", "Account 5", "Account 6", "Account 7", "Account 8"]:
+                        if acc_id not in raw_balances:
+                            continue
+                        d = raw_balances[acc_id]
+                        is_decom = "DECOMMISSIONED" in d.get("status", "") or acc_id in ["Account 4", "Account 5", "Account 8"]
+                        base_val = float(d.get("base", 25000.0))
+                        bal_val = round(float(d.get("balance", d.get("equity", base_val))), 2)
+                        target_val = round(float(d.get("target", base_val * 1.08)), 2)
+                        profit_val = round(bal_val - base_val, 2)
+                        positions_count = int(d.get("positions", 0))
+                        
+                        item = {
+                            "id": acc_id,
+                            "acc_num": str(d.get("acc_num", "1")),
+                            "tier": f"${int(base_val / 1000)}k",
+                            "balance": bal_val,
+                            "target": target_val,
+                            "profit": profit_val,
+                            "positions": positions_count,
+                            "status": d.get("status", "LIVE ACTIVE"),
+                            "color": d.get("color", "teal")
+                        }
+                        if is_decom:
+                            item["status"] = "DECOMMISSIONED (LIQUIDATION ONLY)"
+                            item["reason"] = "Blown / Liquidation Only - Removed from active fleet ($0 risk)"
+                            decommissioned_data.append(item)
+                        else:
+                            fleet_data.append(item)
+                            
+                    acc1_raw = raw_balances.get("Account 1", {})
+                    a1_bal = round(float(acc1_raw.get("balance", 25286.07)), 2)
+                    a1_base = round(float(acc1_raw.get("base", 25000.0)), 2)
+                    a1_target = round(float(acc1_raw.get("target", 27000.0)), 2)
+                    _CACHED_STATE["account1"] = {
+                        "balance": a1_bal,
+                        "target": a1_target,
+                        "base": a1_base,
+                        "profit": round(a1_bal - a1_base, 2),
+                        "daily_cap": 400.00,
+                        "daily_profit": 0.00,
+                        "consistency_pct": 20.0,
+                        "best_day": 400.00
+                    }
+                except Exception as e:
+                    logger.debug(f"Error reading live_fleet_balances.json: {e}")
+
+            if not fleet_data:
+                # Fallback if file not yet present
+                fleet_data = [
+                    {"id": "Account 1", "acc_num": "1", "tier": "$25k", "balance": 25286.07, "target": 27000.00, "profit": 286.07, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+                    {"id": "Account 2", "acc_num": "1", "tier": "$50k", "balance": 48567.27, "target": 54000.00, "profit": -1432.73, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+                    {"id": "Account 3", "acc_num": "1", "tier": "$25k", "balance": 24615.74, "target": 27000.00, "profit": -384.26, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+                    {"id": "Account 6", "acc_num": "1", "tier": "$50k", "balance": 48801.06, "target": 54000.00, "profit": -1198.94, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+                    {"id": "Account 7", "acc_num": "1", "tier": "$25k", "balance": 24260.35, "target": 27000.00, "profit": -739.65, "positions": 0, "status": "LIVE ACTIVE", "color": "teal"},
+                ]
+                decommissioned_data = [
+                    {"id": "Account 4", "acc_num": "1", "tier": "$10k", "balance": 9636.17, "status": "DECOMMISSIONED (LIQUIDATION ONLY)", "reason": "Blown / Liquidation Only - Removed from active fleet"},
+                    {"id": "Account 5", "acc_num": "1", "tier": "$10k", "balance": 9631.37, "status": "DECOMMISSIONED (LIQUIDATION ONLY)", "reason": "Blown / Liquidation Only - Removed from active fleet"},
+                    {"id": "Account 8", "acc_num": "1", "tier": "$10k", "balance": 9627.98, "status": "DECOMMISSIONED (LIQUIDATION ONLY)", "reason": "Blown / Liquidation Only - Removed from active fleet"},
+                ]
+            
             _CACHED_STATE["fleet"] = fleet_data
+            _CACHED_STATE["decommissioned_fleet"] = decommissioned_data
             _CACHED_STATE["total_fleet_nav"] = round(sum(x["balance"] for x in fleet_data), 2)
-            _CACHED_STATE["account1"] = {
-                "balance": 25438.48,
-                "target": 27000.00,
-                "base": 25000.00,
-                "profit": 438.48,
-                "daily_cap": 400.00,
-                "daily_profit": 0.00,
-                "consistency_pct": 20.0,
-                "best_day": 400.00
-            }
+
 
             # 4. Fetch Real Executed Trades from Journal and Signed Ledger
             cursor.execute("""
@@ -855,7 +944,7 @@ def update_live_state():
                 "time": now_str[11:19],
                 "type": "HEARTBEAT",
                 "tag": "FLEET RECONCILE",
-                "msg": f"Active Fleet: 5 Live / 3 Quarantined • ${float(_CACHED_STATE['total_fleet_nav']):,.2f} NAV",
+                "msg": f"Active Fleet: 5 Live / 1 Quarantined (Accounts 5 & 8 Blown Removed) • ${float(_CACHED_STATE['total_fleet_nav']):,.2f} Active NAV",
                 "status": "COMPLIANT",
                 "color": "teal"
             })
@@ -1044,6 +1133,9 @@ class GlassHTTPHandler(BaseHTTPRequestHandler):
                     content = f.read()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
                 self.send_header("Content-Length", str(len(content)))
                 self.end_headers()
                 self.wfile.write(content)
@@ -1122,8 +1214,83 @@ class GlassHTTPHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+def refresh_fleet_balances_from_tradelocker():
+    """Polls TradeLocker API across all accounts and updates data/live_fleet_balances.json."""
+    try:
+        from src.clients.tl_client import TradeLockerClient
+        tl = TradeLockerClient()
+        if not tl.helpers:
+            return
+
+        email_map = {
+            "s79qv3xetj@upcomers.com": ("Account 1", 25000.0, 27000.0, "LIVE ACTIVE", "teal"),
+            "498svcbpfi@upcomers.com": ("Account 2", 50000.0, 54000.0, "LIVE ACTIVE", "teal"),
+            "q20gxm287x@upcomers.com": ("Account 3", 25000.0, 27000.0, "LIVE ACTIVE", "teal"),
+            "vkrbpwdprh@upcomers.com": ("Account 4", 10000.0, 10800.0, "DECOMMISSIONED (LIQUIDATION ONLY)", "rose"),
+            "hnr10rtj4k@upcomers.com": ("Account 5", 10000.0, 10800.0, "DECOMMISSIONED (LIQUIDATION ONLY)", "rose"),
+            "dwundrtxjv@upcomers.com": ("Account 6", 50000.0, 54000.0, "LIVE ACTIVE", "teal"),
+            "875do5esrd@upcomers.com": ("Account 7", 25000.0, 27000.0, "LIVE ACTIVE", "teal"),
+            "h4sj53tg4f@upcomers.com": ("Account 8", 10000.0, 10800.0, "DECOMMISSIONED (LIQUIDATION ONLY)", "rose"),
+        }
+
+        new_data = {}
+        for h in tl.helpers:
+            meta = email_map.get(h.email)
+            if not meta:
+                continue
+            acc_id, base, target, default_status, color = meta
+            try:
+                if not h.access_token:
+                    h.login()
+                h.get_account_details()
+                pos = h.get_open_positions() or []
+                bal = round(float(h.balance), 2)
+                profit = round(bal - base, 2)
+                
+                status = default_status
+                if "DECOMMISSIONED" not in default_status:
+                    if len(pos) > 0:
+                        status = f"LIVE ACTIVE ({len(pos)} POS)"
+                    else:
+                        status = "LIVE ACTIVE"
+                        
+                new_data[acc_id] = {
+                    "email": h.email,
+                    "tier": f"${int(base/1000)}k",
+                    "balance": bal,
+                    "equity": bal,
+                    "positions": len(pos),
+                    "status": status,
+                    "base": base,
+                    "target": target,
+                    "profit": profit,
+                    "color": color
+                }
+            except Exception as e:
+                logger.debug(f"Error querying TradeLocker for {h.email}: {e}")
+
+        if new_data:
+            out_path = os.path.join(ROOT_DIR, "data", "live_fleet_balances.json")
+            tmp_path = out_path + ".tmp"
+            with open(tmp_path, "w") as f:
+                json.dump(new_data, f, indent=2)
+            os.replace(tmp_path, out_path)
+            logger.info("💎 [Sovereign Glass] Live TradeLocker fleet balances refreshed successfully")
+    except Exception as e:
+        logger.debug(f"Fleet balance background poller notice: {e}")
+
+def _background_fleet_balance_poller():
+    """Continuous background thread that periodically refreshes fleet balances from TradeLocker."""
+    time.sleep(3)
+    while True:
+        refresh_fleet_balances_from_tradelocker()
+        time.sleep(45)
+
 def run_glass_hud_server(host: str = "127.0.0.1", port: int = 8899):
     """Starts the multi-threaded Glass HUD HTTP/SSE micro-server."""
+    poller_thread = threading.Thread(target=_background_fleet_balance_poller, daemon=True, name="FleetBalancePoller")
+    poller_thread.start()
+
     server = ThreadingHTTPServer((host, port), GlassHTTPHandler)
     logger.info(f"💎 [Software as Glass] Sovereign Observability HUD Live at http://{host}:{port}")
     server.serve_forever()
