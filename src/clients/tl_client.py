@@ -918,6 +918,13 @@ class TradeLockerClient:
                                     target_risk_usd = 50.0
                                 else:
                                     target_risk_usd = 35.0
+                            elif helper.email == "jfcuue7er3@upcomers.com":
+                                # Account 9: Fresh 50k Oracle Lead Striker
+                                # $150 base -> scales to $250 once trailing floor locks at $50,000 (buffer > $2,650)
+                                if remaining_buffer > 2650.0:
+                                    target_risk_usd = 250.0
+                                else:
+                                    target_risk_usd = 150.0
                             elif equity <= 35000.0:
                                 # $25k Tier (Accounts 3, 7): Base $35 / $50 -> scales to $65 / $80 at buffer > $1,000
                                 if remaining_buffer > 1000.0:

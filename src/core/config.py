@@ -233,7 +233,8 @@ class Config:
     # Index 2: Account 3 ($25k Account)
     # Index 3: Account 4 ($10k Account)
     # Index 4: Account 5 ($10k Account)
-    SCALE_OUT_ACCOUNT_INDICES = [0, 2, 3, 4]
+    # Index 8: Account 9 ($50k Oracle Lead Striker)
+    SCALE_OUT_ACCOUNT_INDICES = [0, 2, 3, 4, 8]
     
     # Accounts that run 100% full position with Trailing Ratchet for max multi-R windfalls:
     # Index 1: Account 2 ($50k Account)
@@ -254,6 +255,7 @@ class Config:
     
     # ── Per-Account Calibrated Risk Ceiling (Decoupled by Buffer Runway) ──
     ACCOUNT_RISK_CAPS = {
+        "jfcuue7er3@upcomers.com": 150.0, # Account 9: Fresh 50k Oracle Lead Striker ($150 base -> $250 once buffer > $2,650; 16.6 losses runway on $2,500 cushion)
         "s79qv3xetj@upcomers.com": 35.0,  # Account 1: Accelerated $35.00 (8.2 losses runway on $286 buffer)
         "875do5esrd@upcomers.com": 35.0,  # Account 7: Balanced $35.00 (14.5 losses runway on $510 buffer)
         "q20gxm287x@upcomers.com": 50.0,  # Account 3: Growth $50.00 (17.3 losses runway on $865 buffer)

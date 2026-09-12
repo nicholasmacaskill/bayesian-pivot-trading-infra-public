@@ -57,10 +57,11 @@
       * **Account 1 (`s79qv3xetj`):** Balance ~$25,286 (+$286 in profit; Floor locked at $25,000). **Base Risk: $35.00** (Accelerated: **8.2 losses runway** on $286 buffer; scales to $50 at buffer > $600, $70 at buffer > $1,200).
       * **Account 7 (`875do5esrd`):** Balance ~$24,260 (-$740 DD; Floor $23,750). **Base Risk: $35.00** (Balanced: **14.5 losses runway** on $510 buffer).
       * **Account 3 (`q20gxm287x`):** Balance ~$24,616 (-$384 DD; Floor $23,750). **Base Risk: $50.00** (Growth: **17.3 losses runway** on $865 buffer).
-  * **$50k Tier (Accounts 2, 6):**
+  * **$50k Tier (Accounts 2, 6, 9):**
     * Target Net Profit: **+$4,000.00** (Payout Unlock Balance: **$54,000.00**).
     * Max Single-Day Profit: **$800.00** (20% ceiling; system clamped to **$760.00**).
     * Current Status & Decoupled Starting Risk:
+      * **Account 9 (`jfcuue7er3` - Fresh Oracle Lead Striker):** Balance **$50,000.00** ($2,500 full buffer; Floor $47,500). **Base Risk: $150.00** (**16.6 losses runway** on $2,500 cushion; scales to $250.00 once trailing floor permanently locks at $50,000 Even Equity / buffer > $2,650).
       * **Account 2 (`498svcbpfi`):** Balance ~$48,567 (-$1,433 DD; Floor $47,500). **Base Risk: $70.00** (**15.2 losses runway** on $1,067 buffer; scales to $120 at buffer > $1,800).
       * **Account 6 (`dwundrtxjv`):** Balance ~$48,801 (-$1,199 DD; Floor $47,500). **Base Risk: $80.00** (**16.2 losses runway** on $1,301 buffer; scales to $120 at buffer > $1,800).
   * **$10k Tier (Accounts 4, 5, 8):**
