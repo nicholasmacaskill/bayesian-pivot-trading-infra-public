@@ -248,9 +248,22 @@ class Config:
     # ── Tiered Risk Scaling (Dynamic Fractional Kelly Sizing) ──
     DYNAMIC_RISK_SCALING_ENABLED = False
     TIER_CAPS_ENABLED = True            # Enforce hard dollar risk ceilings per account tier
-    TIER_MAX_RISK_10K = 10.0            # Defensive: Hard $10.00 max risk per trade on $10k accounts (0.10%)
-    TIER_MAX_RISK_25K = 40.0            # Calibrated Target: Hard $40.00 max risk per trade on $25k accounts (Accelerated 4-week timeline)
-    TIER_MAX_RISK_50K = 80.0            # Calibrated Target: Hard $80.00 max risk per trade on $50k accounts (Accelerated 4-week timeline)
+    TIER_MAX_RISK_10K = 0.0             # Quarantined: $0.00 risk on $10k accounts
+    TIER_MAX_RISK_25K = 40.0            # Default $25k ceiling
+    TIER_MAX_RISK_50K = 80.0            # Default $50k ceiling
+    
+    # ── Per-Account Calibrated Risk Ceiling (Decoupled by Buffer Runway) ──
+    ACCOUNT_RISK_CAPS = {
+        "s79qv3xetj@upcomers.com": 25.0,  # Account 1: Ultra-Defensive $25.00 (11.4 losses runway on $286 buffer)
+        "875do5esrd@upcomers.com": 35.0,  # Account 7: Balanced $35.00 (14.5 losses runway on $510 buffer)
+        "q20gxm287x@upcomers.com": 50.0,  # Account 3: Growth $50.00 (17.3 losses runway on $865 buffer)
+        "498svcbpfi@upcomers.com": 70.0,  # Account 2: Standard $50k $70.00 (15.2 losses runway on $1,067 buffer)
+        "dwundrtxjv@upcomers.com": 80.0,  # Account 6: Standard $50k $80.00 (16.2 losses runway on $1,301 buffer)
+        # Quarantined / Decommissioned Accounts:
+        "vkrbpwdprh@upcomers.com": 0.0,   # Account 4 ($10k)
+        "hnr10rtj4k@upcomers.com": 0.0,   # Account 5 ($10k)
+        "h4sj53tg4f@upcomers.com": 0.0,   # Account 8 ($10k)
+    }
     
     BASELINE_RISK_PCT = 0.0020          # 0.20% Defensive Base Risk (Lowered from 0.50% for DtD protection)
     A_PLUS_RISK_PCT = 0.0040            # 0.40% Scaled Risk (Lowered from 0.85% for A+ setups)

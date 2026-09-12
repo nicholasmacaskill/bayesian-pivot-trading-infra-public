@@ -902,33 +902,43 @@ class TradeLockerClient:
                     continue
 
                 # Enforce Fleet-Wide Tier-Specific Dollar Risk Ceilings with Buffer-Adaptive Ladders
-                # $40 base on $25k accounts (7+ loss runway on Account 1's $286 buffer)
-                # $80 base on $50k accounts (13-16+ loss runway on $1,000+ buffers)
                 if getattr(Config, 'TIER_CAPS_ENABLED', True):
-                    if equity <= 15000.0:
+                    acct_caps = getattr(Config, 'ACCOUNT_RISK_CAPS', {})
+                    if helper.email in acct_caps:
+                        base_cap = acct_caps[helper.email]
+                        if base_cap <= 0.0:
+                            target_risk_usd = 0.0
+                        else:
+                            # Dynamic ratchet scaling based on remaining buffer above floor:
+                            if helper.email == getattr(Config, 'FUNDED_ACCOUNT_1_EMAIL', 's79qv3xetj@upcomers.com'):
+                                # Account 1: $25 base -> $45 when buffer > $600 -> $65 when buffer > $1,200
+                                if remaining_buffer > 1200.0:
+                                    target_risk_usd = 65.0
+                                elif remaining_buffer > 600.0:
+                                    target_risk_usd = 45.0
+                                else:
+                                    target_risk_usd = 25.0
+                            elif equity <= 35000.0:
+                                # $25k Tier (Accounts 3, 7): Base $35 / $50 -> scales to $65 / $80 at buffer > $1,000
+                                if remaining_buffer > 1000.0:
+                                    target_risk_usd = min(80.0, base_cap * 1.5)
+                                else:
+                                    target_risk_usd = base_cap
+                            else:
+                                # $50k Tier (Accounts 2, 6): Base $70 / $80 -> scales to $120 at buffer > $1,800
+                                if remaining_buffer > 1800.0:
+                                    target_risk_usd = 120.0
+                                else:
+                                    target_risk_usd = base_cap
+                            # Ensure buffer maintains survival runway (at least 5+ losses)
+                            target_risk_usd = min(target_risk_usd, max(15.0, remaining_buffer * 0.20))
+                    elif equity <= 15000.0:
                         # Decommissioned accounts ($10k tier)
                         target_risk_usd = 0.0
                     elif equity <= 35000.0:
-                        # $25k Tier (Accounts 1, 3, 7): Base $40 -> Scales to $60 (buffer > $600) -> $80 (buffer > $1,200)
-                        if remaining_buffer < 600.0:
-                            tier_cap = getattr(Config, 'TIER_MAX_RISK_25K', 40.0)
-                        elif remaining_buffer < 1200.0:
-                            tier_cap = 60.0
-                        else:
-                            tier_cap = 80.0
-                        # Ensure buffer maintains survival runway (at least 5+ losses)
-                        tier_cap = min(tier_cap, max(20.0, remaining_buffer * 0.20))
-                        target_risk_usd = min(target_risk_usd, tier_cap)
+                        target_risk_usd = getattr(Config, 'TIER_MAX_RISK_25K', 40.0)
                     else:
-                        # $50k Tier (Accounts 2, 6): Base $80 -> Scales to $120 (buffer > $1,500) -> $160 (buffer > $2,500)
-                        if remaining_buffer < 1500.0:
-                            tier_cap = getattr(Config, 'TIER_MAX_RISK_50K', 80.0)
-                        elif remaining_buffer < 2500.0:
-                            tier_cap = 120.0
-                        else:
-                            tier_cap = 160.0
-                        tier_cap = min(tier_cap, max(40.0, remaining_buffer * 0.15))
-                        target_risk_usd = min(target_risk_usd, tier_cap)
+                        target_risk_usd = getattr(Config, 'TIER_MAX_RISK_50K', 80.0)
                 
                 # Calculate exact stop loss distance
                 if stop_loss is not None and entry_price is not None:

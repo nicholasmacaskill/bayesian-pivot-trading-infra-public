@@ -12,18 +12,23 @@ class DataManager:
         os.makedirs(cache_dir, exist_ok=True)
         self.exchange = ccxt.binance()
 
-    def get_data(self, symbol, timeframe='5m', days=30):
-        cache_file = os.path.join(self.cache_dir, f"{symbol.replace('/', '_')}_{timeframe}_{days}d.csv")
+    def get_data(self, symbol, timeframe='5m', days=30, start_date=None, end_date=None):
+        if start_date and end_date:
+            cache_file = os.path.join(self.cache_dir, f"{symbol.replace('/', '_')}_{timeframe}_{start_date}_{end_date}.csv")
+        else:
+            cache_file = os.path.join(self.cache_dir, f"{symbol.replace('/', '_')}_{timeframe}_{days}d.csv")
         
         if os.path.exists(cache_file):
-            print(f"📦 Loading {symbol} from cache...")
+            print(f"📦 Loading {symbol} from cache ({os.path.basename(cache_file)})...")
             df = pd.read_csv(cache_file, parse_dates=['timestamp'])
             return df
 
         if symbol in ["DXY", "NQ", "ES"]:
             return self._fetch_index_data(symbol, timeframe, days, cache_file)
             
-        return self._fetch_exchange_data(symbol, timeframe, days, cache_file)
+        start_ts = int(pd.Timestamp(start_date).timestamp() * 1000) if start_date else None
+        end_ts = int(pd.Timestamp(end_date).timestamp() * 1000) if end_date else None
+        return self._fetch_exchange_data(symbol, timeframe, days, cache_file, start_ts=start_ts, end_ts=end_ts)
 
     def _fetch_index_data(self, symbol, timeframe, days, cache_file):
         tickers = {"DXY": "DX=F", "NQ": "NQ=F", "ES": "ES=F"}
@@ -52,10 +57,12 @@ class DataManager:
         print(f"✅ Cached {len(df)} candles to {cache_file}")
         return df
 
-    def _fetch_exchange_data(self, symbol, timeframe, days, cache_file):
+    def _fetch_exchange_data(self, symbol, timeframe, days, cache_file, start_ts=None, end_ts=None):
         print(f"📥 Fetching {symbol} from exchange (this will be cached)...")
-        end_ts = int(datetime.now().timestamp() * 1000)
-        start_ts = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
+        if end_ts is None:
+            end_ts = int(datetime.now().timestamp() * 1000)
+        if start_ts is None:
+            start_ts = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
         
         all_data = []
         current_ts = start_ts
@@ -63,8 +70,11 @@ class DataManager:
         while current_ts < end_ts:
             try:
                 ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, since=current_ts, limit=1000)
-                if not ohlcv: break
+                if not ohlcv:
+                    break
                 all_data.extend(ohlcv)
+                if ohlcv[-1][0] <= current_ts:
+                    break
                 current_ts = ohlcv[-1][0] + 1
             except Exception as e:
                 print(f"Error: {e}")
@@ -72,6 +82,11 @@ class DataManager:
 
         df = pd.DataFrame(all_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms').dt.tz_localize(None)
+        if start_ts and end_ts:
+            start_dt = pd.to_datetime(start_ts, unit='ms')
+            end_dt = pd.to_datetime(end_ts, unit='ms')
+            df = df[(df['timestamp'] >= start_dt) & (df['timestamp'] <= end_dt)]
+        df = df.drop_duplicates(subset=['timestamp']).sort_values('timestamp').reset_index(drop=True)
         df.to_csv(cache_file, index=False)
         print(f"✅ Cached {len(df)} candles to {cache_file}")
         return df

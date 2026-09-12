@@ -53,18 +53,16 @@
   * **$25k Tier (Accounts 1, 3, 7):**
     * Target Net Profit: **+$2,000.00** (Payout Unlock Balance: **$27,000.00**).
     * Max Single-Day Profit: **$400.00** (20% ceiling; system clamped to **$380.00**).
-    * Base Risk: **$40.00** (scales to $60 at buffer > $600, $80 at buffer > $1,200; 7+ loss runway on Account 1's $286 buffer).
-    * Current Status:
-      * **Account 1 (`s79qv3xetj`):** Balance ~$25,286 (+$286 in profit; Floor locked at $25,000). Needs **+$1,714** $\rightarrow$ **~4 to 5 weeks** at $40 risk.
-      * **Account 3 (`q20gxm287x`):** Balance ~$24,697 (-$303 DD; Floor $23,750). Needs **+$2,303** $\rightarrow$ **~5 to 6 weeks** at $40 risk.
-      * **Account 7 (`875do5esrd`):** Balance ~$24,344 (-$656 DD; Floor $23,750). Needs **+$2,656** $\rightarrow$ **~6 to 7 weeks** at $40 risk.
+    * Current Status & Decoupled Starting Risk:
+      * **Account 1 (`s79qv3xetj`):** Balance ~$25,286 (+$286 in profit; Floor locked at $25,000). **Base Risk: $25.00** (Defensive: **11.4 losses runway** on $286 buffer; scales to $45 at buffer > $600, $65 at buffer > $1,200).
+      * **Account 7 (`875do5esrd`):** Balance ~$24,260 (-$740 DD; Floor $23,750). **Base Risk: $35.00** (Balanced: **14.5 losses runway** on $510 buffer).
+      * **Account 3 (`q20gxm287x`):** Balance ~$24,616 (-$384 DD; Floor $23,750). **Base Risk: $50.00** (Growth: **17.3 losses runway** on $865 buffer).
   * **$50k Tier (Accounts 2, 6):**
     * Target Net Profit: **+$4,000.00** (Payout Unlock Balance: **$54,000.00**).
     * Max Single-Day Profit: **$800.00** (20% ceiling; system clamped to **$760.00**).
-    * Base Risk: **$80.00** (scales to $120 at buffer > $1,500, $160 at buffer > $2,500; 13-16+ loss runway).
-    * Current Status:
-      * **Account 6 (`dwundrtxjv`):** Balance ~$48,801 (-$1,199 DD; Floor $47,500). Needs **+$5,199** $\rightarrow$ **~5 to 7 weeks** at $80 risk.
-      * **Account 2 (`498svcbpfi`):** Balance ~$48,567 (-$1,433 DD; Floor $47,500). Needs **+$5,433** $\rightarrow$ **~6 to 8 weeks** at $80 risk.
+    * Current Status & Decoupled Starting Risk:
+      * **Account 2 (`498svcbpfi`):** Balance ~$48,567 (-$1,433 DD; Floor $47,500). **Base Risk: $70.00** (**15.2 losses runway** on $1,067 buffer; scales to $120 at buffer > $1,800).
+      * **Account 6 (`dwundrtxjv`):** Balance ~$48,801 (-$1,199 DD; Floor $47,500). **Base Risk: $80.00** (**16.2 losses runway** on $1,301 buffer; scales to $120 at buffer > $1,800).
   * **$10k Tier (Accounts 4, 5, 8):**
     * **Permanently Decommissioned / Liquidation-Only.** Sizing set to **$0.00** (quarantined).
 

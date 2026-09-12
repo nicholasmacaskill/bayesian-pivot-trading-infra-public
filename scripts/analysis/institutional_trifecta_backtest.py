@@ -182,12 +182,13 @@ def simulate_trade_with_scale_out(
         pnl_r = max(0.5 * tp1_r, pnl_r)
     return {'pnl_r': round(pnl_r, 2) - comm_r, 'exit_reason': 'TIMED_EXIT'}
 
-def run_trifecta_backtest(days: int = 120, active_symbols: list = None):
+def run_trifecta_backtest(days: int = 120, active_symbols: list = None, start_date: str = None, end_date: str = None):
     if active_symbols is None:
         active_symbols = ["BTC/USDT"]  # Production Focus: BTC Active (Gold retained for SMT Divergence)
 
+    session_label = f"{start_date} to {end_date}" if start_date and end_date else f"Last {days} Days"
     print("=" * 80)
-    print(" 🏛️  SOVEREIGN SMC — PRODUCTION TRADING ENGINE WALK-FORWARD AUDIT (120 DAYS)")
+    print(f" 🏛️  SOVEREIGN SMC — PRODUCTION TRADING ENGINE WALK-FORWARD AUDIT ({session_label})")
     print(f" Active Trade Symbols: {active_symbols} | Intermarket SMT: BTC + Gold (PAXG)")
     print(" Strategies: 1. Judas Inducement Sniper | 2. London Close Silver Bullet | 3. Mean-Reverting Turtle Soup")
     print(" Filters: Weekdays Only | Max 2 Trades/Day | Pessimistic SL-First Collision")
@@ -196,8 +197,12 @@ def run_trifecta_backtest(days: int = 120, active_symbols: list = None):
     dm = DataManager()
     indicators = VectorizedIndicators()
 
-    btc_df = dm.get_data("BTC/USDT", timeframe='5m', days=days)
-    paxg_df = dm.get_data("PAXG/USDT", timeframe='5m', days=days)
+    if start_date and end_date:
+        btc_df = dm.get_data("BTC/USDT", timeframe='5m', start_date=start_date, end_date=end_date)
+        paxg_df = dm.get_data("PAXG/USDT", timeframe='5m', start_date=start_date, end_date=end_date)
+    else:
+        btc_df = dm.get_data("BTC/USDT", timeframe='5m', days=days)
+        paxg_df = dm.get_data("PAXG/USDT", timeframe='5m', days=days)
 
     print(f" • Loaded {len(btc_df):,} BTC 5m candles and {len(paxg_df):,} PAXG (Gold) 5m candles.")
     print(" • Pre-calculating Vectorized Indicators, VWAP Bands, Hurst Regimes, and SMT...\n")
@@ -484,10 +489,11 @@ def run_trifecta_backtest(days: int = 120, active_symbols: list = None):
     running_max = tdf['cum_r'].cummax()
     max_dd_r = (tdf['cum_r'] - running_max).min()
 
+    calc_days = (pd.Timestamp(end_date) - pd.Timestamp(start_date)).days if start_date and end_date else days
     print("\n" + "=" * 80)
-    print(" 📊 120-DAY EXECUTIVE PERFORMANCE REPORT — LIVE TRIFECTA AUDIT")
+    print(f" 📊 EXECUTIVE PERFORMANCE REPORT — {session_label.upper()} AUDIT")
     print("=" * 80)
-    print(f" • Total Qualified Setups:    {total_trades} (Averaging ~{total_trades/days:.2f} trades/day)")
+    print(f" • Total Qualified Setups:    {total_trades} (Averaging ~{total_trades/calc_days:.2f} trades/day)")
     print(f" • Win Rate:                  {win_rate:.1f}% ({wins} Wins / {losses} Losses)")
     print(f" • Total Net R-Multiple:      {total_r:+.2f} R")
     print(f" • Expected Value per Trade:  {avg_r:+.2f} R")
@@ -521,9 +527,22 @@ def run_trifecta_backtest(days: int = 120, active_symbols: list = None):
         print(f" {asset:<28} | {a_tot:<6} | {a_wr:<5.1f}% | {a_r:<+7.2f}R | {a_avgr:<+5.2f}R | {a_pf:<4.2f}")
     print("=" * 80 + "\n")
 
-    out_file = "data/trifecta_backtest_results.json"
+    out_file = f"data/trifecta_backtest_{start_date}_{end_date}.json" if start_date and end_date else "data/trifecta_backtest_results.json"
     tdf.to_json(out_file, orient='records', indent=2)
     print(f"✅ Full trade ledger saved to {out_file}\n")
 
 if __name__ == '__main__':
-    run_trifecta_backtest(days=120)
+    import argparse
+    parser = argparse.ArgumentParser(description="Institutional Trifecta Backtest")
+    parser.add_argument("--days", type=int, default=120, help="Lookback days from today")
+    parser.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD")
+    parser.add_argument("--end", type=str, default=None, help="End date YYYY-MM-DD")
+    parser.add_argument("--fall-2025", action="store_true", help="Run Fall 2025 session (Sept 1 to Dec 1, 2025)")
+    args = parser.parse_args()
+
+    if args.fall_2025:
+        run_trifecta_backtest(start_date="2025-09-01", end_date="2025-12-01")
+    elif args.start and args.end:
+        run_trifecta_backtest(start_date=args.start, end_date=args.end)
+    else:
+        run_trifecta_backtest(days=args.days)
