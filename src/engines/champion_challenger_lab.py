@@ -437,7 +437,8 @@ class ChampionChallengerLab:
             from src.engines.visual_vector_engine import VisualVectorEngine
             engine = VisualVectorEngine()
             query_vec = engine.extract_geometric_features(df, setup=setup)
-            return engine.evaluate_visual_precedent(query_vec, symbol=symbol, direction=direction)
+            active_regime = (setup.get('regime') or setup.get('regime_type') or 'UNKNOWN') if setup else 'UNKNOWN'
+            return engine.evaluate_visual_precedent(query_vec, symbol=symbol, direction=direction, regime_type=active_regime)
         except Exception as e:
             logger.debug(f"Visual challenger evaluation error: {e}")
             return {'recommendation': 'NEUTRAL', 'win_rate': 50.0, 'key_reason': str(e)}

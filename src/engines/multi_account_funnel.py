@@ -270,7 +270,8 @@ class MultiAccountFunnelManager:
         slippage_ratio: float,
         cal_safe: bool,
         corr_ok: bool,
-        regime_allowed: bool
+        regime_allowed: bool,
+        regime_type: Optional[str] = None
     ) -> Tuple[bool, List[str]]:
         """
         Evaluates a candidate trade against a specific account's validator profile.
@@ -335,6 +336,37 @@ class MultiAccountFunnelManager:
         passed = len(rejection_reasons) == 0
         return passed, rejection_reasons
 
+    def find_candidate_visual_analogs(
+        self,
+        candidate_setup: dict,
+        query_vector: Optional[Any] = None,
+        top_k: int = 3,
+        regime_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Queries visual vector analogs for a candidate trade conditioned on active regime.
+        Supplies active regime_type derived from RegimeFilter or candidate metadata.
+        Guarantees sub-millisecond local retrieval without blocking HTTP operations.
+        """
+        try:
+            from src.engines.visual_vector_engine import VisualVectorEngine
+            v_engine = VisualVectorEngine()
+            active_regime = regime_type or candidate_setup.get('regime') or candidate_setup.get('regime_type') or 'UNKNOWN'
+            symbol = candidate_setup.get('symbol', '')
+            direction = candidate_setup.get('direction', 'BUY')
+            if query_vector is None:
+                query_vector = v_engine.extract_geometric_features(None, setup=candidate_setup)
+            return v_engine.find_visual_analogs(
+                query_vector=query_vector,
+                symbol=symbol,
+                direction=direction,
+                top_k=top_k,
+                regime_type=active_regime
+            )
+        except Exception as e:
+            logger.debug(f"Candidate visual analog retrieval error: {e}")
+            return []
+
     def evaluate_setup_for_account(
         self,
         setup: dict,
@@ -346,10 +378,12 @@ class MultiAccountFunnelManager:
         corr_ok: bool = True,
         regime_allowed: bool = True,
         ai_score: float = 8.0,
-        open_positions: Optional[List[dict]] = None
+        open_positions: Optional[List[dict]] = None,
+        regime_type: Optional[str] = None
     ) -> Tuple[bool, List[str]]:
         """
         Evaluates a candidate setup against an account's validator profile, including anti-hedging.
+        Optionally conditions on regime_type derived from RegimeFilter.
         """
         profile = self.profiles.get(account_key)
         if not profile:
@@ -376,7 +410,8 @@ class MultiAccountFunnelManager:
             slippage_ratio=slippage_ratio,
             cal_safe=cal_safe,
             corr_ok=corr_ok,
-            regime_allowed=regime_allowed
+            regime_allowed=regime_allowed,
+            regime_type=regime_type
         )
         rejection_reasons.extend(elig_reasons)
 

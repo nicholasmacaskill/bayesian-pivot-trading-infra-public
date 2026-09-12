@@ -192,6 +192,56 @@ def init_db():
                 closed_at TEXT
             )
         ''')
+
+        # Migrations for counterfactual_trades
+        for cf_col, cf_type in [
+            ('regime_type', "TEXT DEFAULT 'UNKNOWN'"),
+            ('entry_hurst', "REAL DEFAULT 0.50"),
+            ('adx_at_entry', "REAL DEFAULT 20.0"),
+            ('vol_percentile', "REAL DEFAULT 50.0")
+        ]:
+            try:
+                c.execute(f"ALTER TABLE counterfactual_trades ADD COLUMN {cf_col} {cf_type}")
+            except sqlite3.OperationalError:
+                pass
+
+        # Chart Visual Embeddings Table (Multimodal Geometric & Visual RAG)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chart_visual_embeddings (
+                embedding_id TEXT PRIMARY KEY,
+                signal_id TEXT,
+                timestamp TEXT,
+                symbol TEXT,
+                pattern TEXT,
+                session TEXT,
+                direction TEXT,
+                outcome TEXT,
+                realized_r REAL,
+                pnl REAL,
+                vector BLOB,
+                vector_dim INTEGER,
+                notes TEXT,
+                regime_type TEXT DEFAULT 'UNKNOWN',
+                hurst REAL DEFAULT 0.50,
+                atr_percentile REAL DEFAULT 50.0,
+                created_at TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_cve_symbol_pattern 
+            ON chart_visual_embeddings(symbol, pattern)
+        ''')
+
+        # Auto-migrations for chart_visual_embeddings
+        for cve_col, cve_type in [
+            ('regime_type', "TEXT DEFAULT 'UNKNOWN'"),
+            ('hurst', "REAL DEFAULT 0.50"),
+            ('atr_percentile', "REAL DEFAULT 50.0")
+        ]:
+            try:
+                c.execute(f"ALTER TABLE chart_visual_embeddings ADD COLUMN {cve_col} {cve_type}")
+            except sqlite3.OperationalError:
+                pass
         
         conn.commit()
     except Exception as e:

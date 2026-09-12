@@ -797,7 +797,7 @@ def update_live_state():
 
             # 1. Fetch live agent calls & scans (including shadow decisions)
             cursor.execute("""
-                SELECT id, timestamp, symbol, pattern, direction, ai_score, ai_reasoning, verdict, session, killzone, hurst 
+                SELECT id, timestamp, symbol, pattern, direction, ai_score, ai_reasoning, verdict, session, killzone, hurst, shadow_regime 
                 FROM scans 
                 WHERE symbol != 'HEARTBEAT'
                 ORDER BY id DESC LIMIT 15
@@ -816,7 +816,8 @@ def update_live_state():
                     "mode": "SHADOW LAB (0-Risk)" if is_shadow else "LIVE AUTO-EXECUTE",
                     "session": r[8] or "London/NY",
                     "killzone": r[9] or "Active",
-                    "hurst": r[10] or 0.612
+                    "hurst": r[10] or 0.612,
+                    "regime": r[11] or ("Persistent Trend" if (r[10] or 0.5) > 0.55 else "Mean-Reverting")
                 })
             _CACHED_STATE["agent_calls"] = calls
 
@@ -1111,11 +1112,28 @@ def update_live_state():
             "stages": pipeline_stages,
             "latest_thought": latest_scan.get("reasoning", "Evaluating liquidity structure and Bayesian prior updates.")
         }
+
+        # 6b. Retrieve Visual Vector Analogs Conditioned on Active Regime for Candidate
+        try:
+            from src.engines.visual_vector_engine import VisualVectorEngine
+            v_eng = VisualVectorEngine()
+            active_regime = latest_scan.get("regime") or latest_scan.get("shadow_regime") or "UNKNOWN"
+            q_vec = v_eng.extract_geometric_features(None, setup=latest_scan)
+            c_analogs = v_eng.find_visual_analogs(
+                q_vec,
+                symbol=latest_scan.get("symbol", "BTC/USD"),
+                direction=latest_scan.get("direction", "BUY"),
+                top_k=3,
+                regime_type=active_regime
+            )
+            _CACHED_STATE["candidate_analogs"] = c_analogs
+        except Exception as _c_err:
+            logger.debug(f"Candidate analog retrieval notice: {_c_err}")
+            _CACHED_STATE["candidate_analogs"] = []
         
         # Calculate true tick latency
         _CACHED_STATE["latency_ms"] = round((time.perf_counter() - t0) * 1000.0, 1)
     except Exception as e:
-        logger.debug(f"State update notice: {e}")
         logger.debug(f"State update notice: {e}")
 
 class GlassHTTPHandler(BaseHTTPRequestHandler):
@@ -1123,7 +1141,9 @@ class GlassHTTPHandler(BaseHTTPRequestHandler):
         return
 
     def do_HEAD(self):
-        self.do_GET()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
 
     def do_GET(self):
         if self.path == "/" or self.path == "/index.html":
@@ -1164,6 +1184,45 @@ class GlassHTTPHandler(BaseHTTPRequestHandler):
             update_live_state()
             data = json.dumps(_CACHED_STATE).encode("utf-8")
             self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        elif self.path.startswith("/api/visual_analogs"):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                from src.engines.visual_vector_engine import VisualVectorEngine
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                symbol = params.get('symbol', ['BTC/USD'])[0]
+                direction = params.get('direction', ['BUY'])[0]
+                regime_type = params.get('regime_type', [params.get('regime', ['UNKNOWN'])[0]])[0]
+                top_k = int(params.get('top_k', [3])[0])
+
+                v_eng = VisualVectorEngine()
+                dummy_q = v_eng.extract_geometric_features(None, setup={'symbol': symbol, 'direction': direction})
+                analogs = v_eng.find_visual_analogs(
+                    dummy_q,
+                    symbol=symbol,
+                    direction=direction,
+                    top_k=top_k,
+                    regime_type=regime_type
+                )
+                resp_obj = {
+                    "status": "SUCCESS",
+                    "symbol": symbol,
+                    "direction": direction,
+                    "regime_type": regime_type,
+                    "analogs": analogs
+                }
+                data = json.dumps(resp_obj).encode("utf-8")
+                self.send_response(200)
+            except Exception as e:
+                data = json.dumps({"status": "ERROR", "message": str(e)}).encode("utf-8")
+                self.send_response(500)
+
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Content-Length", str(len(data)))

@@ -53,6 +53,9 @@ class VisualVectorEngine:
                     vector BLOB,
                     vector_dim INTEGER,
                     notes TEXT,
+                    regime_type TEXT DEFAULT 'UNKNOWN',
+                    hurst REAL DEFAULT 0.50,
+                    atr_percentile REAL DEFAULT 50.0,
                     created_at TEXT
                 );
             """)
@@ -60,6 +63,18 @@ class VisualVectorEngine:
                 CREATE INDEX IF NOT EXISTS idx_cve_symbol_pattern 
                 ON chart_visual_embeddings(symbol, pattern);
             """)
+
+            # Auto-migration for existing SQLite tables
+            for col, col_def in [
+                ('regime_type', "TEXT DEFAULT 'UNKNOWN'"),
+                ('hurst', "REAL DEFAULT 0.50"),
+                ('atr_percentile', "REAL DEFAULT 50.0")
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE chart_visual_embeddings ADD COLUMN {col} {col_def}")
+                except sqlite3.OperationalError:
+                    pass
+
             conn.commit()
             conn.close()
         except Exception as e:
@@ -72,7 +87,7 @@ class VisualVectorEngine:
         lookback: int = 30
     ) -> np.ndarray:
         """
-        Extracts a normalized, invariant 64-dimensional geometric feature vector
+        Extracts a normalized, invariant 48-dimensional geometric feature vector
         from price action candles and SMC structure:
           - Candle Body vs Wick Ratios (recent 10 candles)
           - Normalized True Range (volatility expansion)
@@ -164,7 +179,10 @@ class VisualVectorEngine:
         pnl: float,
         vector: np.ndarray,
         session: str = "GLOBAL",
-        notes: str = ""
+        notes: str = "",
+        regime_type: str = "UNKNOWN",
+        hurst: float = 0.50,
+        atr_percentile: float = 50.0
     ) -> bool:
         """Stores a computed vector embedding and its verified outcome in SQLite."""
         try:
@@ -176,12 +194,13 @@ class VisualVectorEngine:
                 INSERT OR REPLACE INTO chart_visual_embeddings (
                     embedding_id, signal_id, timestamp, symbol, pattern, 
                     session, direction, outcome, realized_r, pnl, 
-                    vector, vector_dim, notes, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    vector, vector_dim, notes, regime_type, hurst, atr_percentile, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 embedding_id, str(signal_id), str(timestamp), str(symbol), str(pattern),
                 str(session), str(direction), str(outcome), float(realized_r), float(pnl),
-                vector_blob, len(vector), str(notes), datetime.now(timezone.utc).isoformat()
+                vector_blob, len(vector), str(notes), str(regime_type), float(hurst), float(atr_percentile),
+                datetime.now(timezone.utc).isoformat()
             ))
             conn.commit()
             conn.close()
@@ -195,10 +214,12 @@ class VisualVectorEngine:
         query_vector: np.ndarray,
         symbol: Optional[str] = None,
         direction: Optional[str] = None,
-        top_k: int = 3
+        top_k: int = 3,
+        regime_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Performs fast cosine similarity search across the visual embeddings library.
+        Optionally pre-filters by regime_type with graceful symbol-only fallback if < 3 matches.
         Returns the top-K nearest historical chart analogs with their realized outcomes.
         """
         if query_vector is None or len(query_vector) == 0:
@@ -208,56 +229,77 @@ class VisualVectorEngine:
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            query = "SELECT embedding_id, signal_id, timestamp, symbol, pattern, direction, outcome, realized_r, pnl, vector, notes FROM chart_visual_embeddings"
-            params = []
-            conditions = []
-
-            if symbol:
-                conditions.append("(symbol = ? OR symbol LIKE ?)")
-                params.extend([symbol, f"%{symbol.split('/')[0]}%"])
-
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
-
-            rows = cursor.execute(query, tuple(params)).fetchall()
-            conn.close()
-
-            if not rows:
-                return []
-
-            # Compute Cosine Similarities in Vectorized NumPy
-            similarities = []
             q_norm = np.linalg.norm(query_vector)
             if q_norm < 1e-6:
+                conn.close()
                 return []
 
-            for r in rows:
-                v_blob = r[9]
-                if not v_blob:
-                    continue
-                db_vector = np.frombuffer(v_blob, dtype=np.float32)
-                db_norm = np.linalg.norm(db_vector)
-                if db_norm < 1e-6:
-                    continue
+            def _query_and_score(apply_regime_filter: bool) -> List[Dict[str, Any]]:
+                query = """
+                    SELECT embedding_id, signal_id, timestamp, symbol, pattern, 
+                           direction, outcome, realized_r, pnl, vector, notes,
+                           regime_type, hurst, atr_percentile 
+                    FROM chart_visual_embeddings
+                """
+                params = []
+                conditions = []
 
-                cosine_sim = float(np.dot(query_vector, db_vector) / (q_norm * db_norm))
-                similarities.append({
-                    'embedding_id': r[0],
-                    'signal_id': r[1],
-                    'timestamp': r[2],
-                    'symbol': r[3],
-                    'pattern': r[4],
-                    'direction': r[5],
-                    'outcome': r[6],
-                    'realized_r': float(r[7] or 0.0),
-                    'pnl': float(r[8] or 0.0),
-                    'notes': r[10] or '',
-                    'similarity': round(cosine_sim, 4)
-                })
+                if symbol:
+                    conditions.append("(symbol = ? OR symbol LIKE ?)")
+                    params.extend([symbol, f"%{symbol.split('/')[0]}%"])
 
-            # Sort descending by similarity
-            similarities.sort(key=lambda x: x['similarity'], reverse=True)
-            return similarities[:top_k]
+                if apply_regime_filter and regime_type and str(regime_type).upper() != "UNKNOWN":
+                    conditions.append("(regime_type = ? OR regime_type IS NULL OR regime_type = 'UNKNOWN')")
+                    params.append(str(regime_type))
+
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+
+                rows = cursor.execute(query, tuple(params)).fetchall()
+                if not rows:
+                    return []
+
+                similarities = []
+                for r in rows:
+                    v_blob = r[9]
+                    if not v_blob:
+                        continue
+                    db_vector = np.frombuffer(v_blob, dtype=np.float32)
+                    db_norm = np.linalg.norm(db_vector)
+                    if db_norm < 1e-6:
+                        continue
+
+                    cosine_sim = float(np.dot(query_vector, db_vector) / (q_norm * db_norm))
+                    similarities.append({
+                        'embedding_id': r[0],
+                        'signal_id': r[1],
+                        'timestamp': r[2],
+                        'symbol': r[3],
+                        'pattern': r[4],
+                        'direction': r[5],
+                        'outcome': r[6],
+                        'realized_r': float(r[7] or 0.0),
+                        'pnl': float(r[8] or 0.0),
+                        'notes': r[10] or '',
+                        'regime_type': r[11] if len(r) > 11 and r[11] is not None else 'UNKNOWN',
+                        'hurst': float(r[12] or 0.50) if len(r) > 12 and r[12] is not None else 0.50,
+                        'atr_percentile': float(r[13] or 50.0) if len(r) > 13 and r[13] is not None else 50.0,
+                        'similarity': round(cosine_sim, 4)
+                    })
+
+                similarities.sort(key=lambda x: x['similarity'], reverse=True)
+                return similarities
+
+            if regime_type and str(regime_type).upper() != "UNKNOWN":
+                analogs = _query_and_score(apply_regime_filter=True)
+                if len(analogs) < 3:
+                    # Fall back gracefully to symbol-only search to guarantee analog availability
+                    analogs = _query_and_score(apply_regime_filter=False)
+            else:
+                analogs = _query_and_score(apply_regime_filter=False)
+
+            conn.close()
+            return analogs[:top_k]
 
         except Exception as e:
             logger.error(f"Error querying visual analogs: {e}")
@@ -267,7 +309,8 @@ class VisualVectorEngine:
         self,
         query_vector: np.ndarray,
         symbol: str,
-        direction: str
+        direction: str,
+        regime_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Evaluates visual precedent against historical library.
@@ -277,7 +320,9 @@ class VisualVectorEngine:
           - avg_r: Expected R-multiple
           - key_reason: Analytical explanation
         """
-        analogs = self.find_visual_analogs(query_vector, symbol=symbol, direction=direction, top_k=3)
+        analogs = self.find_visual_analogs(
+            query_vector, symbol=symbol, direction=direction, top_k=3, regime_type=regime_type
+        )
         if not analogs:
             return {
                 'recommendation': 'NEUTRAL',

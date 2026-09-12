@@ -91,19 +91,39 @@ class SetupMemory:
 
     def get_context_for_validator(self, setup):
         """
-        Prepares a context string for the AI Validator based on memory.
+        Prepares a context string for the AI Validator based on memory with corrective RAG gating.
+        Enforces a strict similarity threshold (>= 0.72) before prompt injection to avoid noise.
         """
         similar = self.find_similar_setups(setup)
         if not similar:
-            return "MEMORY: No highly similar historical setups found for reference."
+            return "MEMORY: No statistically valid historical precedents found for this market condition. Evaluate purely on current structural confluence."
+
+        # Corrective RAG Evaluation Gate: Gate out noise or low-quality semantic matches (< 0.72)
+        valid_trades = []
+        for trade in similar:
+            sim = trade.get('similarity')
+            if sim is None:
+                sim = trade.get('score', trade.get('match_score', 0.0))
+            try:
+                sim_val = float(sim or 0.0)
+            except (ValueError, TypeError):
+                sim_val = 0.0
+
+            if sim_val >= 0.72:
+                valid_trades.append(trade)
+
+        if not valid_trades:
+            return "MEMORY: No statistically valid historical precedents found for this market condition. Evaluate purely on current structural confluence."
 
         context = "MEMORY: Found similar historical setups:\n"
-        for i, trade in enumerate(similar, 1):
-            pnl_status = "WIN" if trade.get('pnl', 0) > 0 else "LOSS"
+        for i, trade in enumerate(valid_trades, 1):
+            pnl_status = "WIN" if (trade.get('pnl', 0) or 0) > 0 else "LOSS"
+            grade = trade.get('ai_grade') or trade.get('ai_score') or 'N/A'
+            feedback = trade.get('notes') or trade.get('ai_reasoning') or 'No notes.'
             context += (
-                f"{i}. [{trade.get('symbol')}] Result: {pnl_status} (${trade.get('pnl')}). "
-                f"AI Grade: {(trade.get('ai_grade') or trade.get('ai_score'))}/10. "
-                f"Feedback: {(trade.get('notes') or trade.get('ai_reasoning')) or 'No notes.'}\n"
+                f"{i}. [{trade.get('symbol')}] Result: {pnl_status} (${trade.get('pnl', 0)}). "
+                f"AI Grade: {grade}/10. "
+                f"Feedback: {feedback}\n"
             )
         
         return context

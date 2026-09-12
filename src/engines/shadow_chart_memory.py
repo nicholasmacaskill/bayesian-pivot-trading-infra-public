@@ -38,7 +38,9 @@ class ShadowChartMemory:
         symbol: str,
         direction: str = "LONG",
         limit: int = 2,
-        df: Any = None
+        df: Any = None,
+        setup: Optional[Dict[str, Any]] = None,
+        regime_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Queries the database for resolved historical setups across the 6-month history.
@@ -47,12 +49,13 @@ class ShadowChartMemory:
         winners = []
         losers = []
 
-        # 0. Query Visual Vector Precedent Library (Fast Cosine Similarity)
+        # 0. Query Visual Vector Precedent Library (Fast Cosine Similarity conditioned on regime)
         try:
             from src.engines.visual_vector_engine import VisualVectorEngine
             v_eng = VisualVectorEngine()
-            q_vec = v_eng.extract_geometric_features(df, setup={'direction': direction, 'pattern': pattern})
-            v_analogs = v_eng.find_visual_analogs(q_vec, symbol=symbol, direction=direction, top_k=4)
+            q_vec = v_eng.extract_geometric_features(df, setup=setup or {'direction': direction, 'pattern': pattern})
+            active_regime = regime_type or (setup.get('regime') if setup else None) or (setup.get('regime_type') if setup else None) or 'UNKNOWN'
+            v_analogs = v_eng.find_visual_analogs(q_vec, symbol=symbol, direction=direction, top_k=4, regime_type=active_regime)
             for a in v_analogs:
                 is_win = (a.get('outcome') == 'WIN' or a.get('realized_r', 0) > 0)
                 sim_pct = a.get('similarity', 0.0) * 100.0

@@ -601,10 +601,12 @@ class AIValidator:
                 from src.engines.visual_vector_engine import VisualVectorEngine
                 v_engine = VisualVectorEngine()
                 q_vec = v_engine.extract_geometric_features(df, setup=setup)
+                active_regime = setup.get('regime', setup.get('regime_type', 'UNKNOWN'))
                 v_eval = v_engine.evaluate_visual_precedent(
                     q_vec, 
                     symbol=setup.get('symbol', 'BTC/USD'), 
-                    direction=setup.get('direction', 'LONG')
+                    direction=setup.get('direction', 'LONG'),
+                    regime_type=active_regime
                 )
                 
                 rec = v_eval.get('recommendation', 'NEUTRAL')
