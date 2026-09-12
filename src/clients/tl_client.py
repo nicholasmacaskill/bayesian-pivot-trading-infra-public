@@ -150,6 +150,7 @@ class TradeLockerHelper:
                     # Capture both ID, AccNum, and live Balance
                     self.account_id = accounts[0]['id']
                     self.acc_num = accounts[0].get('accNum')
+                    self.status = str(accounts[0].get('status', 'ACTIVE')).upper()
                     self.balance = float(accounts[0].get('projectedEquity') or accounts[0].get('accountBalance') or 25000.0)
                     print(f"DEBUG: Account Discovery Meta: {accounts[0]}")
                     try:
@@ -410,12 +411,7 @@ class TradeLockerHelper:
         else:
             payload["price"] = 0.0
 
-        if stop_loss:
-            payload["stopLoss"] = float(stop_loss)
-            payload["stopLossType"] = "absolute"
-        if take_profit:
-            payload["takeProfit"] = float(take_profit)
-            payload["takeProfitType"] = "absolute"
+
 
         for attempt in range(2):
             try:
@@ -443,19 +439,24 @@ class TradeLockerHelper:
                     if stop_loss or take_profit:
                         time.sleep(0.5)
                         try:
-                            open_pos = self.get_open_positions()
-                            if open_pos:
-                                for p in open_pos:
-                                    if str(p.get("symbol", "")).replace("/", "").upper() in ["BTCUSD", "ETHUSD"] or str(p.get("tradableInstrumentId", "")) == str(instrument_id):
-                                        pos_id = p.get("id")
-                                        if pos_id:
-                                            patch_url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions/{pos_id}"
-                                            patch_payload = {"stopLossType": "absolute", "takeProfitType": "absolute"}
-                                            if stop_loss: patch_payload["stopLoss"] = float(stop_loss)
-                                            if take_profit: patch_payload["takeProfit"] = float(take_profit)
-                                            p_res = requests.patch(patch_url, json=patch_payload, headers=self._get_headers(auth=True), timeout=5)
-                                            logger.info(f"🛡️ Attached SL (${stop_loss}) & TP (${take_profit}) to Position {pos_id}: {p_res.status_code}")
+                            # Robust 5-second polling loop to guarantee settlement before patch
+                            import time
+                            settled = False
+                            for poll in range(5):
+                                time.sleep(1.0)
+                                open_pos = self.get_open_positions()
+                                if open_pos:
+                                    for p in open_pos:
+                                        if str(p.get("tradableInstrumentId")) == str(instrument_id) and str(p.get("side")).lower() == side.lower():
+                                            # Found it, patch it
+                                            pos_id = p.get("id")
+                                            self.modify_position_bracket(pos_id, stop_loss=stop_loss, take_profit=take_profit)
+                                            settled = True
                                             break
+                                if settled:
+                                    break
+                            if not settled:
+                                logger.critical("⚠️ Trade placed but failed to locate position ID for bracket patch!")
                         except Exception as bracket_err:
                             logger.warning(f"⚠️ Bracket attach non-fatal error: {bracket_err}")
 
@@ -529,8 +530,7 @@ class TradeLockerHelper:
         """Safely closes an open position on TradeLocker using DELETE endpoint."""
         if not self.access_token and not self.login():
             return False
-        acc_part = f"/accounts/{self.account_id}" if self.account_id else ""
-        url = f"{self.base_url}/backend-api/trade{acc_part}/positions/{position_id}"
+        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
         try:
             resp = requests.delete(url, headers=self._get_headers(auth=True), timeout=10)
             if resp.status_code in [200, 204]:
@@ -755,18 +755,59 @@ class TradeLockerClient:
         Features Dynamic Fractional Kelly Risk Sizing (scales up on A+ confluence, caps at 1.00% max safety ceiling).
         Protected by the Sovereign ExecutionFirewall.
         """
+        # Atomic Daily Setup Lock Enforcement
+        import json
+        import os
+        from datetime import datetime, timezone
+        from filelock import FileLock
+        
+        lock_file_path = "data/daily_setup_lock.json"
+        try:
+            os.makedirs("data", exist_ok=True)
+            lock = FileLock("data/daily_setup_lock.json.lock")
+            with lock.acquire(timeout=5):
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                if os.path.exists(lock_file_path):
+                    with open(lock_file_path, "r") as lf:
+                        data = json.load(lf)
+                else:
+                    data = {"date": today_str, "setups_fired": 0}
+                    
+                if data.get("date") != today_str:
+                    data = {"date": today_str, "setups_fired": 0}
+                    
+                if data.get("setups_fired", 0) >= 2:
+                    logger.critical("🛡️ [ATOMIC LOCK] Daily Setup Limit (2) reached. Rejecting fleet dispatch.")
+                    return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
+                    
+                data["setups_fired"] = data.get("setups_fired", 0) + 1
+                with open(lock_file_path, "w") as lf:
+                    json.dump(data, lf)
+        except Exception as e:
+            logger.error(f"Failed to acquire atomic setup lock: {e}")
+            return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
+            
+
         import time
         from src.core.execution_firewall import ExecutionFirewall
 
         # ── SOVEREIGN EXECUTION FIREWALL AIRGAP GATE ──
         if not bypass_firewall:
+            # Query live fleet positions before evaluating firewall invariants
+            current_open_positions = []
+            try:
+                current_open_positions = self.get_open_positions()
+            except Exception as pos_err:
+                logger.warning(f"Note querying open positions during pre-flight firewall audit: {pos_err}")
+
             is_approved, rejection_reason = ExecutionFirewall.audit_trade_request(
                 symbol=symbol,
                 side=side,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
                 ai_score=ai_score,
-                is_htf_confirmed=is_htf_confirmed
+                is_htf_confirmed=is_htf_confirmed,
+                open_positions=current_open_positions
             )
             if not is_approved:
                 logger.critical(f"🛡️ [EXECUTION FIREWALL INTERCEPTED] Blocked un-gated order on {symbol} {side.upper()}: {rejection_reason}")
@@ -838,28 +879,56 @@ class TradeLockerClient:
                 raw_trailing_floor = hwm * (1.0 - max_dd_pct)
                 # Floor locks at initial_size (even equity) and never trails higher than initial balance
                 hard_floor = min(initial_size, raw_trailing_floor)
+                # Account 1 ($25k funded) peak exceeded $26k -> Floor permanently locked at $25,000.00 Even Equity
+                is_account_1 = (helper.email == getattr(Config, 'FUNDED_ACCOUNT_1_EMAIL', 's79qv3xetj@upcomers.com'))
+                if is_account_1:
+                    hard_floor = 25000.0
                 remaining_buffer = max(0.0, equity - hard_floor)
                 
-                # Check Emergency Quarantine List or Low Buffer Gate
-                quarantined_accounts = getattr(Config, 'EMERGENCY_LOCKOUT_ACCOUNTS', [])
-                min_safe_buffer = getattr(Config, 'MIN_ACCOUNT_BUFFER_USD', 100.0)
-                if helper.email in quarantined_accounts or remaining_buffer < min_safe_buffer:
-                    logger.critical(f"🛡️ [EMERGENCY TRAILING DD QUARANTINE] Account {i+1} ({helper.email}) locked out! (Equity: ${equity:,.2f}, Buffer: ${remaining_buffer:,.2f} < ${min_safe_buffer:.2f} safe margin). Zero risk permitted.")
+                # Check Account Status, Open Position Count & Drawdown Quarantine Gate (Invariant 9)
+                acct_status = getattr(helper, 'status', 'ACTIVE')
+                acct_open_pos = helper.get_open_positions()
+                acct_pos_count = len(acct_open_pos) if acct_open_pos else 0
+
+                is_eligible, ineligibility_reason = ExecutionFirewall.is_account_eligible(
+                    email=helper.email,
+                    status=acct_status,
+                    equity=equity,
+                    hard_floor=hard_floor,
+                    open_positions_count=acct_pos_count
+                )
+                if not is_eligible:
+                    logger.critical(f"🛡️ [ACCOUNT EXCLUDED] Account {i+1} ({helper.email}): {ineligibility_reason}. Zero risk permitted.")
                     continue
 
-                # Cap dollar risk to at most 10% of remaining buffer to guarantee a 10-loss buffer runway
-                dtd_risk_cap = max(10.0, remaining_buffer * 0.10)
-                target_risk_usd = min(target_risk_usd, dtd_risk_cap)
-
-                # Enforce Hard Tier-Specific Dollar Risk Ceilings
+                # Enforce Fleet-Wide Tier-Specific Dollar Risk Ceilings with Buffer-Adaptive Ladders
+                # $40 base on $25k accounts (7+ loss runway on Account 1's $286 buffer)
+                # $80 base on $50k accounts (13-16+ loss runway on $1,000+ buffers)
                 if getattr(Config, 'TIER_CAPS_ENABLED', True):
                     if equity <= 15000.0:
-                        tier_cap = getattr(Config, 'TIER_MAX_RISK_10K', 25.0)
+                        # Decommissioned accounts ($10k tier)
+                        target_risk_usd = 0.0
                     elif equity <= 35000.0:
-                        tier_cap = getattr(Config, 'TIER_MAX_RISK_25K', 65.0)
+                        # $25k Tier (Accounts 1, 3, 7): Base $40 -> Scales to $60 (buffer > $600) -> $80 (buffer > $1,200)
+                        if remaining_buffer < 600.0:
+                            tier_cap = getattr(Config, 'TIER_MAX_RISK_25K', 40.0)
+                        elif remaining_buffer < 1200.0:
+                            tier_cap = 60.0
+                        else:
+                            tier_cap = 80.0
+                        # Ensure buffer maintains survival runway (at least 5+ losses)
+                        tier_cap = min(tier_cap, max(20.0, remaining_buffer * 0.20))
+                        target_risk_usd = min(target_risk_usd, tier_cap)
                     else:
-                        tier_cap = getattr(Config, 'TIER_MAX_RISK_50K', 125.0)
-                    target_risk_usd = min(target_risk_usd, tier_cap)
+                        # $50k Tier (Accounts 2, 6): Base $80 -> Scales to $120 (buffer > $1,500) -> $160 (buffer > $2,500)
+                        if remaining_buffer < 1500.0:
+                            tier_cap = getattr(Config, 'TIER_MAX_RISK_50K', 80.0)
+                        elif remaining_buffer < 2500.0:
+                            tier_cap = 120.0
+                        else:
+                            tier_cap = 160.0
+                        tier_cap = min(tier_cap, max(40.0, remaining_buffer * 0.15))
+                        target_risk_usd = min(target_risk_usd, tier_cap)
                 
                 # Calculate exact stop loss distance
                 if stop_loss is not None and entry_price is not None:
@@ -875,6 +944,13 @@ class TradeLockerClient:
                     
                 exact_lots = target_risk_usd / stop_dist
                 scaled_lot = round(exact_lots * risk_scale, 2)
+                
+                # Enforce Hard Per-Order Maximum Lot Size Ceiling
+                max_order_lot = getattr(Config, 'MAX_LOT_SIZE_PER_ORDER', {}).get(symbol, 5.0)
+                if scaled_lot > max_order_lot:
+                    logger.warning(f"⚠️ Clamping order size on {symbol} from {scaled_lot} lots to max safety cap {max_order_lot} lots.")
+                    scaled_lot = max_order_lot
+                    
                 if scaled_lot < 0.01:
                     scaled_lot = 0.01
                     
@@ -941,6 +1017,11 @@ class TradeLockerClient:
                 
         filled_count = sum(1 for r in results if r)
         logger.info(f"📊 [PROBE & SCALE] Execution summary: {filled_count}/{len(self.helpers)} accounts successfully filled.")
+        
+        # Record Persistent Cooldown upon successful order execution (Invariant 8)
+        if filled_count > 0:
+            ExecutionFirewall.record_trade_execution(symbol)
+
         return {
             "success": filled_count > 0,
             "filled_count": filled_count,
