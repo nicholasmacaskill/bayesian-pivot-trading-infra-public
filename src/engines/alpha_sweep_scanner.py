@@ -45,7 +45,13 @@ class AlphaSweepScanner(SMCScanner):
         except Exception as ame_err:
             logger.debug(f"AuctionMarketEngine init error: {ame_err}")
             self.auction_engine = None
-        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Live Orderflow Feed, Liquidity Heatmap, Retail Trap Shadow Engine, Auction Market Engine & TradeLocker Fleet Client.")
+        try:
+            from src.engines.judas_inducement_engine import JudasInducementEngine
+            self.judas_engine = JudasInducementEngine()
+        except Exception as jie_err:
+            logger.debug(f"JudasInducementEngine init error: {jie_err}")
+            self.judas_engine = None
+        logger.info("Bayesian Pivot Alpha Sweep Scanner Initialized with Live Orderflow Feed, Liquidity Heatmap, Judas Inducement Engine, Retail Trap Shadow Engine, Auction Market Engine & TradeLocker Fleet Client.")
 
     def is_premium_killzone(self, dt=None):
         """
@@ -173,15 +179,19 @@ class AlphaSweepScanner(SMCScanner):
         ema50 = df_1h['close'].ewm(span=50).mean().iloc[-1]
         trend = "UP" if closes_1h[-1] > ema50 else "DOWN"
         
-        # Gate regime using Hurst
-        # Trending: H > 0.55
-        # Mean Reverting: H < 0.45
-        # Random/Chop: 0.45 <= H <= 0.55 (Filtered out)
-        if 0.45 <= hurst <= 0.55:
-            logger.info(f"Regime is Random/Chop (Hurst: {hurst:.3f}). Setup blocked to maintain quality.")
+        # Gate regime using Hurst:
+        # Mean Reversion / Range Bound Chop: H <= 0.48 (Fades range extremes)
+        # Trending: H > 0.55 (Trend continuation sweeps only)
+        # Transitional / Low Edge: 0.48 < H <= 0.55 (Filtered out)
+        if 0.48 < hurst <= 0.55:
+            logger.info(f"Regime is Transitional (Hurst: {hurst:.3f}). Setup filtered out to maintain win rate.")
             return None
             
         is_trending = hurst > 0.55
+        target_rr = getattr(Config, 'TARGET_RR', 2.5)
+        min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.003)
+        min_stop_dist = c_close * min_stop_pct
+        buffer = max(atr_5m * 0.5, min_stop_dist * 0.5)
         
         # Long Setup (Sweep of Support)
         for level in recent_lows:
@@ -198,15 +208,26 @@ class AlphaSweepScanner(SMCScanner):
                             logger.info(f"Long setup blocked due to trend mismatch (Hurst: {hurst:.3f}, Trend: {trend})")
                             continue
                         
+                        sl = round(c_low - buffer, 2)
+                        if (c_close - sl) < min_stop_dist:
+                            sl = round(c_close - min_stop_dist, 2)
+                        risk_d = c_close - sl
+                        if risk_d <= 0:
+                            continue
+                        tp = round(c_close + (risk_d * target_rr), 2)
+                        
                         return {
                             "direction": "LONG",
                             "level": level,
                             "hurst": hurst,
                             "trend": trend,
                             "regime": "TRENDING" if is_trending else "MEAN_REVERSION",
+                            "pattern_type": "TURTLE_SOUP_LIQUIDITY_SWEEP",
                             "sweep_dist": sweep_dist,
                             "atr": atr_5m,
-                            "price": c_close
+                            "price": c_close,
+                            "stop_loss": sl,
+                            "take_profit": tp
                         }
                         
         # Short Setup (Sweep of Resistance)
@@ -224,6 +245,14 @@ class AlphaSweepScanner(SMCScanner):
                             logger.info(f"Short setup blocked due to trend mismatch (Hurst: {hurst:.3f}, Trend: {trend})")
                             continue
                         
+                        sl = round(c_high + buffer, 2)
+                        if (sl - c_close) < min_stop_dist:
+                            sl = round(c_close + min_stop_dist, 2)
+                        risk_d = sl - c_close
+                        if risk_d <= 0:
+                            continue
+                        tp = round(c_close - (risk_d * target_rr), 2)
+                        
                         return {
                             "direction": "SHORT",
                             "level": level,
@@ -233,7 +262,9 @@ class AlphaSweepScanner(SMCScanner):
                             "pattern_type": "TURTLE_SOUP_LIQUIDITY_SWEEP",
                             "sweep_dist": sweep_dist,
                             "atr": atr_5m,
-                            "price": c_close
+                            "price": c_close,
+                            "stop_loss": sl,
+                            "take_profit": tp
                         }
                         
         return None
@@ -658,13 +689,34 @@ class AlphaSweepScanner(SMCScanner):
             logger.warning(f"Failed to fetch data for {symbol}.")
             return None
             
-        # 1. Primary Hunt: Turtle Soup Liquidity Sweeps
-        setup = self.check_turtle_soup(symbol, df_5m, df_1h)
-        
-        # 2. Secondary Hunt: Breaker Block Mitigations (Strictly London/NY Only)
+        # 1. Primary Champion Hunt: Judas Outlier Inducement Hunter (Strategy 9)
+        setup = None
+        if getattr(Config, 'STRATEGY_9_ENABLED', True) and getattr(self, 'judas_engine', None):
+            try:
+                j_setup = self.judas_engine.evaluate_dataframe(df_5m, symbol=symbol)
+                if j_setup:
+                    h_val = self.get_hurst_exponent(df_1h['close'].values) if df_1h is not None and len(df_1h) >= 20 else 0.60
+                    setup = {
+                        'pattern_type': 'JUDAS_INDUCEMENT_SNIPER',
+                        'strategy_id': 'STRATEGY_9_JUDAS_INDUCEMENT',
+                        'direction': j_setup['direction'],
+                        'price': j_setup['entry_price'],
+                        'level': j_setup['entry_price'],
+                        'stop_loss': j_setup['stop_loss'],
+                        'take_profit': j_setup['take_profit'],
+                        'atr': j_setup['atr_20'],
+                        'regime': 'VOLATILITY_EXPANSION_INDUCEMENT',
+                        'hurst': h_val,
+                        'is_shadow_only': False
+                    }
+                    logger.info(f"🎯 [STRATEGY 9 CHAMPION] Detected Judas Inducement setup on {symbol}: {j_setup['direction']} @ {j_setup['entry_price']}")
+            except Exception as j_err:
+                logger.error(f"Strategy 9 Judas hunt error: {j_err}")
+
+        # 2. Secondary Hunt: Turtle Soup Liquidity Sweeps (Mean Reversion Chop H <= 0.48)
         if not setup:
-            setup = self.check_breaker_block_mitigation(symbol, df_5m, df_1h, killzone)
-            
+            setup = self.check_turtle_soup(symbol, df_5m, df_1h)
+        
         # 3. Tertiary Hunt: London Close Silver Bullet (10-11 AM EST Rebalance)
         if not setup:
             setup = self.check_london_close_silver_bullet(symbol, df_5m, df_1h, killzone)
@@ -735,15 +787,20 @@ class AlphaSweepScanner(SMCScanner):
             # Dynamic Risk and Sizing Calculations
             entry_price = setup['price']
             atr_val = setup['atr']
-            stop_distance = atr_val * getattr(Config, 'STOP_LOSS_ATR_MULTIPLIER', 2.5)
-            
-            # Stop Loss
-            if setup['direction'] == 'LONG':
-                sl_price = entry_price - stop_distance
-                tp_price = entry_price + (stop_distance * getattr(Config, 'TARGET_RR', 3.0))
+            if setup.get('stop_loss') is not None and setup.get('take_profit') is not None:
+                sl_price = float(setup['stop_loss'])
+                tp_price = float(setup['take_profit'])
+                stop_distance = abs(entry_price - sl_price)
             else:
-                sl_price = entry_price + stop_distance
-                tp_price = entry_price - (stop_distance * getattr(Config, 'TARGET_RR', 3.0))
+                stop_distance = atr_val * getattr(Config, 'STOP_LOSS_ATR_MULTIPLIER', 2.5)
+                target_rr = getattr(Config, 'TARGET_RR', 2.5)
+                # Stop Loss
+                if setup['direction'] == 'LONG':
+                    sl_price = entry_price - stop_distance
+                    tp_price = entry_price + (stop_distance * target_rr)
+                else:
+                    sl_price = entry_price + stop_distance
+                    tp_price = entry_price - (stop_distance * target_rr)
                 
             # Base risk amount
             risk_amt = getattr(Config, 'FIXED_RISK_USD', 100.0)
@@ -855,9 +912,11 @@ class AlphaSweepScanner(SMCScanner):
                 'key_reason': 'Visual vector initializing'
             }
             try:
+                active_regime = setup.get('regime', setup.get('regime_type', 'UNKNOWN'))
                 query_vec = self.visual_vector_engine.extract_geometric_features(df_5m, setup=setup)
                 vec_result = self.visual_vector_engine.evaluate_visual_precedent(
-                    query_vec, symbol=symbol, direction=setup['direction']
+                    query_vec, symbol=symbol, direction=setup['direction'],
+                    regime_type=active_regime
                 )
                 logger.info(
                     f"🔮 [VISUAL VECTOR] {symbol} {setup['direction']}: {vec_result['key_reason']} "
@@ -878,7 +937,10 @@ class AlphaSweepScanner(SMCScanner):
                     pnl=0.0,
                     vector=query_vec,
                     session=killzone or 'UNKNOWN',
-                    notes=f"density={liq_density:.1f} | shadow_score={shadow_score:.1f}"
+                    notes=f"density={liq_density:.1f} | shadow_score={shadow_score:.1f}",
+                    regime_type=active_regime,
+                    hurst=float(setup.get('hurst', 0.50)),
+                    atr_percentile=float(setup.get('atr_percentile', 50.0))
                 )
             except Exception as vve_err:
                 logger.debug(f"Visual vector evaluation skipped (non-blocking): {vve_err}")

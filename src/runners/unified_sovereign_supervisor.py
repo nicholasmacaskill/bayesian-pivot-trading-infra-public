@@ -79,12 +79,12 @@ class UnifiedSovereignSupervisor:
             logger.error(f"Failed to initialize AlphaSweepScanner: {e}")
             return
 
-        live_symbols = list(getattr(Config, 'SYMBOLS', ['BTC/USD', 'ETH/USD', 'XAU/USD']))
-        shadow_symbols = list(getattr(Config, 'SHADOW_SYMBOLS', ['SOL/USD']))
-        all_symbols = list(dict.fromkeys(live_symbols + shadow_symbols))
-        
         while self.running:
             try:
+                live_symbols = list(getattr(Config, 'SYMBOLS', ['BTC/USD']))
+                shadow_symbols = list(getattr(Config, 'SHADOW_SYMBOLS', ['XAU/USD', 'ETH/USD', 'SOL/USD']))
+                all_symbols = list(dict.fromkeys(live_symbols + shadow_symbols))
+
                 # 1. Check & trail open positions
                 try:
                     self.scanner.check_and_trail_positions()

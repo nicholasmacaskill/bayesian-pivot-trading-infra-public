@@ -894,7 +894,7 @@ class LocalScannerRunner:
                         conviction_score=8.5 if not bias_data['bias_conflict'] else 6.0,
                         regime=strategy_mode,
                         rag_similarity=85.0 if not bias_data['bias_conflict'] else 50.0,
-                        authorized_archetypes=["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"],
+                        authorized_archetypes=["JUDAS_INDUCEMENT_SNIPER", "LONDON_CLOSE_SILVER_BULLET", "TURTLE_SOUP_LIQUIDITY_SWEEP"],
                         notes=f"Daily: {daily_bias} | 4H: {htf_bias} | Hurst: {hurst_val:.2f}"
                     )
                 except Exception as perm_err:
@@ -1060,6 +1060,10 @@ class LocalScannerRunner:
                     if not regime_result.allowed: continue
 
                     self.scan_results[symbol]['regime'] = regime_result.regime.value
+                    setup['regime'] = regime_result.regime.value
+                    setup['regime_type'] = regime_result.regime.value
+                    setup['hurst'] = regime_result.hurst
+                    setup['atr_percentile'] = regime_result.atr_percentile
 
                     # ── AI Validation (Cloud → Llama3 fallback) ───────────────
                     session_info_for_llm = session_info
@@ -1125,7 +1129,8 @@ class LocalScannerRunner:
                             corr_ok=corr_ok,
                             regime_allowed=regime_result.allowed,
                             ai_score=live_score,
-                            open_positions=all_open_positions
+                            open_positions=all_open_positions,
+                            regime_type=regime_result.regime.value
                         )
 
 
