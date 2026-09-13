@@ -124,35 +124,70 @@ class ExecutionFirewall:
     @staticmethod
     def check_daily_loss_circuit_breaker() -> Tuple[bool, str]:
         """
-        INVARIANT 10: Checks if today's closed trades hit consecutive loss limits.
-        If >= MAX_CONSECUTIVE_DAILY_LOSSES (2) occurred today, halts trading for 24 hours.
+        INVARIANT 10: Checks if today's closed setups hit consecutive loss limits.
+        Clusters multi-tranche and multi-account fleet tickets of the same setup into a single setup outcome.
+        If >= MAX_CONSECUTIVE_DAILY_LOSSES (2) consecutive setups lost today, halts trading for 24 hours.
         """
         try:
             import sqlite3
+            from datetime import datetime, timezone
             db_path = getattr(Config, 'DB_PATH', os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "smc_alpha.db"))
             if os.path.exists(db_path):
                 conn = sqlite3.connect(db_path, timeout=5.0)
                 cur = conn.cursor()
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 cur.execute("""
-                    SELECT pnl FROM journal 
+                    SELECT timestamp, symbol, side, pnl FROM journal 
                     WHERE timestamp LIKE ? AND status = 'CLOSED' AND strategy != 'ROGUE'
-                    ORDER BY id DESC LIMIT 10
+                    ORDER BY id DESC LIMIT 50
                 """, (f"{today_str}%",))
                 rows = cur.fetchall()
                 conn.close()
 
+                if not rows:
+                    return True, "OK"
+
+                def parse_time(ts_str):
+                    if not ts_str:
+                        return 0.0
+                    clean_ts = ts_str.replace("Z", "").split(".")[0]
+                    try:
+                        return datetime.fromisoformat(clean_ts).timestamp()
+                    except Exception:
+                        return 0.0
+
+                # Group rows into distinct setup clusters (tickets within 15 mins on same symbol)
+                # rows are ordered DESC (most recent first)
+                setup_clusters = []
+                current_cluster = []
+                
+                for r in rows:
+                    ts, sym, side, pnl = r[0], r[1], r[2], float(r[3] or 0.0)
+                    t_sec = parse_time(ts)
+                    
+                    if not current_cluster:
+                        current_cluster.append({'time': t_sec, 'symbol': sym, 'pnl': pnl})
+                    else:
+                        ref = current_cluster[0]
+                        if abs(t_sec - ref['time']) <= 900 and sym == ref['symbol']:
+                            current_cluster.append({'time': t_sec, 'symbol': sym, 'pnl': pnl})
+                        else:
+                            setup_clusters.append(current_cluster)
+                            current_cluster = [{'time': t_sec, 'symbol': sym, 'pnl': pnl}]
+                if current_cluster:
+                    setup_clusters.append(current_cluster)
+
                 max_loss_streak = getattr(Config, 'MAX_CONSECUTIVE_DAILY_LOSSES', 2)
                 loss_streak = 0
-                for r in rows:
-                    pnl = float(r[0] or 0.0)
-                    if pnl < 0:
+                for cluster in setup_clusters:
+                    cluster_net_pnl = sum(item['pnl'] for item in cluster)
+                    if cluster_net_pnl < 0:
                         loss_streak += 1
                     else:
                         break
 
                 if loss_streak >= max_loss_streak:
-                    return False, f"Daily consecutive loss ceiling hit ({loss_streak}/{max_loss_streak} losses today). Trading locked for 24h to preserve prop equity."
+                    return False, f"Daily consecutive loss ceiling hit ({loss_streak}/{max_loss_streak} distinct setups lost today). Trading locked for 24h to preserve prop equity."
         except Exception as e:
             logger.warning(f"Error checking daily loss circuit breaker: {e}")
         return True, "OK"

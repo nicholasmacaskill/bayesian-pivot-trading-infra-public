@@ -255,7 +255,7 @@ class Config:
     
     # ── Per-Account Calibrated Risk Ceiling (Decoupled by Buffer Runway) ──
     ACCOUNT_RISK_CAPS = {
-        "jfcuue7er3@upcomers.com": 150.0, # Account 9: Fresh 50k Oracle Lead Striker ($150 base -> $250 once buffer > $2,650; 16.6 losses runway on $2,500 cushion)
+        "jfcuue7er3@upcomers.com": 100.0, # Account 9: Fresh 50k Oracle Lead Striker ($100 base -> $120 after +$350 buffer -> $180 once floor locks at $50k; 25.0 losses runway on $2,500 cushion)
         "s79qv3xetj@upcomers.com": 35.0,  # Account 1: Accelerated $35.00 (8.2 losses runway on $286 buffer)
         "875do5esrd@upcomers.com": 35.0,  # Account 7: Balanced $35.00 (14.5 losses runway on $510 buffer)
         "q20gxm287x@upcomers.com": 50.0,  # Account 3: Growth $50.00 (17.3 losses runway on $865 buffer)

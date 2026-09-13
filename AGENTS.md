@@ -61,7 +61,7 @@
     * Target Net Profit: **+$4,000.00** (Payout Unlock Balance: **$54,000.00**).
     * Max Single-Day Profit: **$800.00** (20% ceiling; system clamped to **$760.00**).
     * Current Status & Decoupled Starting Risk:
-      * **Account 9 (`jfcuue7er3` - Fresh Oracle Lead Striker):** Balance **$50,000.00** ($2,500 full buffer; Floor $47,500). **Base Risk: $150.00** (**16.6 losses runway** on $2,500 cushion; scales to $250.00 once trailing floor permanently locks at $50,000 Even Equity / buffer > $2,650).
+      * **Account 9 (`jfcuue7er3` - Fresh Oracle Lead Striker):** Balance **$50,000.00** ($2,500 full buffer; Floor $47,500). **Base Risk: $100.00** (2-Phase Buffer Ramp: **25.0 losses runway**, 4.3% ruin rate; scales to **$120.00** after ~2 wins / cushion $\ge +\$350$, scales to **$180.00** once trailing floor permanently locks at $50,000 Even Equity / cushion $\ge +\$2,500$).
       * **Account 2 (`498svcbpfi`):** Balance ~$48,567 (-$1,433 DD; Floor $47,500). **Base Risk: $70.00** (**15.2 losses runway** on $1,067 buffer; scales to $120 at buffer > $1,800).
       * **Account 6 (`dwundrtxjv`):** Balance ~$48,801 (-$1,199 DD; Floor $47,500). **Base Risk: $80.00** (**16.2 losses runway** on $1,301 buffer; scales to $120 at buffer > $1,800).
   * **$10k Tier (Accounts 4, 5, 8):**
