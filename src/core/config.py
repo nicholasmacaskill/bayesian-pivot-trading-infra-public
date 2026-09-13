@@ -90,7 +90,7 @@ class Config:
     STRATEGY_9_MIN_WICK_PCT = 60.0      # 60% Minimum Rejection Wick (Graduated from Challenger)
     STRATEGY_9_MIN_ATR_MULT = 1.5       # 1.5x 20-period ATR Range (Graduated from Challenger)
     STRATEGY_9_MIN_VOL_MULT = 1.5       # 1.5x 20-period Average Volume (Graduated from Challenger)
-    STRATEGY_9_TARGET_RR = 2.5          # 2.5R Fixed Target (Proven 10.0 Profit Factor)
+    STRATEGY_9_TARGET_RR = 3.0          # 3.0R Target (Extends runner for asymmetric profit)
     STRATEGY_9_STOP_BUFFER_ATR = 0.35   # 0.35 ATR stop buffer for breathing room
     STRATEGY_9_RISK_USD = 40.0          # Base dollar risk per trade ($40 on $25k, $80 on $50k)
     STRATEGY_9_BYPASS_GENERIC_AI = False # Requires full 8.0+ AI Validator gate
@@ -288,7 +288,7 @@ class Config:
     
     # Exit Parameters (Scalp Optimized)
     TP1_R_MULTIPLE = 1.0               # First scale out at +1.0R
-    TP2_R_MULTIPLE = 2.5               # Runner target at +2.5R
+    TP2_R_MULTIPLE = 3.0               # Runner target at +3.0R (Extends free-ride runner)
     STOP_LOSS_ATR_MULTIPLIER = 2.5
     ENTRY_OFFSET_ATR_MULTIPLIER = 0.5
     

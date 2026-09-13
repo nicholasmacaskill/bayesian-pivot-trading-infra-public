@@ -188,7 +188,7 @@ class AlphaSweepScanner(SMCScanner):
             return None
             
         is_trending = hurst > 0.55
-        target_rr = getattr(Config, 'TARGET_RR', 2.5)
+        target_rr = getattr(Config, 'TARGET_RR', 3.0)
         min_stop_pct = getattr(Config, 'MIN_STOP_PCT', {}).get(symbol, 0.003)
         min_stop_dist = c_close * min_stop_pct
         buffer = max(atr_5m * 0.5, min_stop_dist * 0.5)
@@ -793,7 +793,7 @@ class AlphaSweepScanner(SMCScanner):
                 stop_distance = abs(entry_price - sl_price)
             else:
                 stop_distance = atr_val * getattr(Config, 'STOP_LOSS_ATR_MULTIPLIER', 2.5)
-                target_rr = getattr(Config, 'TARGET_RR', 2.5)
+                target_rr = getattr(Config, 'TARGET_RR', 3.0)
                 # Stop Loss
                 if setup['direction'] == 'LONG':
                     sl_price = entry_price - stop_distance
