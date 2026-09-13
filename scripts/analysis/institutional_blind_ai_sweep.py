@@ -161,9 +161,14 @@ def run_institutional_blind_ai_sweep():
                     if dd > max_dd:
                         max_dd = dd
 
-                    if dd >= 0.10:
+                    # Check Prop Firm Hard Breach Circuit Breaker (Upcomers 5.0% Trailing-to-Even Floor)
+                    trailing_amount = start_eq * 0.05
+                    raw_trailing_floor = peak_eq - trailing_amount
+                    hard_floor = min(start_eq, raw_trailing_floor)
+
+                    if eq <= hard_floor:
                         is_breached = True
-                        eq = start_eq * 0.90
+                        eq = hard_floor
 
                     executed.append({'pnl_usd': pnl_usd, 'pnl_r': res['pnl_r']})
 

@@ -152,11 +152,15 @@ def run_isolated_factor_test(trades: List[dict], use_ai: bool, use_hurst: bool) 
                 if dd > max_drawdown:
                     max_drawdown = dd
 
-                # Check Prop Firm Hard Breach Circuit Breaker (-10% Max Drawdown)
-                if dd >= 0.10 or equity <= (start_equity * 0.90):
+                # Check Prop Firm Hard Breach Circuit Breaker (Upcomers 5.0% Trailing-to-Even Floor)
+                trailing_amount = start_equity * 0.05
+                raw_trailing_floor = peak_equity - trailing_amount
+                hard_floor = min(start_equity, raw_trailing_floor)
+
+                if equity <= hard_floor:
                     is_breached = True
                     breached_at_trade = trade_idx + 1
-                    equity = start_equity * 0.90 # Cap loss at -10% hard breach
+                    equity = hard_floor # Cap loss at the exact breach level
 
                 executed_trades.append({
                     'pnl_usd': trade_pnl,

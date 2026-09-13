@@ -147,9 +147,14 @@ def run_30day_backtest():
                 if dd > max_drawdown:
                     max_drawdown = dd
 
-                if dd >= 0.10:
+                # Check Prop Firm Hard Breach Circuit Breaker (Upcomers 5.0% Trailing-to-Even Floor)
+                trailing_amount = start_equity * 0.05
+                raw_trailing_floor = peak_equity - trailing_amount
+                hard_floor = min(start_equity, raw_trailing_floor)
+
+                if equity <= hard_floor:
                     is_breached = True
-                    equity = start_equity * 0.90
+                    equity = hard_floor
 
                 executed_trades.append({
                     'pnl_usd': trade_pnl,
