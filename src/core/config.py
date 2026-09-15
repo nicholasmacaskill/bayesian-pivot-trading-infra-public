@@ -61,7 +61,7 @@ class Config:
     MAX_CONCURRENT_PER_SYMBOL = 1       # Zero stacking: Max 1 position per asset across the entire fleet
     SYMBOL_COOLDOWN_MINUTES = 30        # Mandatory 30-minute persistent debounce cooldown per symbol
     MAX_LOT_SIZE_PER_ORDER = {
-        "BTC/USD": 0.25,    # Max 0.25 BTC lots per order
+        "BTC/USD": 0.60,    # Max 0.60 BTC lots per order (Allows full $100-$120 risk on tight sniper stops)
         "ETH/USD": 5.0,     # Max 5.00 ETH lots per order (Prevents 15+ lot spikes)
         "XAU/USD": 2.0,     # Max 2.00 Gold lots per order
         "SOL/USD": 50.0,    # Max 50.0 SOL lots per order

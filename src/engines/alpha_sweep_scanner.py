@@ -998,8 +998,12 @@ class AlphaSweepScanner(SMCScanner):
             
             is_symbol_shadow = is_shadow or (symbol in getattr(Config, 'SHADOW_SYMBOLS', []))
             # is_low_density_sweep: sweep hit a noise level with density < 6.0 — never risk live capital
+            authorized_live_patterns = ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"]
+            if getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', False):
+                authorized_live_patterns.extend(["JUDAS_INDUCEMENT_SNIPER", "STRATEGY_9_JUDAS_INDUCEMENT"])
+
             is_archetype_shadow = (
-                (pattern_type not in ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"])
+                (pattern_type not in authorized_live_patterns)
                 or setup.get('is_shadow_only', False)
                 or (killzone == "NY_AFTERNOON_SHADOW")
                 or is_symbol_shadow
