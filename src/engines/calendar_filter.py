@@ -106,6 +106,10 @@ class CalendarFilter:
             return False, reason
         return True, "OK"
 
+    def check(self, symbol: str = None) -> tuple[bool, str]:
+        """Alias for is_safe_to_trade() for compatibility with ExecutionFirewall."""
+        return self.is_safe_to_trade(symbol)
+
     def is_safe_to_trade(self, symbol: str = None) -> tuple[bool, str]:
         """
         Returns (is_safe: bool, reason: str).

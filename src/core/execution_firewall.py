@@ -223,7 +223,12 @@ class ExecutionFirewall:
         try:
             from src.engines.calendar_filter import CalendarFilter
             cal = CalendarFilter()
-            is_safe, reason = cal.check()
+            if hasattr(cal, "is_safe_to_trade"):
+                is_safe, reason = cal.is_safe_to_trade()
+            elif hasattr(cal, "check"):
+                is_safe, reason = cal.check()
+            else:
+                is_safe, reason = True, "OK"
             if not is_safe:
                 return False, f"News Invariant: {reason}"
         except Exception as e:
@@ -292,9 +297,10 @@ class ExecutionFirewall:
         if not bypass_killzone:
             # High-Alpha Windows (UTC):
             # 1. London Open: 07:00 - 10:00 UTC
-            # 2. London Close / NY Morning: 13:30 - 17:00 UTC
+            # 2. London Close / NY Morning: 12:00 - 17:00 UTC
             # 3. Asian Judas: 00:00 - 06:00 UTC
             is_prime_killzone = (
+                (7.0 <= utc_hour <= 10.0) or
                 (12.0 <= utc_hour <= 17.0) or
                 (0.0 <= utc_hour <= 6.0)
             )
