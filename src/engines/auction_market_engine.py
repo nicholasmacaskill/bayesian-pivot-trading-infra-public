@@ -478,14 +478,21 @@ class AuctionMarketEngine:
         try:
             # A. Value Area Alignment (AMT)
             vp = self.compute_volume_profile(df_1h, lookback=48)
-            if direction.upper() in ["SHORT", "SELL"]:
-                if vp["vah"] > 0 and entry_price >= vp["vah"] * 0.998:
-                    boost += 0.5
-                    reasons.append(f"AMT_VAH_CONFLUENCE (+0.5, VAH: {vp['vah']})")
-            elif direction.upper() in ["LONG", "BUY"]:
-                if vp["val"] > 0 and entry_price <= vp["val"] * 1.002:
-                    boost += 0.5
-                    reasons.append(f"AMT_VAL_CONFLUENCE (+0.5, VAL: {vp['val']})")
+            vah = vp.get("vah", 0.0)
+            val = vp.get("val", 0.0)
+            recent_low = float(df_5m["low"].iloc[-3:].min()) if df_5m is not None and len(df_5m) >= 3 else entry_price
+            recent_high = float(df_5m["high"].iloc[-3:].max()) if df_5m is not None and len(df_5m) >= 3 else entry_price
+
+            if direction.upper() in ["SHORT", "SELL"] and vah > 0:
+                # Sweep probed into/above VAH or entry is aligned with upper boundary
+                if recent_high >= vah * 0.997 and entry_price >= vah * 0.990:
+                    boost += 0.8
+                    reasons.append(f"AMT_VAH_CONFLUENCE (+0.8, VAH: {vah:,.2f})")
+            elif direction.upper() in ["LONG", "BUY"] and val > 0:
+                # Sweep probed into/below VAL or entry is aligned with lower boundary
+                if recent_low <= val * 1.003 and entry_price <= val * 1.010:
+                    boost += 0.8
+                    reasons.append(f"AMT_VAL_CONFLUENCE (+0.8, VAL: {val:,.2f})")
 
             # B. Anchored VWAP Sigma Alignment
             vwap_data = self.compute_anchored_vwap(df_5m, anchor_lookback=100)

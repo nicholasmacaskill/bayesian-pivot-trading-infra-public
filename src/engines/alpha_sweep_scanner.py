@@ -878,6 +878,7 @@ class AlphaSweepScanner(SMCScanner):
                 dynamic_tp = None
 
             # ── NON-ICT MODULAR CONFLUENCE BOOSTERS (AMT, AVWAP, ORDER FLOW ABSORPTION) ──
+            boost_reasons = []
             if getattr(self, 'auction_engine', None):
                 try:
                     boost, boost_reasons = self.auction_engine.get_confluence_boost(
@@ -1057,7 +1058,7 @@ class AlphaSweepScanner(SMCScanner):
                 "killzone": killzone,
                 "hurst": setup['hurst'],
                 "smt_strength": 0.0,
-                "formations": f"Sweep of {setup['level']:.2f} | AI Score: {shadow_score:.1f}/10 | {tag_label}",
+                "formations": f"Sweep of {setup['level']:.2f} | AI Score: {shadow_score:.1f}/10 | {tag_label}" + (f" | Confluence: {', '.join(boost_reasons)}" if boost_reasons else ""),
                 # ── Visual Vector Shadow Metadata (for future gate validation) ──
                 "vec_recommendation": vec_result.get('recommendation', 'NEUTRAL'),
                 "vec_win_rate": round(vec_result.get('win_rate', 50.0), 1),
