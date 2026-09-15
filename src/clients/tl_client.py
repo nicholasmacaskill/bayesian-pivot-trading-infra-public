@@ -500,8 +500,7 @@ class TradeLockerHelper:
         """
         if not self.access_token and not self.login():
             return False
-        acc_part = f"/accounts/{self.account_id}" if self.account_id else ""
-        url = f"{self.base_url}/backend-api/trade{acc_part}/positions/{position_id}"
+        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
         payload = {"stopLossType": "absolute", "takeProfitType": "absolute"}
         if stop_loss is not None:
             payload["stopLoss"] = float(stop_loss)
@@ -768,7 +767,7 @@ class TradeLockerClient:
             except ImportError:
                 has_filelock = False
 
-            def _update_setup_lock():
+            def _check_setup_lock():
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 data = {"date": today_str, "setups_fired": 0}
                 if os.path.exists(lock_file_path):
@@ -782,21 +781,33 @@ class TradeLockerClient:
                 if data.get("setups_fired", 0) >= 2:
                     logger.critical("🛡️ [ATOMIC LOCK] Daily Setup Limit (2) reached. Rejecting fleet dispatch.")
                     return False
+                return True
+
+            def _increment_setup_lock():
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                data = {"date": today_str, "setups_fired": 0}
+                if os.path.exists(lock_file_path):
+                    try:
+                        with open(lock_file_path, "r") as lf:
+                            data = json.load(lf)
+                    except Exception:
+                        pass
+                if data.get("date") != today_str:
+                    data = {"date": today_str, "setups_fired": 0}
                 data["setups_fired"] = data.get("setups_fired", 0) + 1
                 with open(lock_file_path, "w") as lf:
                     json.dump(data, lf)
-                return True
 
             if has_filelock:
                 lock = FileLock("data/daily_setup_lock.json.lock")
                 with lock.acquire(timeout=5):
-                    if not _update_setup_lock():
+                    if not _check_setup_lock():
                         return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
             else:
-                if not _update_setup_lock():
+                if not _check_setup_lock():
                     return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
         except Exception as e:
-            logger.error(f"Failed to acquire atomic setup lock: {e}")
+            logger.error(f"Failed to verify atomic setup lock: {e}")
             return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
             
 
@@ -1052,9 +1063,18 @@ class TradeLockerClient:
         filled_count = sum(1 for r in results if r)
         logger.info(f"📊 [PROBE & SCALE] Execution summary: {filled_count}/{len(self.helpers)} accounts successfully filled.")
         
-        # Record Persistent Cooldown upon successful order execution (Invariant 8)
+        # Record Persistent Cooldown & Setup Lock upon successful order execution (Invariant 8 & 11)
         if filled_count > 0:
             ExecutionFirewall.record_trade_execution(symbol)
+            try:
+                if has_filelock:
+                    lock = FileLock("data/daily_setup_lock.json.lock")
+                    with lock.acquire(timeout=5):
+                        _increment_setup_lock()
+                else:
+                    _increment_setup_lock()
+            except Exception as _lock_inc_err:
+                logger.error(f"Failed to increment daily setup lock: {_lock_inc_err}")
 
         return {
             "success": filled_count > 0,
