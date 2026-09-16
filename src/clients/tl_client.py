@@ -1016,6 +1016,7 @@ class TradeLockerClient:
                 )
                 if not is_eligible:
                     logger.critical(f"🛡️ [ACCOUNT EXCLUDED] Account {i+1} ({helper.email}): {ineligibility_reason}. Zero risk permitted.")
+                    results.append(False)
                     continue
 
                 # Enforce Fleet-Wide Tier-Specific Dollar Risk Ceilings with Buffer-Adaptive Ladders
@@ -1163,7 +1164,7 @@ class TradeLockerClient:
             logger.info("🛡️ [RULE 4 RECONCILIATION] Verifying protective Stop Loss brackets across filled accounts...")
             clean_sym = symbol.replace("/", "").replace("_", "").upper()
             for i, helper in enumerate(self.helpers):
-                if not results[i]:
+                if i >= len(results) or not results[i]:
                     continue
                 try:
                     open_pos = helper.get_open_positions() or []
