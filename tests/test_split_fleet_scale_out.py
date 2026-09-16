@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, mock_open
 from src.core.config import Config
 from src.clients.tl_client import TradeLockerClient, TradeLockerHelper
 
@@ -25,6 +25,7 @@ class TestSplitFleetScaleOut(unittest.TestCase):
         self.assertEqual(Config.SCALE_OUT_TP1_R, 2.0)
         self.assertEqual(Config.SCALE_OUT_TP1_PCT, 0.50)
 
+    @patch("builtins.open", mock_open(read_data='{"date": "2099-01-01", "setups_fired": 0}'))
     @patch.object(TradeLockerHelper, 'place_order')
     @patch.object(TradeLockerHelper, 'login')
     def test_two_tranche_dispatch_on_scale_out_accounts(self, mock_login, mock_place_order):
@@ -38,11 +39,13 @@ class TestSplitFleetScaleOut(unittest.TestCase):
         helper0.access_token = "token"
         helper0.balance = 25000.0
         helper0.place_order = MagicMock(return_value={"orderId": "t1"})
+        helper0.get_open_positions = MagicMock(return_value=[])
 
         helper1 = TradeLockerHelper("acc2@upcomers.com", "p", "s", "http://api")
         helper1.access_token = "token"
         helper1.balance = 50000.0
         helper1.place_order = MagicMock(return_value={"orderId": "runner"})
+        helper1.get_open_positions = MagicMock(return_value=[])
 
         tl.helpers = [helper0, helper1]
 

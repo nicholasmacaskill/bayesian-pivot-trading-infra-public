@@ -17,7 +17,7 @@ class TestJudasInducementEngine(unittest.TestCase):
         # 25 normal consolidation bars (ATR ~ 50)
         for i in range(25):
             data.append({
-                'timestamp': f'2026-08-24 00:{i:02d}:00',
+                'timestamp': f'2026-08-24 08:{i:02d}:00',
                 'open': base_price,
                 'high': base_price + 25.0,
                 'low': base_price - 25.0,
@@ -29,7 +29,7 @@ class TestJudasInducementEngine(unittest.TestCase):
         # Open: 60000, Low: 59800, High: 60000, Close: 59960
         # Candle range = 200. Lower wick = 59960 - 59800 = 160 (80% lower wick)
         data.append({
-            'timestamp': '2026-08-24 00:26:00',
+            'timestamp': '2026-08-24 08:26:00',
             'open': 60000.0,
             'high': 60000.0,
             'low': 59800.0,

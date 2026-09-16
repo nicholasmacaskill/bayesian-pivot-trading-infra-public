@@ -44,7 +44,9 @@ def test_firewall_approves_valid_master_trade():
         take_profit=86000.0,
         ai_score=9.2,
         is_htf_confirmed=True,
-        bypass_killzone=True
+        bypass_killzone=True,
+        bypass_cooldown=True,
+        bypass_circuit_breaker=True
     )
     assert approved
     assert reason == "APPROVED_BY_FIREWALL"

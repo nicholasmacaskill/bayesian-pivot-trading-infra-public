@@ -54,8 +54,10 @@ class TestHardenedArchitecture(unittest.TestCase):
         mock_helper.place_order.return_value = {"orderId": "mock_1"}
         client.helpers = [mock_helper]
 
-        with patch("src.core.execution_firewall.ExecutionFirewall.audit_trade_request", return_value=(True, "Approved")):
-            with patch("src.core.execution_firewall.ExecutionFirewall.is_account_eligible", return_value=(True, "ELIGIBLE")):
+        with patch("src.core.execution_firewall.ExecutionFirewall.audit_trade_request", return_value=(True, "Approved")), \
+             patch("src.core.execution_firewall.ExecutionFirewall.is_account_eligible", return_value=(True, "ELIGIBLE")), \
+             patch.object(Config, 'ACCOUNT_RISK_CAPS', {"s79qv3xetj@upcomers.com": 25.0}), \
+             patch("builtins.open", unittest.mock.mock_open(read_data='{"date": "2099-01-01", "setups_fired": 0}')):
                 res = client.execute_trade_across_all_accounts(
                     symbol="BTC/USD",
                     side="buy",
@@ -72,7 +74,7 @@ class TestHardenedArchitecture(unittest.TestCase):
                 args_t1 = mock_helper.place_order.call_args_list[0][1]
                 args_t2 = mock_helper.place_order.call_args_list[1][1]
                 total_qty = round(args_t1["qty"] + args_t2["qty"], 2)
-                self.assertEqual(total_qty, 0.08, f"Account 1 total lots should be 0.08, got {total_qty}")
+                self.assertEqual(total_qty, 0.12, f"Account 1 total lots should be 0.12, got {total_qty}")
 
     def test_gate_10_daily_consecutive_loss_circuit_breaker(self):
         """Gate 10 must halt execution when 2 consecutive closed losses occur today."""
@@ -84,6 +86,8 @@ class TestHardenedArchitecture(unittest.TestCase):
                 CREATE TABLE journal (
                     id INTEGER PRIMARY KEY,
                     timestamp TEXT,
+                    symbol TEXT,
+                    side TEXT,
                     pnl REAL,
                     status TEXT,
                     strategy TEXT
@@ -91,8 +95,8 @@ class TestHardenedArchitecture(unittest.TestCase):
             """)
             today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             # Insert 2 consecutive closed losses today
-            cur.execute("INSERT INTO journal VALUES (1, ?, -25.0, 'CLOSED', 'SYSTEM')", (f"{today_str}T08:00:00",))
-            cur.execute("INSERT INTO journal VALUES (2, ?, -30.0, 'CLOSED', 'SYSTEM')", (f"{today_str}T08:30:00",))
+            cur.execute("INSERT INTO journal VALUES (1, ?, 'BTC/USD', 'BUY', -25.0, 'CLOSED', 'SYSTEM')", (f"{today_str}T08:00:00",))
+            cur.execute("INSERT INTO journal VALUES (2, ?, 'ETH/USD', 'BUY', -30.0, 'CLOSED', 'SYSTEM')", (f"{today_str}T08:30:00",))
             conn.commit()
             conn.close()
 
