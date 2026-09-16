@@ -191,6 +191,14 @@ class TelegramNotifier:
             )
             warning_block = (warning_block or "") + conflict_warning
 
+        security_block = ""
+        if security_status:
+            if "CLEAN" in str(security_status).upper() or "SECURE" in str(security_status).upper():
+                status_formatted = "🛡️ *Security:* Environment confirmed as secure"
+            else:
+                status_formatted = f"⚠️ *Security:* {security_status}"
+            security_block = f"\n\n{status_formatted}"
+
         msg = (
             f"{emoji} <b>{grade}: {symbol}</b>\n"
             f"{header}\n\n"
@@ -199,7 +207,8 @@ class TelegramNotifier:
             f"{liquidity}\n\n"
             f"{system_state}"
             f"{exec_block}"
-            f"{warning_block}\n\n"
+            f"{warning_block}"
+            f"{security_block}\n\n"
             f"📊 <a href='{tv_link}'>View on TradingView</a>"
             f"{spoiler_block}"
         )
