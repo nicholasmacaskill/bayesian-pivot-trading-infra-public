@@ -2,7 +2,7 @@ import requests
 import os
 import time
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from dotenv import load_dotenv
 from src.core.config import Config
 
@@ -206,32 +206,74 @@ class TradeLockerHelper:
                 positions = data.get('d', {}).get('positions', [])
                 if not positions and isinstance(data, list): positions = data
                 
+                # Enrich list positions with real Stop Loss and Take Profit prices from orders endpoint
+                orders_map = {}
+                orders_by_id = {}
+                has_bracket_orders = any(
+                    isinstance(p, list) and len(p) > 7 and (p[6] or p[7])
+                    for p in positions
+                )
+                if has_bracket_orders:
+                    try:
+                        ord_url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/orders"
+                        ord_resp = requests.get(ord_url, headers=self._get_headers(auth=True), timeout=4)
+                        if ord_resp.status_code == 200:
+                            raw_orders = ord_resp.json().get('d', {}).get('orders', [])
+                            for o in raw_orders:
+                                if isinstance(o, list) and len(o) > 16:
+                                    ord_id = str(o[0])
+                                    pos_link_id = str(o[16]) if o[16] else ""
+                                    o_type = str(o[5]).lower() if len(o) > 5 and o[5] else ""
+                                    price_val = None
+                                    if o_type == "stop" and len(o) > 10 and o[10]:
+                                        try: price_val = float(o[10])
+                                        except (ValueError, TypeError): pass
+                                    elif o_type == "limit" and len(o) > 9 and o[9]:
+                                        try: price_val = float(o[9])
+                                        except (ValueError, TypeError): pass
+                                    
+                                    if price_val is not None:
+                                        if pos_link_id:
+                                            if pos_link_id not in orders_map: orders_map[pos_link_id] = {}
+                                            orders_map[pos_link_id]['stopLoss' if o_type == 'stop' else 'takeProfit'] = price_val
+                                        if ord_id:
+                                            orders_by_id[ord_id] = price_val
+                    except Exception as ord_err:
+                        logger.debug(f"Orders lookup for SL/TP enrichment skipped: {ord_err}")
+
                 for p in positions:
-                    print(f"DEBUG LOOP: Type={type(p)}, p={p}")
                     # Parse Active Position
                     if isinstance(p, list) and len(p) >= 10:
                         try:
-                            # Upcomers List Format
+                            # Upcomers List Format: p[0]=id, p[1]=instrumentId, p[2]=routeId, p[3]=side, p[4]=qty, p[5]=price, p[6]=slOrderId, p[7]=tpOrderId, p[8]=entry_ms, p[9]=pnl
+                            pos_id_str = str(p[0])
+                            pos_sl = orders_map.get(pos_id_str, {}).get('stopLoss') or orders_by_id.get(str(p[6]))
+                            pos_tp = orders_map.get(pos_id_str, {}).get('takeProfit') or orders_by_id.get(str(p[7]))
                             trades.append({
-                                'id': str(p[0]),
+                                'id': pos_id_str,
                                 'symbol': self.resolve_symbol(p[1]), 
+                                'tradableInstrumentId': str(p[1]),
+                                'instrumentId': str(p[1]),
                                 'side': 'BUY' if str(p[3]).lower() == 'buy' else 'SELL',
                                 'pnl': float(p[9] or 0.0),
-                                'entry_time': datetime.utcfromtimestamp(float(p[8]) / 1000).isoformat() + 'Z' if p[8] else None,
+                                'entry_time': datetime.fromtimestamp(float(p[8]) / 1000, tz=timezone.utc).isoformat() if p[8] else None,
                                 'price': float(p[5] or 0.0),
                                 'qty': float(p[4] or 0.0),
                                 'stopLossOrderId': str(p[6]) if len(p) > 6 and p[6] else None,
                                 'takeProfitOrderId': str(p[7]) if len(p) > 7 and p[7] else None,
+                                'stopLoss': pos_sl,
+                                'takeProfit': pos_tp,
                                 'status': 'OPEN'
                             })
                         except Exception as e:
-                            print(f"❌ PARSE ERROR: {e} | DATA: {p}")
                             logger.error(f"Failed to parse list position: {e}")
                     else:
                         trades.append({
-                            'id': p.get('id'),
+                            'id': str(p.get('id')),
                             'symbol': self.resolve_symbol(p.get('instrumentId')),
-                            'side': 'BUY' if p.get('side') == 'buy' else 'SELL',
+                            'tradableInstrumentId': str(p.get('tradableInstrumentId') or p.get('instrumentId') or ''),
+                            'instrumentId': str(p.get('instrumentId') or p.get('tradableInstrumentId') or ''),
+                            'side': 'BUY' if str(p.get('side', '')).lower() == 'buy' else 'SELL',
                             'pnl': float(p.get('floatingProfit') or p.get('profit') or 0.0), 
                             'entry_time': p.get('openDate') or p.get('created'),
                             'price': float(p.get('avgOpenPrice') or p.get('openPrice') or 0.0),
@@ -269,6 +311,11 @@ class TradeLockerHelper:
                 logger.warning(f"401 Unauthorized for {self.email} on history. Re-authenticating...")
                 if self.login():
                     return self.get_recent_history(hours)
+                return []
+            if resp.status_code == 429:
+                retry_after = max(float(resp.headers.get("Retry-After") or 5.0), 5.0)
+                logger.warning(f"⚠️ Rate limited on history fetch (HTTP 429) for {self.email}. Backing off {retry_after}s...")
+                time.sleep(retry_after)
                 return []
             if resp.status_code != 200:
                 logger.error(f"ordersHistory failed: {resp.status_code} - {resp.text[:200]}")
@@ -411,6 +458,13 @@ class TradeLockerHelper:
         else:
             payload["price"] = 0.0
 
+        if stop_loss is not None:
+            payload["stopLoss"] = float(stop_loss)
+            payload["stopLossType"] = "absolute"
+        if take_profit is not None:
+            payload["takeProfit"] = float(take_profit)
+            payload["takeProfitType"] = "absolute"
+
 
 
         for attempt in range(2):
@@ -442,21 +496,26 @@ class TradeLockerHelper:
                             # Robust 5-second polling loop to guarantee settlement before patch
                             import time
                             settled = False
+                            target_sym = self.resolve_symbol(instrument_id).replace("/", "").replace("_", "").upper()
                             for poll in range(5):
                                 time.sleep(1.0)
                                 open_pos = self.get_open_positions()
                                 if open_pos:
                                     for p in open_pos:
-                                        if str(p.get("tradableInstrumentId")) == str(instrument_id) and str(p.get("side")).lower() == side.lower():
+                                        p_inst = str(p.get("tradableInstrumentId") or p.get("instrumentId") or "")
+                                        p_sym = str(p.get("symbol") or "").replace("/", "").replace("_", "").upper()
+                                        inst_match = (p_inst == str(instrument_id)) or (target_sym in p_sym or p_sym in target_sym)
+                                        side_match = str(p.get("side")).lower() == side.lower()
+                                        if inst_match and side_match:
                                             # Found it, patch it
                                             pos_id = p.get("id")
-                                            self.modify_position_bracket(pos_id, stop_loss=stop_loss, take_profit=take_profit)
-                                            settled = True
-                                            break
+                                            if self.modify_position_bracket(pos_id, stop_loss=stop_loss, take_profit=take_profit):
+                                                settled = True
+                                                break
                                 if settled:
                                     break
                             if not settled:
-                                logger.critical("⚠️ Trade placed but failed to locate position ID for bracket patch!")
+                                logger.critical(f"🚨 [BRACKET ATTACH FAILED] Trade placed on instrument {instrument_id} ({symbol_hint}) but failed to attach protective brackets!")
                         except Exception as bracket_err:
                             logger.warning(f"⚠️ Bracket attach non-fatal error: {bracket_err}")
 
@@ -500,7 +559,11 @@ class TradeLockerHelper:
         """
         if not self.access_token and not self.login():
             return False
-        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+        if self.account_id:
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions/{position_id}"
+        else:
+            url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+            
         payload = {"stopLossType": "absolute", "takeProfitType": "absolute"}
         if stop_loss is not None:
             payload["stopLoss"] = float(stop_loss)
@@ -517,6 +580,23 @@ class TradeLockerHelper:
                     retry_after = max(float(resp.headers.get("Retry-After") or 15.0), 15.0)
                     logger.warning(f"⚠️ Rate limited on position patch (HTTP 429). Sleeping {retry_after}s...")
                     time.sleep(retry_after)
+                elif resp.status_code == 404:
+                    # Fallback to alternate position endpoint
+                    if self.account_id and "accounts" in url:
+                        fallback_url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+                    elif self.account_id:
+                        fallback_url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions/{position_id}"
+                    else:
+                        fallback_url = None
+
+                    if fallback_url:
+                        logger.warning(f"Retrying position patch with alternate endpoint: {fallback_url}")
+                        fb_resp = requests.patch(fallback_url, json=payload, headers=self._get_headers(auth=True), timeout=10)
+                        if fb_resp.status_code in [200, 201, 204]:
+                            logger.info(f"✅ Position {position_id} updated via alternate endpoint: SL={stop_loss}, TP={take_profit}")
+                            return True
+                    logger.error(f"❌ Failed to patch position {position_id}: {resp.status_code} - {resp.text}")
+                    return False
                 else:
                     logger.error(f"❌ Failed to patch position {position_id}: {resp.status_code} - {resp.text}")
                     return False
@@ -529,15 +609,23 @@ class TradeLockerHelper:
         """Safely closes an open position on TradeLocker using DELETE endpoint."""
         if not self.access_token and not self.login():
             return False
-        url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+        if self.account_id:
+            url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions/{position_id}"
+        else:
+            url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
         try:
             resp = requests.delete(url, headers=self._get_headers(auth=True), timeout=10)
             if resp.status_code in [200, 204]:
                 logger.info(f"✅ Position {position_id} successfully closed.")
                 return True
-            else:
-                logger.warning(f"DELETE position {position_id} returned {resp.status_code}: {resp.text}")
-                return False
+            elif resp.status_code == 404 and self.account_id and "accounts" in url:
+                fallback_url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+                fb_resp = requests.delete(fallback_url, headers=self._get_headers(auth=True), timeout=10)
+                if fb_resp.status_code in [200, 204]:
+                    logger.info(f"✅ Position {position_id} successfully closed via fallback.")
+                    return True
+            logger.warning(f"DELETE position {position_id} returned {resp.status_code}: {resp.text}")
+            return False
         except Exception as e:
             logger.error(f"Error closing position {position_id}: {e}")
             return False
@@ -670,11 +758,16 @@ class TradeLockerClient:
         return total_equity
 
     def get_recent_history(self, hours=24):
-        """Aggregates history from all accounts."""
+        """Aggregates history from all accounts with 2.0s rate-limit pacing."""
         all_trades = []
-        for helper in self.helpers:
-            trades = helper.get_recent_history(hours)
-            all_trades.extend(trades)
+        for i, helper in enumerate(self.helpers):
+            if i > 0:
+                time.sleep(2.0)
+            try:
+                trades = helper.get_recent_history(hours)
+                all_trades.extend(trades)
+            except Exception as e:
+                logger.debug(f"History query notice for {helper.email}: {e}")
         return all_trades
 
     def get_daily_trades_count(self):
@@ -798,14 +891,15 @@ class TradeLockerClient:
                 with open(lock_file_path, "w") as lf:
                     json.dump(data, lf)
 
-            if has_filelock:
-                lock = FileLock("data/daily_setup_lock.json.lock")
-                with lock.acquire(timeout=5):
+            if not bypass_firewall:
+                if has_filelock:
+                    lock = FileLock("data/daily_setup_lock.json.lock")
+                    with lock.acquire(timeout=5):
+                        if not _check_setup_lock():
+                            return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
+                else:
                     if not _check_setup_lock():
                         return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
-            else:
-                if not _check_setup_lock():
-                    return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
         except Exception as e:
             logger.error(f"Failed to verify atomic setup lock: {e}")
             return {"success": False, "filled_count": 0, "total_accounts": len(self.helpers) if hasattr(self, "helpers") and self.helpers else 0, "error": "ATOMIC_SETUP_LIMIT_REACHED"}
@@ -1008,10 +1102,10 @@ class TradeLockerClient:
                     if lot_t1 < 0.01: lot_t1 = 0.01
                     if lot_t2 < 0.01: lot_t2 = 0.01
                     
-                    tp1_r = getattr(Config, 'SCALE_OUT_TP1_R', 1.5)
+                    tp1_r = getattr(Config, 'SCALE_OUT_TP1_R', 2.0)
                     tp1_price = round(float(entry_price) + (tp1_r * stop_dist) if side == "buy" else float(entry_price) - (tp1_r * stop_dist), 2)
                     
-                    # Place Tranche 1 (Cash Builder @ +1.5R)
+                    # Place Tranche 1 (Cash Builder @ +2.0R)
                     res_t1 = helper.place_order(
                         instrument_id=instrument_id,
                         side=side,
@@ -1062,9 +1156,33 @@ class TradeLockerClient:
                 
         filled_count = sum(1 for r in results if r)
         logger.info(f"📊 [PROBE & SCALE] Execution summary: {filled_count}/{len(self.helpers)} accounts successfully filled.")
+
+        # ── RULE 4: MANDATORY POST-EXECUTION RECONCILIATION & PROTECTIVE BRACKET ASSERTION ──
+        if filled_count > 0 and (stop_loss is not None or take_profit is not None):
+            time.sleep(1.5)
+            logger.info("🛡️ [RULE 4 RECONCILIATION] Verifying protective Stop Loss brackets across filled accounts...")
+            clean_sym = symbol.replace("/", "").replace("_", "").upper()
+            for i, helper in enumerate(self.helpers):
+                if not results[i]:
+                    continue
+                try:
+                    open_pos = helper.get_open_positions() or []
+                    for pos in open_pos:
+                        pos_sym = str(pos.get('symbol', '')).replace("/", "").replace("_", "").upper()
+                        pos_inst = str(pos.get('tradableInstrumentId') or pos.get('instrumentId') or '')
+                        if (clean_sym in pos_sym or pos_inst == str(instrument_id)) and str(pos.get('side')).lower() == side.lower():
+                            pos_id = pos.get('id')
+                            has_sl = bool(pos.get('stopLoss') or pos.get('stopLossOrderId'))
+                            if not has_sl:
+                                logger.critical(f"🚨 [RULE 4 ALERT] Account {i+1} ({helper.email}) position {pos_id} missing verified Stop Loss! Immediately patching...")
+                                helper.modify_position_bracket(pos_id, stop_loss=stop_loss, take_profit=take_profit)
+                            else:
+                                logger.info(f"✅ [RULE 4 VERIFIED] Account {i+1} ({helper.email}) position {pos_id} has verified Stop Loss.")
+                except Exception as recon_err:
+                    logger.error(f"Rule 4 verification error on Account {i+1}: {recon_err}")
         
         # Record Persistent Cooldown & Setup Lock upon successful order execution (Invariant 8 & 11)
-        if filled_count > 0:
+        if filled_count > 0 and not bypass_firewall:
             ExecutionFirewall.record_trade_execution(symbol)
             try:
                 if has_filelock:
