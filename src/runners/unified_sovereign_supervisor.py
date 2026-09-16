@@ -212,6 +212,36 @@ class UnifiedSovereignSupervisor:
                 except Exception as hyg_err:
                     logger.debug(f"System hygiene sweep notice: {hyg_err}")
 
+                # 3. Synchronize Broker Positions & Closed History into SQLite journal
+                try:
+                    from datetime import datetime, timezone
+                    from src.clients.tl_client import TradeLockerClient
+                    tl_sync = TradeLockerClient()
+                    open_pos = tl_sync.get_open_positions()
+                    history = tl_sync.get_recent_history(hours=72)
+                    if open_pos or history:
+                        sync_conn = get_db_connection()
+                        sc = sync_conn.cursor()
+                        for t in (open_pos or []):
+                            entry_time = t.get('entry_time') or datetime.now(timezone.utc).isoformat()
+                            sc.execute("""
+                                INSERT INTO journal (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy)
+                                VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0.0, 'Synced Active Trade', 'SYSTEM')
+                                ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'OPEN'
+                            """, (entry_time, str(t['id']), str(t['symbol']), str(t['side']), float(t.get('pnl', 0.0)), float(t.get('price', 0.0))))
+                        for t in (history or []):
+                            close_time = t.get('close_time') or datetime.now(timezone.utc).isoformat()
+                            sc.execute("""
+                                INSERT INTO journal (timestamp, trade_id, symbol, side, pnl, price, status, ai_grade, mentor_feedback, strategy)
+                                VALUES (?, ?, ?, ?, ?, ?, 'CLOSED', 0.0, 'Synced History', 'FLEET_SYNC')
+                                ON CONFLICT(trade_id) DO UPDATE SET pnl = excluded.pnl, status = 'CLOSED'
+                            """, (close_time, str(t['id']), str(t['symbol']), str(t['side']), float(t.get('pnl', 0.0)), float(t.get('price', 0.0))))
+                        sync_conn.commit()
+                        sync_conn.close()
+                        logger.info(f"📊 [Broker Sync] Synchronized {len(open_pos or [])} active positions & {len(history or [])} closed trades into SQLite journal.")
+                except Exception as sync_err:
+                    logger.debug(f"Broker journal sync notice: {sync_err}")
+
             except Exception as e:
                 logger.debug(f"Maintenance error: {e}")
 
