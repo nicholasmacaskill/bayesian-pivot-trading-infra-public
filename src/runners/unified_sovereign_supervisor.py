@@ -302,9 +302,9 @@ class UnifiedSovereignSupervisor:
             except Exception as e:
                 logger.debug(f"Maintenance error: {e}")
 
-            # Run maintenance every 15 minutes (900s)
+            # Run broker sync and maintenance every 2 minutes (120s) for real-time circuit breaker tracking
             slept = 0
-            while slept < 900 and self.running:
+            while slept < 120 and self.running:
                 time.sleep(5)
                 slept += 5
 
