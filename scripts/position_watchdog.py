@@ -216,8 +216,15 @@ class PositionWatchdog:
                     if not target_pos:
                         continue
 
-                    # If account is a scale-out account with multiple positions, close the first tranche
-                    if acc_idx in scale_out_indices and len(target_pos) > 1:
+                    is_mfe = "MFE Peak Retracement" in str(reason)
+                    
+                    if is_mfe:
+                        # Defensive market closure: close ALL remaining positions on this account to lock in banked gain
+                        for p in target_pos:
+                            pid = p.get("id") or p.get("positionId")
+                            if helper.close_position(pid):
+                                closed_count += 1
+                    elif acc_idx in scale_out_indices and len(target_pos) > 1:
                         # Close T1 (first tranche) to lock cash profit
                         t1_pos = target_pos[0]
                         pos_id = t1_pos.get("id") or t1_pos.get("positionId")
@@ -238,14 +245,23 @@ class PositionWatchdog:
                 except Exception as acc_err:
                     print(f"Error scaling out account {acc_idx+1}: {acc_err}")
 
-            scaleout_msg = (
-                f"🛡️ <b>AUTONOMOUS FLEET PROFIT PROTECTION</b>\n\n"
-                f"Symbol: <code>{symbol}</code>\n"
-                f"Trigger: <b>{reason}</b>\n\n"
-                f"🔒 <b>Risk-Free Trailing:</b> Trailed Stop Loss to Entry (${entry_price:,.2f}) on {trailed_count} positions\n"
-                f"🏦 <b>Realized Cash Profit:</b> Closed {closed_count} tranches on scale-out accounts\n\n"
-                f"✅ <b>Invariant:</b> Zero risk remaining. Runners riding to full Target."
-            )
+            if "MFE Peak Retracement" in str(reason):
+                scaleout_msg = (
+                    f"🛡️ <b>MFE PEAK RATCHET PROFIT LOCK</b>\n\n"
+                    f"Symbol: <code>{symbol}</code>\n"
+                    f"Trigger: <b>{reason}</b>\n\n"
+                    f"🏦 <b>Realized Cash Profit:</b> Market-closed {closed_count} positions across fleet\n"
+                    f"✅ <b>Invariant:</b> Protected peak profit. Zero surrender to reversal."
+                )
+            else:
+                scaleout_msg = (
+                    f"🛡️ <b>AUTONOMOUS FLEET PROFIT PROTECTION</b>\n\n"
+                    f"Symbol: <code>{symbol}</code>\n"
+                    f"Trigger: <b>{reason}</b>\n\n"
+                    f"🔒 <b>Risk-Free Trailing:</b> Trailed Stop Loss to Entry (${entry_price:,.2f}) on {trailed_count} positions\n"
+                    f"🏦 <b>Realized Cash Profit:</b> Closed {closed_count} tranches on scale-out accounts\n\n"
+                    f"✅ <b>Invariant:</b> Zero risk remaining. Runners riding to full Target."
+                )
             self.notifier._send_message(scaleout_msg)
             print(f"✅ Fleet Scale-Out Complete: Trailed={trailed_count}, Closed={closed_count}")
         except Exception as e:

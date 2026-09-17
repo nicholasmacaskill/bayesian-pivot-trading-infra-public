@@ -177,5 +177,76 @@ class TestWatchdogAndScaleoutInvariants(unittest.TestCase):
         self.assertGreaterEqual(peak_r, Config.MFE_MIN_PEAK_R)
         self.assertGreaterEqual(retrace, Config.MFE_MAX_RETRACEMENT_R)
 
+    @patch.object(TradeLockerHelper, 'close_position')
+    @patch.object(TradeLockerHelper, 'modify_position_bracket')
+    @patch.object(TradeLockerHelper, 'get_open_positions')
+    def test_mfe_peak_retracement_physically_market_closes_positions(self, mock_get_pos, mock_modify, mock_close):
+        """Verify that when reason is MFE Peak Retracement, watchdog physically closes all open positions."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier = MagicMock()
+        mock_close.return_value = True
+        mock_get_pos.return_value = [
+            {"id": "runner_pos_1", "symbol": "BTCUSD", "qty": 0.20}
+        ]
+
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "token"
+        helper.get_open_positions = mock_get_pos
+        helper.close_position = mock_close
+        helper.modify_position_bracket = mock_modify
+
+        watchdog.tl.helpers = [helper]
+
+        with patch("time.sleep"):
+            watchdog.execute_fleet_scaleout("BTCUSD", entry_price=76682.0, reason="MFE Peak Retracement (+2.50R -> +1.60R)")
+
+        # Verify close_position was called to market-close the runner
+        mock_close.assert_called_once_with("runner_pos_1")
+        # Verify modify_position_bracket was NOT called (we don't just trail to BE, we exit!)
+        mock_modify.assert_not_called()
+
+    @patch('requests.patch')
+    def test_modify_position_bracket_reauth_on_401(self, mock_patch):
+        """Verify modify_position_bracket catches 401, refreshes token via login(), and retries."""
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "expired_token"
+        helper.login = MagicMock(return_value=True)
+
+        resp_401 = MagicMock()
+        resp_401.status_code = 401
+
+        resp_200 = MagicMock()
+        resp_200.status_code = 200
+        resp_200.json.return_value = {"success": True}
+
+        mock_patch.side_effect = [resp_401, resp_200]
+
+        res = helper.modify_position_bracket("pos_123", stop_loss=76000.0)
+
+        self.assertTrue(res)
+        self.assertTrue(helper.login.called, "login() should be called on 401")
+        self.assertEqual(mock_patch.call_count, 2, "Should retry patch after re-auth")
+
+    @patch('requests.delete')
+    def test_close_position_reauth_on_401(self, mock_delete):
+        """Verify close_position catches 401, refreshes token via login(), and retries."""
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "expired_token"
+        helper.login = MagicMock(return_value=True)
+
+        resp_401 = MagicMock()
+        resp_401.status_code = 401
+
+        resp_200 = MagicMock()
+        resp_200.status_code = 200
+
+        mock_delete.side_effect = [resp_401, resp_200]
+
+        res = helper.close_position("pos_123")
+
+        self.assertTrue(res)
+        self.assertTrue(helper.login.called, "login() should be called on 401")
+        self.assertEqual(mock_delete.call_count, 2, "Should retry delete after re-auth")
+
 if __name__ == "__main__":
     unittest.main()

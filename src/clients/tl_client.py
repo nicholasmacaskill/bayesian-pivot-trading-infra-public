@@ -596,6 +596,11 @@ class TradeLockerHelper:
                 if resp.status_code in [200, 201, 204]:
                     logger.info(f"✅ Position {position_id} updated: SL={stop_loss}, TP={take_profit}")
                     return True
+                elif resp.status_code == 401 and attempt == 0:
+                    logger.warning(f"⚠️ 401 Unauthorized on position patch for {position_id}. Refreshing token...")
+                    if self.login():
+                        continue
+                    return False
                 elif resp.status_code == 429:
                     retry_after = max(float(resp.headers.get("Retry-After") or 15.0), 15.0)
                     logger.warning(f"⚠️ Rate limited on position patch (HTTP 429). Sleeping {retry_after}s...")
@@ -633,22 +638,32 @@ class TradeLockerHelper:
             url = f"{self.base_url}/backend-api/trade/accounts/{self.account_id}/positions/{position_id}"
         else:
             url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
-        try:
-            resp = requests.delete(url, headers=self._get_headers(auth=True), timeout=10)
-            if resp.status_code in [200, 204]:
-                logger.info(f"✅ Position {position_id} successfully closed.")
-                return True
-            elif resp.status_code == 404 and self.account_id and "accounts" in url:
-                fallback_url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
-                fb_resp = requests.delete(fallback_url, headers=self._get_headers(auth=True), timeout=10)
-                if fb_resp.status_code in [200, 204]:
-                    logger.info(f"✅ Position {position_id} successfully closed via fallback.")
+        for attempt in range(2):
+            try:
+                resp = requests.delete(url, headers=self._get_headers(auth=True), timeout=10)
+                if resp.status_code in [200, 204]:
+                    logger.info(f"✅ Position {position_id} successfully closed.")
                     return True
-            logger.warning(f"DELETE position {position_id} returned {resp.status_code}: {resp.text}")
-            return False
-        except Exception as e:
-            logger.error(f"Error closing position {position_id}: {e}")
-            return False
+                elif resp.status_code == 401 and attempt == 0:
+                    logger.warning(f"⚠️ 401 Unauthorized on close_position for {position_id}. Refreshing token...")
+                    if self.login():
+                        continue
+                    return False
+                elif resp.status_code == 404 and self.account_id and "accounts" in url:
+                    fallback_url = f"{self.base_url}/backend-api/trade/positions/{position_id}"
+                    fb_resp = requests.delete(fallback_url, headers=self._get_headers(auth=True), timeout=10)
+                    if fb_resp.status_code in [200, 204]:
+                        logger.info(f"✅ Position {position_id} successfully closed via fallback.")
+                        return True
+                logger.warning(f"DELETE position {position_id} returned {resp.status_code}: {resp.text}")
+                return False
+            except Exception as e:
+                logger.error(f"Error closing position {position_id}: {e}")
+                if attempt == 0:
+                    time.sleep(1.0)
+                    continue
+                return False
+        return False
 
     def get_todays_trades_count(self):
         """Simplified trade count for verification."""
