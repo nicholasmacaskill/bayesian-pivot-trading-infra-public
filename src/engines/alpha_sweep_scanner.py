@@ -1276,11 +1276,35 @@ class AlphaSweepScanner(SMCScanner):
                     # Fallback estimate based on typical 0.25% stop if uninitialized
                     initial_r_dist = entry_price * 0.0025
 
-                # Fetch live mark price
-                df_tick = self.fetch_data(symbol, '5m', limit=2, synchronized=False)
-                if df_tick is None or len(df_tick) == 0:
+                # Fetch live mark price with symbol normalization & broker fallback
+                fetch_sym = symbol
+                if "/" not in fetch_sym:
+                    if "BTC" in fetch_sym: fetch_sym = "BTC/USD"
+                    elif "ETH" in fetch_sym: fetch_sym = "ETH/USD"
+                    elif "SOL" in fetch_sym: fetch_sym = "SOL/USD"
+                    elif "XAU" in fetch_sym: fetch_sym = "XAU/USD"
+                    elif len(fetch_sym) == 6: fetch_sym = f"{fetch_sym[:3]}/{fetch_sym[3:]}"
+
+                df_tick = self.fetch_data(fetch_sym, '5m', limit=2, synchronized=False)
+                current_price = None
+                if df_tick is not None and len(df_tick) > 0:
+                    try:
+                        current_price = float(df_tick.iloc[-1]['close'])
+                    except Exception:
+                        current_price = None
+
+                # Broker-native mark price fallback from PnL if exchange fetch fails
+                if current_price is None or current_price <= 0:
+                    pnl = float(p.get('pnl') or 0.0)
+                    qty = float(p.get('qty') or 0.0)
+                    contract_size = Config.get_contract_size(fetch_sym)
+                    if qty > 0:
+                        delta_price = pnl / (qty * contract_size)
+                        current_price = (entry_price + delta_price) if side == "buy" else (entry_price - delta_price)
+
+                if current_price is None or current_price <= 0:
                     continue
-                current_price = float(df_tick.iloc[-1]['close'])
+
                 if hasattr(self, 'exec_shadow_engine'):
                     self.exec_shadow_engine.update_price(symbol, current_price)
 

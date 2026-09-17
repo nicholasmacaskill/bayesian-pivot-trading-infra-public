@@ -132,24 +132,18 @@ class UnifiedSovereignSupervisor:
                     for pos in positions:
                         t_id = pos['id']
                         symbol = pos['symbol']
-                        entry = pos['price']
-                        pnl = pos['pnl']
+                        entry = float(pos.get('price') or 0.0)
+                        pnl = float(pos.get('pnl') or 0.0)
                         
                         if t_id not in self.watchdog.alerted_trades:
                             self.watchdog.alerted_trades[t_id] = {}
 
-                        sl, scan = self.watchdog.get_stop_loss(symbol)
-                        if not sl:
+                        sl, scan = self.watchdog.get_stop_loss(symbol, pos=pos)
+                        if not sl or entry <= 0:
                             continue
                         
-                        qty = pos.get('qty', 0)
-                        clean_sym = symbol.replace("/", "").replace("_", "").upper()
-                        if any(c in clean_sym for c in ["BTC", "ETH", "SOL", "GALA", "CRYPTO"]):
-                            contract_size = 1.0
-                        elif any(m in clean_sym for m in ["XAU", "GOLD", "SILVER", "XAG"]):
-                            contract_size = 100.0
-                        else:
-                            contract_size = 100000.0  # Standard Forex
+                        qty = float(pos.get('qty') or 0.0)
+                        contract_size = Config.get_contract_size(symbol)
                         risk_usd = abs(entry - sl) * qty * contract_size
                         if risk_usd > 0:
                             r_multiple = pnl / risk_usd
@@ -251,10 +245,29 @@ class UnifiedSovereignSupervisor:
                 time.sleep(5)
                 slept += 5
 
-    # ── WORKER 4: Software as Glass Observability HUD ──
-    def run_glass_hud_worker(self):
-        logger.info("💎 [Worker: Glass HUD] Dashboard server SHUT OFF by user request.")
-        return
+    # ── WORKER 4: Sovereign Quality Governor & Invariant Sentry ──
+    def run_quality_governor_worker(self):
+        logger.info("🛡️ [Worker: Quality Governor] Starting Continuous Runtime Invariant Sentry...")
+        try:
+            from src.core.quality_governor import QualityGovernor
+            governor = QualityGovernor()
+        except Exception as e:
+            logger.error(f"Failed to initialize QualityGovernor: {e}")
+            return
+
+        while self.running:
+            try:
+                report = governor.run_runtime_audit(tl_client=getattr(self.watchdog, 'tl', None))
+                if report.get("status") == "CRITICAL":
+                    logger.critical(f"🚨 [QUALITY GOVERNOR ALARM] {len(report.get('violations', []))} Invariant Violation(s) Detected!")
+            except Exception as e:
+                logger.error(f"Quality Governor worker loop error: {e}")
+
+            # Sleep 60 seconds between runtime health audits
+            slept = 0
+            while slept < 60 and self.running:
+                time.sleep(2)
+                slept += 2
 
     def start(self):
         logger.info("👑 =========================================================")
@@ -262,15 +275,27 @@ class UnifiedSovereignSupervisor:
         logger.info(f"👑 PID: {os.getpid()} | Adaptive Pacing: Active | Memory Cap: ~120 MB")
         logger.info("👑 =========================================================")
 
+        # Run Pre-Flight Invariant Audit before launching workers
+        try:
+            from src.core.quality_governor import QualityGovernor
+            gov = QualityGovernor()
+            audit = gov.run_preflight_audit()
+            if audit["status"] != "PASS":
+                logger.warning(f"⚠️ [PRE-FLIGHT WARNING] Pre-flight audit flagged {len(audit['all_issues'])} issue(s).")
+            else:
+                logger.info("✅ [PRE-FLIGHT PASSED] All broker and codebase invariants verified.")
+        except Exception as pf_err:
+            logger.error(f"Pre-flight audit execution error: {pf_err}")
+
         t_scanner = threading.Thread(target=self.run_scanner_worker, name="ScannerThread", daemon=True)
         t_watchdog = threading.Thread(target=self.run_watchdog_worker, name="WatchdogThread", daemon=True)
         t_maint = threading.Thread(target=self.run_maintenance_worker, name="MaintThread", daemon=True)
-        t_glass = threading.Thread(target=self.run_glass_hud_worker, name="GlassHUDThread", daemon=True)
+        t_governor = threading.Thread(target=self.run_quality_governor_worker, name="QualityGovernorThread", daemon=True)
 
         t_scanner.start()
         t_watchdog.start()
         t_maint.start()
-        t_glass.start()
+        t_governor.start()
 
         # Keep main thread alive
         while self.running:

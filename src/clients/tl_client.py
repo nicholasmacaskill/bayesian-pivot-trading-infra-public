@@ -467,6 +467,14 @@ class TradeLockerHelper:
 
 
 
+        pre_existing_pos_ids = set()
+        try:
+            pre_pos = self.get_open_positions()
+            if pre_pos:
+                pre_existing_pos_ids = {str(p.get("id")) for p in pre_pos if p.get("id")}
+        except Exception:
+            pass
+
         for attempt in range(2):
             try:
                 resp = requests.post(url, json=payload, headers=self._get_headers(auth=True), timeout=8)
@@ -501,16 +509,28 @@ class TradeLockerHelper:
                                 time.sleep(1.0)
                                 open_pos = self.get_open_positions()
                                 if open_pos:
-                                    for p in open_pos:
+                                    # Prioritize newly created positions that did not exist before this order
+                                    candidates = [p for p in open_pos if str(p.get("id")) not in pre_existing_pos_ids]
+                                    if not candidates:
+                                        candidates = open_pos
+
+                                    for p in candidates:
                                         p_inst = str(p.get("tradableInstrumentId") or p.get("instrumentId") or "")
                                         p_sym = str(p.get("symbol") or "").replace("/", "").replace("_", "").upper()
                                         inst_match = (p_inst == str(instrument_id)) or (target_sym in p_sym or p_sym in target_sym)
                                         side_match = str(p.get("side")).lower() == side.lower()
+                                        qty_diff = abs(float(p.get("qty") or 0.0) - float(aligned_qty))
+                                        qty_match = qty_diff < 0.005
+
                                         if inst_match and side_match:
-                                            # Found it, patch it
+                                            # If multiple candidates exist, prioritize exact qty match
+                                            if len(candidates) > 1 and not qty_match and any(abs(float(c.get("qty") or 0.0) - float(aligned_qty)) < 0.005 for c in candidates):
+                                                continue
+
                                             pos_id = p.get("id")
                                             if self.modify_position_bracket(pos_id, stop_loss=stop_loss, take_profit=take_profit):
                                                 settled = True
+                                                pre_existing_pos_ids.add(str(pos_id))
                                                 break
                                 if settled:
                                     break
@@ -667,17 +687,23 @@ class TradeLockerClient:
         """
         Safely modifies Stop Loss in place on all open positions across the fleet.
         Guaranteed to NEVER place duplicate or orphan pending orders.
+        Enforces 2.0s adaptive pacing between accounts per AGENTS.md Rule 5.
         """
         results = []
         for i, helper in enumerate(self.helpers):
-            positions = helper.get_open_positions()
-            for p in positions:
-                sym = str(p.get('symbol', '')).upper()
-                if symbol.replace('/', '').upper() in sym.replace('/', '').upper():
-                    pos_id = p.get('id')
-                    if pos_id:
-                        res = helper.modify_position_bracket(pos_id, stop_loss=new_stop_loss)
-                        results.append(res)
+            if i > 0:
+                time.sleep(2.0)  # Adaptive 2.0s pacing between accounts to prevent 429
+            try:
+                positions = helper.get_open_positions()
+                for p in positions:
+                    sym = str(p.get('symbol', '')).upper()
+                    if symbol.replace('/', '').upper() in sym.replace('/', '').upper():
+                        pos_id = p.get('id')
+                        if pos_id:
+                            res = helper.modify_position_bracket(pos_id, stop_loss=new_stop_loss)
+                            results.append(res)
+            except Exception as e:
+                logger.error(f"Error updating fleet stop loss on account {i+1}: {e}")
         return results
 
     def close_all_fleet_positions(self):
@@ -1082,7 +1108,8 @@ class TradeLockerClient:
                 if stop_dist <= 0:
                     stop_dist = 25.0 if "ETH" in symbol else 300.0 if "BTC" in symbol else 15.0
                     
-                exact_lots = target_risk_usd / stop_dist
+                contract_size = Config.get_contract_size(symbol)
+                exact_lots = target_risk_usd / (stop_dist * contract_size)
                 scaled_lot = round(exact_lots * risk_scale, 2)
                 
                 # Enforce Hard Per-Order Maximum Lot Size Ceiling
@@ -1094,17 +1121,25 @@ class TradeLockerClient:
                 if scaled_lot < 0.01:
                     scaled_lot = 0.01
                     
-                is_scale_out_acc = getattr(Config, 'SPLIT_FLEET_SCALE_OUT_ENABLED', True) and (i in getattr(Config, 'SCALE_OUT_ACCOUNT_INDICES', [0, 2, 3, 4]))
+                is_scale_out_acc = getattr(Config, 'SPLIT_FLEET_SCALE_OUT_ENABLED', True) and (i in getattr(Config, 'SCALE_OUT_ACCOUNT_INDICES', [0, 2, 8]))
 
                 if is_scale_out_acc and scaled_lot >= 0.02 and entry_price is not None and stop_loss is not None:
-                    # ── TWO-TRANCHE SPLIT EXECUTION (50% TP1 @ +1.5R, 50% TP2 @ Full Target) ──
+                    # ── TWO-TRANCHE SPLIT EXECUTION (50% TP1 @ +1.5R/2.0R, 50% TP2 @ Full Target) ──
                     lot_t1 = round(scaled_lot * 0.50, 2)
                     lot_t2 = round(scaled_lot - lot_t1, 2)
                     if lot_t1 < 0.01: lot_t1 = 0.01
                     if lot_t2 < 0.01: lot_t2 = 0.01
                     
                     tp1_r = getattr(Config, 'SCALE_OUT_TP1_R', 2.0)
-                    tp1_price = round(float(entry_price) + (tp1_r * stop_dist) if side == "buy" else float(entry_price) - (tp1_r * stop_dist), 2)
+                    tp_cushion = 0.0
+                    if getattr(Config, 'TP_FRONT_RUN_CUSHION_ENABLED', False):
+                        cushions = getattr(Config, 'TP_FRONT_RUN_CUSHION_USD', {})
+                        for asset, val in cushions.items():
+                            if asset in symbol:
+                                tp_cushion = float(val)
+                                break
+                    raw_tp1 = float(entry_price) + (tp1_r * stop_dist) if side == "buy" else float(entry_price) - (tp1_r * stop_dist)
+                    tp1_price = round(raw_tp1 - tp_cushion, 2) if side == "buy" else round(raw_tp1 + tp_cushion, 2)
                     
                     # Place Tranche 1 (Cash Builder @ +2.0R)
                     res_t1 = helper.place_order(

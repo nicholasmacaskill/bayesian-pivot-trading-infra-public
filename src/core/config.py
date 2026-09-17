@@ -245,6 +245,8 @@ class Config:
     
     SCALE_OUT_TP1_R = 2.0           # Take Profit 1 level = +2.0R (Expands Realized R:R)
     SCALE_OUT_TP1_PCT = 0.50        # 50% size closed at TP1
+    TP_FRONT_RUN_CUSHION_ENABLED = False # Micro-buffer on limit TPs to front-run stop clusters
+    TP_FRONT_RUN_CUSHION_USD = {"BTC": 15.0, "ETH": 1.0, "SOL": 0.10, "XAU": 0.50}
     
     # ── Tiered Risk Scaling (Dynamic Fractional Kelly Sizing) ──
     DYNAMIC_RISK_SCALING_ENABLED = False
@@ -318,6 +320,26 @@ class Config:
 
     # Local Runner Parameters
     RUN_INTERVAL_MINS = 3
+
+    @classmethod
+    def get_contract_size(cls, symbol: str) -> float:
+        """
+        Returns the true broker contract size / lot multiplier for any asset.
+        - Crypto (BTC, ETH, SOL, etc.): 1.0
+        - Gold (XAU/USD): 100.0 (1 lot = 100 oz)
+        - Silver (XAG/USD): 5000.0 (1 lot = 5000 oz)
+        - Forex majors / minors: 100000.0 (1 lot = 100k units)
+        """
+        clean = str(symbol).replace("/", "").replace("_", "").upper()
+        if any(c in clean for c in ["BTC", "ETH", "SOL", "CRYPTO", "GALA", "COIN"]):
+            return 1.0
+        elif any(m in clean for m in ["XAU", "GOLD"]):
+            return 100.0
+        elif any(m in clean for m in ["XAG", "SILVER"]):
+            return 5000.0
+        elif any(fx in clean for fx in ["EUR", "GBP", "AUD", "NZD", "JPY", "CAD", "CHF"]):
+            return 100000.0
+        return 1.0
 
     @classmethod
     def get(cls, key, default=None):
