@@ -13,27 +13,43 @@ from src.clients.telegram_notifier import TelegramNotifier
 from src.core.supabase_client import SupabaseBridge
 from src.core.config import Config
 
+STATE_FILE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data",
+    "watchdog_state.json"
+)
+
 class PositionWatchdog:
     def __init__(self):
-        load_dotenv(".env.local")
         self.tl = TradeLockerClient()
         self.sb = SupabaseBridge()
         self.notifier = TelegramNotifier()
         self.alerted_trades = {} # {trade_id: {r_level: bool}}
+        self.symbol_state = {}   # {clean_sym: {scaleout_executed: bool, peak_r: float, ...}}
         self.load_state()
 
     def load_state(self):
         try:
-            if os.path.exists("watchdog_state.json"):
-                with open("watchdog_state.json", "r") as f:
-                    self.alerted_trades = json.load(f)
+            if os.path.exists(STATE_FILE_PATH):
+                with open(STATE_FILE_PATH, "r") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        self.alerted_trades = data.get("alerted_trades", {})
+                        self.symbol_state = data.get("symbol_state", {})
+                        # Backward compatibility if data was a flat alerted_trades dict
+                        if not self.alerted_trades and not self.symbol_state:
+                            self.alerted_trades = data
         except Exception as e:
             print(f"Error loading state: {e}")
 
     def save_state(self):
         try:
-            with open("watchdog_state.json", "w") as f:
-                json.dump(self.alerted_trades, f, indent=4)
+            os.makedirs(os.path.dirname(STATE_FILE_PATH), exist_ok=True)
+            with open(STATE_FILE_PATH, "w") as f:
+                json.dump({
+                    "alerted_trades": self.alerted_trades,
+                    "symbol_state": self.symbol_state
+                }, f, indent=4)
         except Exception as e:
             print(f"Error saving state: {e}")
 
@@ -92,16 +108,29 @@ class PositionWatchdog:
                 positions = self.tl.get_open_positions()
                 if not positions:
                     print("No open positions found.")
+                    if self.symbol_state or self.alerted_trades:
+                        self.symbol_state.clear()
+                        self.alerted_trades.clear()
+                        self.save_state()
                 
                 for pos in positions:
                     t_id = pos['id']
                     symbol = pos['symbol']
+                    clean_sym = symbol.replace("/", "").replace("_", "").upper()
                     entry = float(pos.get('price') or 0.0)
                     pnl = float(pos.get('pnl') or 0.0)
                     side = pos.get('side', 'BUY')
                     
                     if t_id not in self.alerted_trades:
                         self.alerted_trades[t_id] = {}
+
+                    sym_data = self.symbol_state.setdefault(clean_sym, {
+                        "scaleout_executed": False,
+                        "mfe_scaleout_executed": False,
+                        "macro_scaleout_executed": False,
+                        "peak_r": 0.0,
+                        "milestones": {}
+                    })
 
                     # 1. Fetch SL directly from broker position or fallback
                     sl, scan = self.get_stop_loss(symbol, pos=pos)
@@ -119,48 +148,63 @@ class PositionWatchdog:
                     r_multiple = pnl / risk_usd
                     print(f"[{symbol}] PnL: ${pnl:.2f} | Risk: ${risk_usd:.2f} | R: {r_multiple:.2f}")
 
-                    # 3. Peak R-Multiple Tracking
-                    peak_r = max(self.alerted_trades.get(t_id, {}).get("peak_r", 0.0), r_multiple)
-                    self.alerted_trades[t_id]["peak_r"] = peak_r
+                    # 3. Peak R-Multiple Tracking & Immediate State Persistence
+                    peak_r = max(
+                        sym_data.get("peak_r", 0.0),
+                        self.alerted_trades.get(t_id, {}).get("peak_r", 0.0),
+                        r_multiple
+                    )
+                    if peak_r > sym_data.get("peak_r", 0.0):
+                        sym_data["peak_r"] = peak_r
+                        self.alerted_trades[t_id]["peak_r"] = peak_r
+                        self.save_state()
 
-                    # 4. Standard Automated Fleet Scale-Out at BE Trigger (+1.5R)
+                    # 4. Standard Automated Fleet Scale-Out at BE Trigger (+1.5R) (Deduplicated per Symbol)
                     be_trigger = getattr(Config, 'BE_TRIGGER_R', 1.5)
-                    if r_multiple >= be_trigger and not self.alerted_trades.get(t_id, {}).get("scaleout_executed"):
+                    is_scaled_out = sym_data.get("scaleout_executed") or self.alerted_trades.get(t_id, {}).get("scaleout_executed")
+                    if r_multiple >= be_trigger and not is_scaled_out:
                         print(f"💰 [AUTO SCALE-OUT] {symbol} hit {r_multiple:.2f}R! Executing Fleet Break-Even & Scale-Out...")
                         self.execute_fleet_scaleout(symbol, entry, reason=f"+{be_trigger:.1f}R Target Reached")
+                        sym_data["scaleout_executed"] = True
                         self.alerted_trades[t_id]["scaleout_executed"] = True
                         self.save_state()
 
-                    # 5. MFE Peak Retracement Ratchet (Never allow a +2.0R trade to round-trip)
+                    # 5. MFE Peak Retracement Ratchet (Deduplicated per Symbol)
                     mfe_enabled = getattr(Config, 'MFE_PEAK_RATCHET_ENABLED', True)
                     mfe_min_peak = getattr(Config, 'MFE_MIN_PEAK_R', 2.0)
                     mfe_max_retrace = getattr(Config, 'MFE_MAX_RETRACEMENT_R', 0.75)
+                    is_mfe_scaled = sym_data.get("mfe_scaleout_executed") or self.alerted_trades.get(t_id, {}).get("mfe_scaleout_executed")
                     if mfe_enabled and peak_r >= mfe_min_peak:
                         retrace = peak_r - r_multiple
-                        if retrace >= mfe_max_retrace and not self.alerted_trades.get(t_id, {}).get("mfe_scaleout_executed"):
+                        if retrace >= mfe_max_retrace and not is_mfe_scaled:
                             print(f"🛡️ [MFE PEAK RATCHET] {symbol} peaked at +{peak_r:.2f}R, retraced {retrace:.2f}R (now {r_multiple:.2f}R)! Executing defensive scale-out...")
                             self.execute_fleet_scaleout(symbol, entry, reason=f"MFE Peak Retracement (+{peak_r:.2f}R -> +{r_multiple:.2f}R)")
+                            sym_data["mfe_scaleout_executed"] = True
                             self.alerted_trades[t_id]["mfe_scaleout_executed"] = True
                             self.save_state()
 
-                    # 6. Pre-Macro Event Defense (Bank profit before Tier-1 releases)
+                    # 6. Pre-Macro Event Defense (Deduplicated per Symbol)
                     macro_enabled = getattr(Config, 'MACRO_DEFENSE_ENABLED', True)
                     macro_min_r = getattr(Config, 'MACRO_DEFENSE_MIN_R', 1.0)
-                    if macro_enabled and r_multiple >= macro_min_r and not self.alerted_trades.get(t_id, {}).get("macro_scaleout_executed"):
+                    is_macro_scaled = sym_data.get("macro_scaleout_executed") or self.alerted_trades.get(t_id, {}).get("macro_scaleout_executed")
+                    if macro_enabled and r_multiple >= macro_min_r and not is_macro_scaled:
                         try:
                             from src.engines.calendar_filter import CalendarFilter
                             is_safe, cal_reason = CalendarFilter().is_safe_to_trade(symbol)
                             if not is_safe and "⛔ MACRO BLACKOUT" in str(cal_reason):
                                 print(f"⚡ [PRE-MACRO DEFENSE] {symbol} at +{r_multiple:.2f}R approaching macro event! Banking profit & locking BE...")
                                 self.execute_fleet_scaleout(symbol, entry, reason=f"Pre-Macro Defense: {cal_reason}")
+                                sym_data["macro_scaleout_executed"] = True
                                 self.alerted_trades[t_id]["macro_scaleout_executed"] = True
                                 self.save_state()
                         except Exception as cal_err:
                             pass
 
+                    # 7. Milestone Telegram Alerts (Deduplicated per Symbol)
                     for target in [1.5, 2.0, 2.5]:
                         target_key = str(target)
-                        if r_multiple >= target and not self.alerted_trades.get(t_id, {}).get(target_key):
+                        is_target_alerted = sym_data.get("milestones", {}).get(target_key) or self.alerted_trades.get(t_id, {}).get(target_key)
+                        if r_multiple >= target and not is_target_alerted:
                             msg = (
                                 f"🚀 <b>BAYESIAN PIVOT TARGET REACHED!</b>\n"
                                 f"Symbol: <code>{symbol}</code>\n"
@@ -169,6 +213,7 @@ class PositionWatchdog:
                                 f"Break-Even stop loss and autonomous protection active."
                             )
                             self.notifier._send_message(msg)
+                            sym_data.setdefault("milestones", {})[target_key] = True
                             self.alerted_trades[t_id][target_key] = True
                             self.save_state()
 

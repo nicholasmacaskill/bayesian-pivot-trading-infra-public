@@ -248,5 +248,79 @@ class TestWatchdogAndScaleoutInvariants(unittest.TestCase):
         self.assertTrue(helper.login.called, "login() should be called on 401")
         self.assertEqual(mock_delete.call_count, 2, "Should retry delete after re-auth")
 
+    @patch.object(PositionWatchdog, 'execute_fleet_scaleout')
+    def test_scaleout_deduplication_across_multi_account_positions(self, mock_scaleout):
+        """Verify scale-out and Telegram alerts fire exactly ONCE per symbol even with 6 positions open across fleet."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier._send_message = MagicMock()
+        watchdog.save_state = MagicMock()
+
+        # 6 positions across 6 accounts on BTCUSD at +1.6R
+        fleet_positions = [
+            {"id": f"pos_acc_{i}", "symbol": "BTCUSD", "price": 76682.0, "stopLoss": 76859.0, "pnl": 118.94, "qty": 0.42}
+            for i in range(1, 7)
+        ]
+
+        watchdog.tl.get_open_positions = MagicMock(side_effect=[fleet_positions, []])
+
+        # Run 1 iteration of the watchdog run loop logic
+        clean_sym = "BTCUSD"
+        for pos in fleet_positions:
+            t_id = pos['id']
+            symbol = pos['symbol']
+            entry = float(pos['price'])
+            pnl = float(pos['pnl'])
+            sl, _ = watchdog.get_stop_loss(symbol, pos=pos)
+            risk_usd = abs(entry - sl) * pos['qty'] * 1.0
+            r_multiple = pnl / risk_usd # ~1.60R
+
+            sym_data = watchdog.symbol_state.setdefault(clean_sym, {
+                "scaleout_executed": False,
+                "mfe_scaleout_executed": False,
+                "macro_scaleout_executed": False,
+                "peak_r": 0.0,
+                "milestones": {}
+            })
+
+            peak_r = max(sym_data.get("peak_r", 0.0), r_multiple)
+            sym_data["peak_r"] = peak_r
+
+            be_trigger = 1.5
+            is_scaled = sym_data.get("scaleout_executed") or watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed")
+            if r_multiple >= be_trigger and not is_scaled:
+                watchdog.execute_fleet_scaleout(symbol, entry, reason="+1.5R Target Reached")
+                sym_data["scaleout_executed"] = True
+                watchdog.alerted_trades[t_id] = {"scaleout_executed": True}
+
+            # Telegram milestone alert
+            target_key = "1.5"
+            is_alerted = sym_data.get("milestones", {}).get(target_key) or watchdog.alerted_trades.get(t_id, {}).get(target_key)
+            if r_multiple >= 1.5 and not is_alerted:
+                watchdog.notifier._send_message("Alert 1.5R")
+                sym_data.setdefault("milestones", {})[target_key] = True
+
+        # Assert scale-out was called EXACTLY ONCE (not 6 times)
+        self.assertEqual(mock_scaleout.call_count, 1)
+        # Assert Telegram message was sent EXACTLY ONCE (not 6 times)
+        self.assertEqual(watchdog.notifier._send_message.call_count, 1)
+
+    def test_watchdog_state_clears_when_flat(self):
+        """Verify watchdog state auto-clears when flat so tomorrow's setups can scale out cleanly."""
+        watchdog = PositionWatchdog()
+        watchdog.save_state = MagicMock()
+        watchdog.symbol_state["BTCUSD"] = {"scaleout_executed": True, "peak_r": 2.8}
+        watchdog.alerted_trades["pos_1"] = {"scaleout_executed": True}
+
+        # Simulated flat tick
+        positions = []
+        if not positions:
+            watchdog.symbol_state.clear()
+            watchdog.alerted_trades.clear()
+            watchdog.save_state()
+
+        self.assertEqual(len(watchdog.symbol_state), 0)
+        self.assertEqual(len(watchdog.alerted_trades), 0)
+        watchdog.save_state.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main()

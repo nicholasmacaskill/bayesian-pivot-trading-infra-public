@@ -128,15 +128,29 @@ class UnifiedSovereignSupervisor:
         while self.running:
             try:
                 positions = self.watchdog.tl.get_open_positions()
-                if positions:
+                if not positions:
+                    if getattr(self.watchdog, 'symbol_state', None) or getattr(self.watchdog, 'alerted_trades', None):
+                        self.watchdog.symbol_state.clear()
+                        self.watchdog.alerted_trades.clear()
+                        self.watchdog.save_state()
+                else:
                     for pos in positions:
                         t_id = pos['id']
                         symbol = pos['symbol']
+                        clean_sym = symbol.replace("/", "").replace("_", "").upper()
                         entry = float(pos.get('price') or 0.0)
                         pnl = float(pos.get('pnl') or 0.0)
                         
                         if t_id not in self.watchdog.alerted_trades:
                             self.watchdog.alerted_trades[t_id] = {}
+
+                        sym_data = self.watchdog.symbol_state.setdefault(clean_sym, {
+                            "scaleout_executed": False,
+                            "mfe_scaleout_executed": False,
+                            "macro_scaleout_executed": False,
+                            "peak_r": 0.0,
+                            "milestones": {}
+                        })
 
                         sl, scan = self.watchdog.get_stop_loss(symbol, pos=pos)
                         if not sl or entry <= 0:
@@ -145,63 +159,80 @@ class UnifiedSovereignSupervisor:
                         qty = float(pos.get('qty') or 0.0)
                         contract_size = Config.get_contract_size(symbol)
                         risk_usd = abs(entry - sl) * qty * contract_size
-                        if risk_usd > 0:
-                            r_multiple = pnl / risk_usd
-                            logger.info(f"📊 [OPEN POSITION] {symbol} PnL: ${pnl:.2f} | R: {r_multiple:.2f}R")
+                        if risk_usd <= 0:
+                            continue
 
-                            # 1. Peak R Tracking
-                            peak_r = max(self.watchdog.alerted_trades.get(t_id, {}).get("peak_r", 0.0), r_multiple)
+                        r_multiple = pnl / risk_usd
+                        logger.info(f"📊 [OPEN POSITION] {symbol} PnL: ${pnl:.2f} | R: {r_multiple:.2f}R")
+
+                        # 1. Peak R Tracking & Immediate State Persistence
+                        peak_r = max(
+                            sym_data.get("peak_r", 0.0),
+                            self.watchdog.alerted_trades.get(t_id, {}).get("peak_r", 0.0),
+                            r_multiple
+                        )
+                        if peak_r > sym_data.get("peak_r", 0.0):
+                            sym_data["peak_r"] = peak_r
                             self.watchdog.alerted_trades[t_id]["peak_r"] = peak_r
+                            self.watchdog.save_state()
 
-                            # 2. Autonomous Fleet Scale-Out at BE Trigger (+1.5R)
-                            be_trigger = getattr(Config, 'BE_TRIGGER_R', 1.5)
-                            if r_multiple >= be_trigger and not self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed"):
-                                logger.info(f"💰 [AUTO SCALE-OUT] {symbol} reached {r_multiple:.2f}R! Executing 50% fleet closure & Break-Even trail...")
-                                self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"+{be_trigger:.1f}R Target Reached")
-                                self.watchdog.alerted_trades[t_id]["scaleout_executed"] = True
+                        # 2. Autonomous Fleet Scale-Out at BE Trigger (+1.5R) (Deduplicated per Symbol)
+                        be_trigger = getattr(Config, 'BE_TRIGGER_R', 1.5)
+                        is_scaled_out = sym_data.get("scaleout_executed") or self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed")
+                        if r_multiple >= be_trigger and not is_scaled_out:
+                            logger.info(f"💰 [AUTO SCALE-OUT] {symbol} reached {r_multiple:.2f}R! Executing 50% fleet closure & Break-Even trail...")
+                            self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"+{be_trigger:.1f}R Target Reached")
+                            sym_data["scaleout_executed"] = True
+                            self.watchdog.alerted_trades[t_id]["scaleout_executed"] = True
+                            self.watchdog.save_state()
+
+                        # 3. MFE Peak Retracement Ratchet (Deduplicated per Symbol)
+                        mfe_enabled = getattr(Config, 'MFE_PEAK_RATCHET_ENABLED', True)
+                        mfe_min_peak = getattr(Config, 'MFE_MIN_PEAK_R', 2.0)
+                        mfe_max_retrace = getattr(Config, 'MFE_MAX_RETRACEMENT_R', 0.75)
+                        is_mfe_scaled = sym_data.get("mfe_scaleout_executed") or self.watchdog.alerted_trades.get(t_id, {}).get("mfe_scaleout_executed")
+                        if mfe_enabled and peak_r >= mfe_min_peak:
+                            retrace = peak_r - r_multiple
+                            if retrace >= mfe_max_retrace and not is_mfe_scaled:
+                                logger.warning(f"🛡️ [MFE PEAK RATCHET] {symbol} peaked at +{peak_r:.2f}R, retraced {retrace:.2f}R! Banking profit at market...")
+                                self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"MFE Peak Retracement (+{peak_r:.2f}R -> +{r_multiple:.2f}R)")
+                                sym_data["mfe_scaleout_executed"] = True
+                                self.watchdog.alerted_trades[t_id]["mfe_scaleout_executed"] = True
                                 self.watchdog.save_state()
 
-                            # 3. MFE Peak Retracement Ratchet (Never surrender +2.0R gain)
-                            mfe_enabled = getattr(Config, 'MFE_PEAK_RATCHET_ENABLED', True)
-                            mfe_min_peak = getattr(Config, 'MFE_MIN_PEAK_R', 2.0)
-                            mfe_max_retrace = getattr(Config, 'MFE_MAX_RETRACEMENT_R', 0.75)
-                            if mfe_enabled and peak_r >= mfe_min_peak:
-                                retrace = peak_r - r_multiple
-                                if retrace >= mfe_max_retrace and not self.watchdog.alerted_trades.get(t_id, {}).get("mfe_scaleout_executed"):
-                                    logger.warning(f"🛡️ [MFE PEAK RATCHET] {symbol} peaked at +{peak_r:.2f}R, retraced {retrace:.2f}R! Banking profit at market...")
-                                    self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"MFE Peak Retracement (+{peak_r:.2f}R -> +{r_multiple:.2f}R)")
-                                    self.watchdog.alerted_trades[t_id]["mfe_scaleout_executed"] = True
+                        # 4. Pre-Macro Event Defense (Deduplicated per Symbol)
+                        macro_enabled = getattr(Config, 'MACRO_DEFENSE_ENABLED', True)
+                        macro_min_r = getattr(Config, 'MACRO_DEFENSE_MIN_R', 1.0)
+                        is_macro_scaled = sym_data.get("macro_scaleout_executed") or self.watchdog.alerted_trades.get(t_id, {}).get("macro_scaleout_executed")
+                        if macro_enabled and r_multiple >= macro_min_r and not is_macro_scaled:
+                            try:
+                                from src.engines.calendar_filter import CalendarFilter
+                                is_safe, cal_reason = CalendarFilter().is_safe_to_trade(symbol)
+                                if not is_safe and "⛔ MACRO BLACKOUT" in str(cal_reason):
+                                    logger.warning(f"⚡ [PRE-MACRO DEFENSE] {symbol} at +{r_multiple:.2f}R approaching macro event! Banking profit & locking BE...")
+                                    self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"Pre-Macro Defense: {cal_reason}")
+                                    sym_data["macro_scaleout_executed"] = True
+                                    self.watchdog.alerted_trades[t_id]["macro_scaleout_executed"] = True
                                     self.watchdog.save_state()
+                            except Exception as cal_err:
+                                pass
 
-                            # 4. Pre-Macro Event Defense
-                            macro_enabled = getattr(Config, 'MACRO_DEFENSE_ENABLED', True)
-                            macro_min_r = getattr(Config, 'MACRO_DEFENSE_MIN_R', 1.0)
-                            if macro_enabled and r_multiple >= macro_min_r and not self.watchdog.alerted_trades.get(t_id, {}).get("macro_scaleout_executed"):
-                                try:
-                                    from src.engines.calendar_filter import CalendarFilter
-                                    is_safe, cal_reason = CalendarFilter().is_safe_to_trade(symbol)
-                                    if not is_safe and "⛔ MACRO BLACKOUT" in str(cal_reason):
-                                        logger.warning(f"⚡ [PRE-MACRO DEFENSE] {symbol} at +{r_multiple:.2f}R approaching macro event! Banking profit & locking BE...")
-                                        self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"Pre-Macro Defense: {cal_reason}")
-                                        self.watchdog.alerted_trades[t_id]["macro_scaleout_executed"] = True
-                                        self.watchdog.save_state()
-                                except Exception as cal_err:
-                                    pass
-
-                            # Milestone Telegram Alerts
-                            for target in [1.5, 2.0, 2.5]:
-                                target_key = str(target)
-                                if r_multiple >= target and not self.watchdog.alerted_trades.get(t_id, {}).get(target_key):
-                                    msg = (
-                                        f"🚀 <b>BAYESIAN PIVOT TARGET REACHED!</b>\n"
-                                        f"Symbol: <code>{symbol}</code>\n"
-                                        f"Current R: <b>{r_multiple:.2f}R</b>\n\n"
-                                        f"🛡️ <b>DISCIPLINE CHECK:</b> Target {target}R reached.\n"
-                                        "Autonomous fleet scale-out and trailing stop active."
-                                    )
-                                    self.watchdog.notifier._send_message(msg)
-                                    self.watchdog.alerted_trades[t_id][target_key] = True
-                                    self.watchdog.save_state()
+                        # 5. Milestone Telegram Alerts (Deduplicated per Symbol)
+                        for target in [1.5, 2.0, 2.5]:
+                            target_key = str(target)
+                            is_target_alerted = sym_data.get("milestones", {}).get(target_key) or self.watchdog.alerted_trades.get(t_id, {}).get(target_key)
+                            if r_multiple >= target and not is_target_alerted:
+                                msg = (
+                                    f"🚀 <b>BAYESIAN PIVOT TARGET REACHED!</b>\n"
+                                    f"Symbol: <code>{symbol}</code>\n"
+                                    f"Current R: <b>{r_multiple:.2f}R</b>\n\n"
+                                    f"🛡️ <b>DISCIPLINE CHECK:</b> Target {target}R reached.\n"
+                                    "Autonomous fleet scale-out and trailing stop active."
+                                )
+                                self.watchdog.notifier._send_message(msg)
+                                sym_data.setdefault("milestones", {})[target_key] = True
+                                self.watchdog.alerted_trades[t_id][target_key] = True
+                                self.watchdog.save_state()
 
                 # Sleep 60s when positions exist, 120s when flat
                 sleep_time = 60 if positions else 120
