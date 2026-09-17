@@ -298,9 +298,14 @@ class ExecutionFirewall:
             logger.critical(f"🛡️ [FIREWALL BLOCKED] {err}")
             return False, err
 
-        # ── INVARIANT 2: Universal Weekend Execution Quarantine ──
+        # ── INVARIANT 2: Universal Weekend & Friday Pre-Close Quarantine ──
         if weekday in (5, 6):  # Saturday or Sunday
             err = f"FIREWALL REJECTION (Gate 2): Weekend Execution Locked (Weekday={weekday}). Zero live capital risk on weekends."
+            logger.warning(f"🛡️ [FIREWALL BLOCKED] {err}")
+            return False, err
+
+        if weekday == 4 and utc_hour >= 18.0:  # Friday after 18:00 UTC
+            err = f"FIREWALL REJECTION (Gate 2): Friday Pre-Weekend Lockout active ({utc_hour:.2f} UTC >= 18:00). Prohibiting new entries before market close."
             logger.warning(f"🛡️ [FIREWALL BLOCKED] {err}")
             return False, err
 

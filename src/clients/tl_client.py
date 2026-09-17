@@ -736,9 +736,11 @@ class TradeLockerClient:
         return results
 
     def close_all_fleet_positions(self):
-        """Safely closes all open positions across all accounts in the fleet."""
+        """Safely closes all open positions across all accounts in the fleet with adaptive pacing."""
         total_closed = 0
         for i, helper in enumerate(self.helpers):
+            if i > 0:
+                time.sleep(2.0)  # Adaptive 2.0s pacing between accounts per AGENTS.md Rule 5
             positions = helper.get_open_positions()
             for p in positions:
                 pos_id = p.get('id')

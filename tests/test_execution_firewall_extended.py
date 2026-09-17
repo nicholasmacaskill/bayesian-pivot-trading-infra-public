@@ -183,6 +183,27 @@ class TestExecutionFirewallExtended(unittest.TestCase):
         self.assertTrue(eligible_ok)
         self.assertEqual(reason_ok, "ELIGIBLE")
 
+    def test_invariant_2_friday_pre_weekend_entry_lockout(self):
+        """Verify audit_trade_request rejects new entries on Friday after 18:00 UTC."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Friday 18:30 UTC
+        friday_late = datetime(2026, 9, 18, 18, 30, tzinfo=timezone.utc)
+        with patch("src.core.execution_firewall.datetime") as mock_dt:
+            mock_dt.now.return_value = friday_late
+            approved, reason = ExecutionFirewall.audit_trade_request(
+                symbol="BTC/USD",
+                side="buy",
+                stop_loss=60000.0,
+                take_profit=65000.0,
+                ai_score=9.0,
+                bypass_killzone=True,
+                bypass_circuit_breaker=True
+            )
+            self.assertFalse(approved)
+            self.assertIn("Friday Pre-Weekend Lockout active", reason)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -134,6 +134,22 @@ class UnifiedSovereignSupervisor:
                         self.watchdog.alerted_trades.clear()
                         self.watchdog.save_state()
                 else:
+                    # Friday Pre-Weekend Auto-Flatten Gate: Flatten fleet at Friday 20:00 UTC to eliminate weekend gap slippage
+                    now_utc = datetime.now(timezone.utc)
+                    if now_utc.weekday() == 4 and now_utc.hour >= 20:
+                        logger.warning("🛡️ [FRIDAY PRE-WEEKEND AUTO-FLATTEN] Friday 20:00 UTC reached! Flattening all open positions across fleet to prevent weekend gap slippage...")
+                        closed = self.watchdog.tl.close_all_fleet_positions()
+                        self.watchdog.notifier._send_message(
+                            f"🛡️ <b>FRIDAY PRE-WEEKEND AUTO-FLATTEN EXECUTED</b>\n\n"
+                            f"Market close protection active. Flattened {closed} positions across fleet.\n"
+                            f"✅ <b>Invariant:</b> Zero weekend gap exposure."
+                        )
+                        self.watchdog.symbol_state.clear()
+                        self.watchdog.alerted_trades.clear()
+                        self.watchdog.save_state()
+                        time.sleep(30)
+                        continue
+
                     for pos in positions:
                         t_id = pos['id']
                         symbol = pos['symbol']
