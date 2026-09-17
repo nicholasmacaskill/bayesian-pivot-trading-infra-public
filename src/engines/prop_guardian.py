@@ -17,7 +17,7 @@ class PropGuardian:
         # Strict Prop Firm Rules (4% Daily, 5% Max Total Drawdown)
         self.max_daily_drawdown = Config.get('DAILY_DRAWDOWN_LIMIT', 0.04)
         self.max_total_drawdown = Config.get('MAX_DRAWDOWN_LIMIT', 0.05)
-        self.target_rr = Config.get('TARGET_RR', 3.0)
+        self.target_rr = Config.get('TARGET_RR', 2.5)
         
         # Initialize AI Hub for dynamic rule parsing
         self.hub = SovereignAIHub()

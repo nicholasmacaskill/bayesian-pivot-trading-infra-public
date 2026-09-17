@@ -188,7 +188,7 @@ class UnifiedSovereignSupervisor:
                                     pass
 
                             # Milestone Telegram Alerts
-                            for target in [1.5, 2.0, 3.0]:
+                            for target in [1.5, 2.0, 2.5]:
                                 target_key = str(target)
                                 if r_multiple >= target and not self.watchdog.alerted_trades.get(t_id, {}).get(target_key):
                                     msg = (

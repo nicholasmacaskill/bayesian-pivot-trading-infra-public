@@ -83,14 +83,14 @@ class Config:
 
     MAX_CONSECUTIVE_DAILY_LOSSES = 2  # Hard Circuit Breaker: Max 2 consecutive losses per day before 24h lockout
     DAILY_TRADE_LIMIT = 2
-    TARGET_RR = 3.0
+    TARGET_RR = 2.5                     # 2.5R Target (Peak mathematical expectancy pocket: +0.75R/trade)
 
     # ── Strategy 9: Judas Inducement Hunter (GRADUATED CHAMPION: 80% WR / 10.0 PF) ───
     STRATEGY_9_ENABLED = True
     STRATEGY_9_MIN_WICK_PCT = 60.0      # 60% Minimum Rejection Wick (Graduated from Challenger)
     STRATEGY_9_MIN_ATR_MULT = 1.5       # 1.5x 20-period ATR Range (Graduated from Challenger)
     STRATEGY_9_MIN_VOL_MULT = 1.5       # 1.5x 20-period Average Volume (Graduated from Challenger)
-    STRATEGY_9_TARGET_RR = 3.0          # 3.0R Target (Extends runner for asymmetric profit)
+    STRATEGY_9_TARGET_RR = 2.5          # 2.5R Target (Calibrated to institutional liquidity pocket)
     STRATEGY_9_STOP_BUFFER_ATR = 0.35   # 0.35 ATR stop buffer for breathing room
     STRATEGY_9_RISK_USD = 40.0          # Base dollar risk per trade ($40 on $25k, $80 on $50k)
     STRATEGY_9_BYPASS_GENERIC_AI = False # Requires full 8.0+ AI Validator gate

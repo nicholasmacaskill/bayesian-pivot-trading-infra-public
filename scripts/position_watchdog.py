@@ -157,7 +157,7 @@ class PositionWatchdog:
                         except Exception as cal_err:
                             pass
 
-                    for target in [1.5, 2.0, 3.0]:
+                    for target in [1.5, 2.0, 2.5]:
                         target_key = str(target)
                         if r_multiple >= target and not self.alerted_trades.get(t_id, {}).get(target_key):
                             msg = (
@@ -192,7 +192,7 @@ class PositionWatchdog:
             # Scale-out accounts: Account 1 (0), Account 3 (2), Account 9 (8)
             # Runner accounts: Account 2 (1), Account 6 (5), Account 7 (6)
             # Decommissioned accounts: 3, 4, 7 (quarantined, zero risk)
-            scale_out_indices = {0, 2, 8}
+            scale_out_indices = set(getattr(Config, 'SCALE_OUT_ACCOUNT_INDICES', [0, 2, 8]))
 
             for acc_idx, helper in enumerate(self.tl.helpers):
                 if acc_idx > 0:

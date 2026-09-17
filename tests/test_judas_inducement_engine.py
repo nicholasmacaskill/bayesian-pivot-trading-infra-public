@@ -47,10 +47,10 @@ class TestJudasInducementEngine(unittest.TestCase):
         self.assertLess(setup['stop_loss'], 59800.0, "Stop loss should be below the spike low")
         self.assertGreater(setup['take_profit'], setup['entry_price'], "Take profit should be higher for LONG")
         
-        # Verify 3.0R target ratio
+        # Verify 2.5R target ratio
         risk = setup['entry_price'] - setup['stop_loss']
         reward = setup['take_profit'] - setup['entry_price']
-        self.assertAlmostEqual(reward / risk, 3.0, delta=0.05)
+        self.assertAlmostEqual(reward / risk, 2.5, delta=0.05)
 
     def test_bearish_inducement_detection(self):
         """
