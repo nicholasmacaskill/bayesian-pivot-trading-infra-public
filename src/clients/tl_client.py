@@ -1133,8 +1133,16 @@ class TradeLockerClient:
                 exact_lots = target_risk_usd / (stop_dist * contract_size)
                 scaled_lot = round(exact_lots * risk_scale, 2)
                 
-                # Enforce Hard Per-Order Maximum Lot Size Ceiling
-                max_order_lot = getattr(Config, 'MAX_LOT_SIZE_PER_ORDER', {}).get(symbol, 5.0)
+                # Enforce Hard Per-Order Maximum Lot Size Ceiling (Normalized for Slashed & Unslashed Keys)
+                lot_caps = getattr(Config, 'MAX_LOT_SIZE_PER_ORDER', {})
+                clean_sym = symbol.replace("/", "").replace("_", "").upper()
+                max_order_lot = 5.0
+                for cap_sym, cap_val in lot_caps.items():
+                    clean_cap = cap_sym.replace("/", "").replace("_", "").upper()
+                    if clean_sym == clean_cap or clean_sym in clean_cap or clean_cap in clean_sym:
+                        max_order_lot = float(cap_val)
+                        break
+
                 if scaled_lot > max_order_lot:
                     logger.warning(f"⚠️ Clamping order size on {symbol} from {scaled_lot} lots to max safety cap {max_order_lot} lots.")
                     scaled_lot = max_order_lot
