@@ -1111,6 +1111,12 @@ class TradeLockerClient:
                     else:
                         target_risk_usd = getattr(Config, 'TIER_MAX_RISK_50K', 80.0)
                 
+                # Zero-Dollar Risk Sidelining Invariant (Prevents 0.01 lot order leak on $0 risk accounts)
+                if target_risk_usd <= 0.0:
+                    logger.info(f"🛡️ [ZERO RISK SKIP] Account {i+1} ({helper.email}) target risk is $0.00. Skipping order dispatch.")
+                    results.append(False)
+                    continue
+
                 # Calculate exact stop loss distance
                 if stop_loss is not None and entry_price is not None:
                     stop_dist = abs(float(entry_price) - float(stop_loss))
