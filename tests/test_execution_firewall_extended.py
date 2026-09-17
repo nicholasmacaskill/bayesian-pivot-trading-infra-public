@@ -145,6 +145,44 @@ class TestExecutionFirewallExtended(unittest.TestCase):
         self.assertTrue(eligible_ok)
         self.assertEqual(reason_ok, "ELIGIBLE")
 
+    def test_invariant_9_consistency_profit_ceiling(self):
+        """Verify is_account_eligible blocks accounts that reached the 20% consistency daily profit cap."""
+        # Account 1 reached $380 daily cap ($400 is 20% of $2,000 target)
+        eligible_acc1, reason_acc1 = ExecutionFirewall.is_account_eligible(
+            email="s79qv3xetj@upcomers.com",
+            status="ACTIVE",
+            equity=25286.0,
+            hard_floor=25000.0,
+            open_positions_count=0,
+            today_realized_profit=385.0
+        )
+        self.assertFalse(eligible_acc1)
+        self.assertIn("20% Consistency Daily Profit Ceiling", reason_acc1)
+
+        # 50k Account reached $760 daily cap ($800 is 20% of $4,000 target)
+        eligible_50k, reason_50k = ExecutionFirewall.is_account_eligible(
+            email="jfcuue7er3@upcomers.com",
+            status="ACTIVE",
+            equity=50800.0,
+            hard_floor=47500.0,
+            open_positions_count=0,
+            today_realized_profit=770.0
+        )
+        self.assertFalse(eligible_50k)
+        self.assertIn("20% Consistency Daily Profit Ceiling", reason_50k)
+
+        # 50k Account below daily cap ($250 profit) is approved
+        eligible_ok, reason_ok = ExecutionFirewall.is_account_eligible(
+            email="jfcuue7er3@upcomers.com",
+            status="ACTIVE",
+            equity=50250.0,
+            hard_floor=47500.0,
+            open_positions_count=0,
+            today_realized_profit=250.0
+        )
+        self.assertTrue(eligible_ok)
+        self.assertEqual(reason_ok, "ELIGIBLE")
+
 
 if __name__ == "__main__":
     unittest.main()

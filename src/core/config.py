@@ -295,6 +295,8 @@ class Config:
     CONSISTENCY_RULE_PCT = 0.20             # Max 20% of total profit allowed on any single trading day
     ACCOUNT_1_PROFIT_TARGET = 2000.0        # Account 1 Target Net Profit ($27,000 balance on $25k base)
     ACCOUNT_1_DAILY_PROFIT_CAP = 380.0      # Safety cap: Never exceed $380 in a single day (below the $400 20% threshold)
+    TIER_MAX_DAILY_PROFIT_25K = 380.0       # 20% consistency ceiling on $25k tier (Target: $2,000)
+    TIER_MAX_DAILY_PROFIT_50K = 760.0       # 20% consistency ceiling on $50k tier (Target: $4,000)
     ACCOUNT_1_MIN_TRADING_DAYS = 5          # Minimum trading days required for payout eligibility (target 15-25 days)
     # ──────────────────────────────────────────────────────────
     

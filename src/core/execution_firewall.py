@@ -94,7 +94,8 @@ class ExecutionFirewall:
         status: Optional[str],
         equity: float,
         hard_floor: float,
-        open_positions_count: int = 0
+        open_positions_count: int = 0,
+        today_realized_profit: Optional[float] = None
     ) -> Tuple[bool, str]:
         """
         INVARIANT 9: Verifies individual account eligibility:
@@ -102,6 +103,7 @@ class ExecutionFirewall:
         - Rejects accounts on EMERGENCY_LOCKOUT_ACCOUNTS list
         - Rejects accounts where buffer above trailing drawdown floor < MIN_ACCOUNT_BUFFER_USD
         - Rejects accounts that already have >= MAX_POSITIONS_PER_ACCOUNT open positions
+        - Rejects accounts that reached the 20% Consistency Rule Daily Profit Ceiling
         """
         if status and str(status).upper() == "LIQUIDATION_ONLY":
             return False, f"Account {email} status is LIQUIDATION_ONLY"
@@ -118,6 +120,15 @@ class ExecutionFirewall:
         max_acct_pos = getattr(Config, 'MAX_POSITIONS_PER_ACCOUNT', 2)
         if open_positions_count >= max_acct_pos:
             return False, f"Account {email} already has {open_positions_count} open positions (Max allowed: {max_acct_pos})"
+
+        # Upcomers 20% Consistency Rule Daily Profit Ceiling Guard
+        if today_realized_profit is not None:
+            is_acc_1 = (email == getattr(Config, 'FUNDED_ACCOUNT_1_EMAIL', 's79qv3xetj@upcomers.com'))
+            daily_cap = getattr(Config, 'ACCOUNT_1_DAILY_PROFIT_CAP', 380.0) if is_acc_1 else (
+                getattr(Config, 'TIER_MAX_DAILY_PROFIT_50K', 760.0) if equity > 35000.0 else getattr(Config, 'TIER_MAX_DAILY_PROFIT_25K', 380.0)
+            )
+            if today_realized_profit >= daily_cap:
+                return False, f"Account {email} reached 20% Consistency Daily Profit Ceiling (${today_realized_profit:,.2f} >= ${daily_cap:,.2f}). Trading locked to preserve payout compliance."
 
         return True, "ELIGIBLE"
 

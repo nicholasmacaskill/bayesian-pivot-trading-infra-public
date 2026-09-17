@@ -412,6 +412,20 @@ class TradeLockerHelper:
             logger.error(f"History Fetch Error: {e}")
             return []
 
+    def get_today_realized_profit(self):
+        """Calculates today's cumulative realized net profit from ordersHistory."""
+        try:
+            trades = self.get_recent_history(hours=24)
+            if not trades:
+                return 0.0
+            from datetime import datetime, timezone
+            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            today_trades = [t for t in trades if str(t.get('close_time', '')).startswith(today_str)]
+            return sum(float(t.get('pnl', 0.0)) for t in today_trades)
+        except Exception as e:
+            logger.debug(f"Error calculating today realized profit for {self.email}: {e}")
+            return 0.0
+
     def place_order(self, instrument_id, side, qty, stop_loss=None, take_profit=None, order_type="market", price=0.0, symbol_hint=None):
         """Stealth & Idempotent Order Execution Module with Pre-Flight Broker Invariant Verification."""
         import time
@@ -1043,17 +1057,19 @@ class TradeLockerClient:
                     hard_floor = 25000.0
                 remaining_buffer = max(0.0, equity - hard_floor)
                 
-                # Check Account Status, Open Position Count & Drawdown Quarantine Gate (Invariant 9)
+                # Check Account Status, Open Position Count & Drawdown Quarantine Gate (Invariant 9 & Consistency Ceiling)
                 acct_status = getattr(helper, 'status', 'ACTIVE')
                 acct_open_pos = helper.get_open_positions()
                 acct_pos_count = len(acct_open_pos) if acct_open_pos else 0
+                acct_today_profit = helper.get_today_realized_profit()
 
                 is_eligible, ineligibility_reason = ExecutionFirewall.is_account_eligible(
                     email=helper.email,
                     status=acct_status,
                     equity=equity,
                     hard_floor=hard_floor,
-                    open_positions_count=acct_pos_count
+                    open_positions_count=acct_pos_count,
+                    today_realized_profit=acct_today_profit
                 )
                 if not is_eligible:
                     logger.critical(f"🛡️ [ACCOUNT EXCLUDED] Account {i+1} ({helper.email}): {ineligibility_reason}. Zero risk permitted.")
