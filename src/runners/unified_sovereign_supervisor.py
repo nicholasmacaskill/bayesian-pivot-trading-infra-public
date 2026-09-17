@@ -153,10 +153,11 @@ class UnifiedSovereignSupervisor:
                             peak_r = max(self.watchdog.alerted_trades.get(t_id, {}).get("peak_r", 0.0), r_multiple)
                             self.watchdog.alerted_trades[t_id]["peak_r"] = peak_r
 
-                            # 2. Autonomous Fleet Scale-Out at +1.5R
-                            if r_multiple >= 1.5 and not self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed"):
+                            # 2. Autonomous Fleet Scale-Out at BE Trigger (+1.5R)
+                            be_trigger = getattr(Config, 'BE_TRIGGER_R', 1.5)
+                            if r_multiple >= be_trigger and not self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed"):
                                 logger.info(f"💰 [AUTO SCALE-OUT] {symbol} reached {r_multiple:.2f}R! Executing 50% fleet closure & Break-Even trail...")
-                                self.watchdog.execute_fleet_scaleout(symbol, entry, reason="+1.5R Target Reached")
+                                self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"+{be_trigger:.1f}R Target Reached")
                                 self.watchdog.alerted_trades[t_id]["scaleout_executed"] = True
                                 self.watchdog.save_state()
 

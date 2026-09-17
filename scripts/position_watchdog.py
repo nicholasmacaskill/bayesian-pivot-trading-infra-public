@@ -123,10 +123,11 @@ class PositionWatchdog:
                     peak_r = max(self.alerted_trades.get(t_id, {}).get("peak_r", 0.0), r_multiple)
                     self.alerted_trades[t_id]["peak_r"] = peak_r
 
-                    # 4. Standard Automated Fleet Scale-Out at +1.5R
-                    if r_multiple >= 1.5 and not self.alerted_trades.get(t_id, {}).get("scaleout_executed"):
+                    # 4. Standard Automated Fleet Scale-Out at BE Trigger (+1.5R)
+                    be_trigger = getattr(Config, 'BE_TRIGGER_R', 1.5)
+                    if r_multiple >= be_trigger and not self.alerted_trades.get(t_id, {}).get("scaleout_executed"):
                         print(f"💰 [AUTO SCALE-OUT] {symbol} hit {r_multiple:.2f}R! Executing Fleet Break-Even & Scale-Out...")
-                        self.execute_fleet_scaleout(symbol, entry, reason="+1.5R Target Reached")
+                        self.execute_fleet_scaleout(symbol, entry, reason=f"+{be_trigger:.1f}R Target Reached")
                         self.alerted_trades[t_id]["scaleout_executed"] = True
                         self.save_state()
 
