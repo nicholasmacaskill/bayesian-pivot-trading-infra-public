@@ -119,12 +119,43 @@ class PositionWatchdog:
                     r_multiple = pnl / risk_usd
                     print(f"[{symbol}] PnL: ${pnl:.2f} | Risk: ${risk_usd:.2f} | R: {r_multiple:.2f}")
 
-                    # 3. Alert & Automated Fleet Scale-Out Logic
+                    # 3. Peak R-Multiple Tracking
+                    peak_r = max(self.alerted_trades.get(t_id, {}).get("peak_r", 0.0), r_multiple)
+                    self.alerted_trades[t_id]["peak_r"] = peak_r
+
+                    # 4. Standard Automated Fleet Scale-Out at +1.5R
                     if r_multiple >= 1.5 and not self.alerted_trades.get(t_id, {}).get("scaleout_executed"):
                         print(f"💰 [AUTO SCALE-OUT] {symbol} hit {r_multiple:.2f}R! Executing Fleet Break-Even & Scale-Out...")
-                        self.execute_fleet_scaleout(symbol, entry)
+                        self.execute_fleet_scaleout(symbol, entry, reason="+1.5R Target Reached")
                         self.alerted_trades[t_id]["scaleout_executed"] = True
                         self.save_state()
+
+                    # 5. MFE Peak Retracement Ratchet (Never allow a +2.0R trade to round-trip)
+                    mfe_enabled = getattr(Config, 'MFE_PEAK_RATCHET_ENABLED', True)
+                    mfe_min_peak = getattr(Config, 'MFE_MIN_PEAK_R', 2.0)
+                    mfe_max_retrace = getattr(Config, 'MFE_MAX_RETRACEMENT_R', 0.75)
+                    if mfe_enabled and peak_r >= mfe_min_peak:
+                        retrace = peak_r - r_multiple
+                        if retrace >= mfe_max_retrace and not self.alerted_trades.get(t_id, {}).get("mfe_scaleout_executed"):
+                            print(f"🛡️ [MFE PEAK RATCHET] {symbol} peaked at +{peak_r:.2f}R, retraced {retrace:.2f}R (now {r_multiple:.2f}R)! Executing defensive scale-out...")
+                            self.execute_fleet_scaleout(symbol, entry, reason=f"MFE Peak Retracement (+{peak_r:.2f}R -> +{r_multiple:.2f}R)")
+                            self.alerted_trades[t_id]["mfe_scaleout_executed"] = True
+                            self.save_state()
+
+                    # 6. Pre-Macro Event Defense (Bank profit before Tier-1 releases)
+                    macro_enabled = getattr(Config, 'MACRO_DEFENSE_ENABLED', True)
+                    macro_min_r = getattr(Config, 'MACRO_DEFENSE_MIN_R', 1.0)
+                    if macro_enabled and r_multiple >= macro_min_r and not self.alerted_trades.get(t_id, {}).get("macro_scaleout_executed"):
+                        try:
+                            from src.engines.calendar_filter import CalendarFilter
+                            is_safe, cal_reason = CalendarFilter().is_safe_to_trade(symbol)
+                            if not is_safe and "⛔ MACRO BLACKOUT" in str(cal_reason):
+                                print(f"⚡ [PRE-MACRO DEFENSE] {symbol} at +{r_multiple:.2f}R approaching macro event! Banking profit & locking BE...")
+                                self.execute_fleet_scaleout(symbol, entry, reason=f"Pre-Macro Defense: {cal_reason}")
+                                self.alerted_trades[t_id]["macro_scaleout_executed"] = True
+                                self.save_state()
+                        except Exception as cal_err:
+                            pass
 
                     for target in [1.5, 2.0, 3.0]:
                         target_key = str(target)
@@ -145,7 +176,7 @@ class PositionWatchdog:
             
             time.sleep(60) # Poll every 60s
 
-    def execute_fleet_scaleout(self, symbol: str, entry_price: float):
+    def execute_fleet_scaleout(self, symbol: str, entry_price: float, reason: str = "+1.5R Floating Gain Reached"):
         """
         Automated Fleet Scale-Out & Universal Break-Even Protection:
         - Trailing Stop Loss to Break-Even (entry price) across 100% of open positions on ALL active accounts.
@@ -207,9 +238,9 @@ class PositionWatchdog:
                     print(f"Error scaling out account {acc_idx+1}: {acc_err}")
 
             scaleout_msg = (
-                f"🛡️ <b>AUTONOMOUS FLEET PROFIT PROTECTION (+1.5R)</b>\n\n"
+                f"🛡️ <b>AUTONOMOUS FLEET PROFIT PROTECTION</b>\n\n"
                 f"Symbol: <code>{symbol}</code>\n"
-                f"Trigger: <b>+1.5R Floating Gain Reached</b>\n\n"
+                f"Trigger: <b>{reason}</b>\n\n"
                 f"🔒 <b>Risk-Free Trailing:</b> Trailed Stop Loss to Entry (${entry_price:,.2f}) on {trailed_count} positions\n"
                 f"🏦 <b>Realized Cash Profit:</b> Closed {closed_count} tranches on scale-out accounts\n\n"
                 f"✅ <b>Invariant:</b> Zero risk remaining. Runners riding to full Target."

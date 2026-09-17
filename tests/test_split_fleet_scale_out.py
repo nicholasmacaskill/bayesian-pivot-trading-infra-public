@@ -67,8 +67,9 @@ class TestSplitFleetScaleOut(unittest.TestCase):
         call2 = helper0.place_order.call_args_list[1][1]
         
         # Sizing on 25k @ 0.5% ($125 risk) / 200 pts = 0.62 lots
-        # Tranche 1: 0.31 lots, TP1 = 77800 - (2.0 * 200) = 77400.0
-        self.assertEqual(call1["take_profit"], 77400.0)
+        # Tranche 1: 0.31 lots, TP1 = 77800 - (2.0 * 200) = 77400.0 (+15.0 cushion = 77415.0)
+        cushion = getattr(Config, 'TP_FRONT_RUN_CUSHION_USD', {}).get('BTC', 0.0) if getattr(Config, 'TP_FRONT_RUN_CUSHION_ENABLED', False) else 0.0
+        self.assertEqual(call1["take_profit"], 77400.0 + cushion)
         # Tranche 2: 0.31 lots, TP2 = 77200.0 (Full TP)
         self.assertEqual(call2["take_profit"], 77200.0)
 

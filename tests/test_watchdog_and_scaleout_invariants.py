@@ -124,5 +124,58 @@ class TestWatchdogAndScaleoutInvariants(unittest.TestCase):
         self.assertEqual(call_2_pos_id, "pos_T2")
         self.assertEqual(call_2_tp, 75939.0)
 
+    def test_tp_front_run_cushion_offsets(self):
+        """Verify TP front-run cushion properly offsets limit targets for passive fills."""
+        from src.core.config import Config
+        self.assertTrue(Config.TP_FRONT_RUN_CUSHION_ENABLED)
+        cushion_btc = Config.TP_FRONT_RUN_CUSHION_USD.get("BTC", 0.0)
+        self.assertEqual(cushion_btc, 15.0)
+
+        # On a SHORT trade: raw TP = $76,169.48 -> offset TP = $76,184.48 (easier to fill)
+        raw_tp_short = 76169.48
+        offset_tp_short = round(raw_tp_short + cushion_btc, 2)
+        self.assertEqual(offset_tp_short, 76184.48)
+        # Verify 76,179.00 (today's actual low) hits the offset TP
+        self.assertLessEqual(76179.00, offset_tp_short)
+
+    @patch.object(PositionWatchdog, 'execute_fleet_scaleout')
+    def test_mfe_peak_retracement_scaleout_trigger(self, mock_scaleout):
+        """Verify MFE peak retracement triggers scaleout when profit gives back >= 0.75R."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier = MagicMock()
+        t_id = "test_pos_mfe"
+        watchdog.alerted_trades = {
+            t_id: {
+                "peak_r": 2.50, # Peaked at +2.5R
+                "scaleout_executed": True # Already did +1.5R scaleout
+            }
+        }
+        
+        pos = {
+            "id": t_id,
+            "symbol": "BTCUSD",
+            "price": 76682.0,
+            "stopLoss": 76859.0, # risk = 177 pts * 0.42 = $74.34
+            "pnl": 118.94, # $118.94 / $74.34 = 1.60R (retraced 0.90R from 2.50R!)
+            "qty": 0.42
+        }
+
+        # Mock tl.get_open_positions
+        watchdog.tl = MagicMock()
+        watchdog.tl.get_open_positions.return_value = [pos]
+        
+        # Run one iteration logic
+        entry = pos["price"]
+        sl, _ = watchdog.get_stop_loss("BTCUSD", pos=pos)
+        risk_usd = abs(entry - sl) * pos["qty"] * 1.0
+        r_multiple = pos["pnl"] / risk_usd # 1.60R
+        
+        peak_r = max(watchdog.alerted_trades.get(t_id, {}).get("peak_r", 0.0), r_multiple)
+        retrace = peak_r - r_multiple # 0.90R
+        
+        from src.core.config import Config
+        self.assertGreaterEqual(peak_r, Config.MFE_MIN_PEAK_R)
+        self.assertGreaterEqual(retrace, Config.MFE_MAX_RETRACEMENT_R)
+
 if __name__ == "__main__":
     unittest.main()

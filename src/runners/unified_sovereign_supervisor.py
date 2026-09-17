@@ -149,12 +149,43 @@ class UnifiedSovereignSupervisor:
                             r_multiple = pnl / risk_usd
                             logger.info(f"📊 [OPEN POSITION] {symbol} PnL: ${pnl:.2f} | R: {r_multiple:.2f}R")
 
-                            # Autonomous Fleet Scale-Out at +1.5R
+                            # 1. Peak R Tracking
+                            peak_r = max(self.watchdog.alerted_trades.get(t_id, {}).get("peak_r", 0.0), r_multiple)
+                            self.watchdog.alerted_trades[t_id]["peak_r"] = peak_r
+
+                            # 2. Autonomous Fleet Scale-Out at +1.5R
                             if r_multiple >= 1.5 and not self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed"):
-                                logger.info(f"💰 [AUTO SCALE-OUT] {symbol} reached {r_multiple:.2f}R! Executing 50% fleet closure...")
-                                self.watchdog.execute_fleet_scaleout(symbol, entry)
+                                logger.info(f"💰 [AUTO SCALE-OUT] {symbol} reached {r_multiple:.2f}R! Executing 50% fleet closure & Break-Even trail...")
+                                self.watchdog.execute_fleet_scaleout(symbol, entry, reason="+1.5R Target Reached")
                                 self.watchdog.alerted_trades[t_id]["scaleout_executed"] = True
                                 self.watchdog.save_state()
+
+                            # 3. MFE Peak Retracement Ratchet (Never surrender +2.0R gain)
+                            mfe_enabled = getattr(Config, 'MFE_PEAK_RATCHET_ENABLED', True)
+                            mfe_min_peak = getattr(Config, 'MFE_MIN_PEAK_R', 2.0)
+                            mfe_max_retrace = getattr(Config, 'MFE_MAX_RETRACEMENT_R', 0.75)
+                            if mfe_enabled and peak_r >= mfe_min_peak:
+                                retrace = peak_r - r_multiple
+                                if retrace >= mfe_max_retrace and not self.watchdog.alerted_trades.get(t_id, {}).get("mfe_scaleout_executed"):
+                                    logger.warning(f"🛡️ [MFE PEAK RATCHET] {symbol} peaked at +{peak_r:.2f}R, retraced {retrace:.2f}R! Banking profit at market...")
+                                    self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"MFE Peak Retracement (+{peak_r:.2f}R -> +{r_multiple:.2f}R)")
+                                    self.watchdog.alerted_trades[t_id]["mfe_scaleout_executed"] = True
+                                    self.watchdog.save_state()
+
+                            # 4. Pre-Macro Event Defense
+                            macro_enabled = getattr(Config, 'MACRO_DEFENSE_ENABLED', True)
+                            macro_min_r = getattr(Config, 'MACRO_DEFENSE_MIN_R', 1.0)
+                            if macro_enabled and r_multiple >= macro_min_r and not self.watchdog.alerted_trades.get(t_id, {}).get("macro_scaleout_executed"):
+                                try:
+                                    from src.engines.calendar_filter import CalendarFilter
+                                    is_safe, cal_reason = CalendarFilter().is_safe_to_trade(symbol)
+                                    if not is_safe and "⛔ MACRO BLACKOUT" in str(cal_reason):
+                                        logger.warning(f"⚡ [PRE-MACRO DEFENSE] {symbol} at +{r_multiple:.2f}R approaching macro event! Banking profit & locking BE...")
+                                        self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"Pre-Macro Defense: {cal_reason}")
+                                        self.watchdog.alerted_trades[t_id]["macro_scaleout_executed"] = True
+                                        self.watchdog.save_state()
+                                except Exception as cal_err:
+                                    pass
 
                             # Milestone Telegram Alerts
                             for target in [1.5, 2.0, 3.0]:

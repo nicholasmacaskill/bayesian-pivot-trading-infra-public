@@ -245,8 +245,18 @@ class Config:
     
     SCALE_OUT_TP1_R = 2.0           # Take Profit 1 level = +2.0R (Expands Realized R:R)
     SCALE_OUT_TP1_PCT = 0.50        # 50% size closed at TP1
-    TP_FRONT_RUN_CUSHION_ENABLED = False # Micro-buffer on limit TPs to front-run stop clusters
+    TP_FRONT_RUN_CUSHION_ENABLED = True # Micro-buffer on limit TPs to front-run stop clusters
     TP_FRONT_RUN_CUSHION_USD = {"BTC": 15.0, "ETH": 1.0, "SOL": 0.10, "XAU": 0.50}
+    
+    # ── Max Favorable Excursion (MFE) Peak Retracement Ratchet ──
+    MFE_PEAK_RATCHET_ENABLED = True
+    MFE_MIN_PEAK_R = 2.0            # Minimum peak R required to arm the ratchet
+    MFE_MAX_RETRACEMENT_R = 0.75    # Giving back 0.75R from peak triggers defensive scale-out
+    
+    # ── Pre-Macro Event Defense ──
+    MACRO_DEFENSE_ENABLED = True    # Front-run high-impact macro data if in profit
+    MACRO_DEFENSE_MIN_R = 1.0       # Minimum floating R to bank before macro event
+    MACRO_DEFENSE_WINDOW_MINS = 15  # Pre-event protection window (minutes)
     
     # ── Tiered Risk Scaling (Dynamic Fractional Kelly Sizing) ──
     DYNAMIC_RISK_SCALING_ENABLED = False
