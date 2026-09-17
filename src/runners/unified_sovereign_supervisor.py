@@ -366,6 +366,20 @@ class UnifiedSovereignSupervisor:
         except Exception as pf_err:
             logger.error(f"Pre-flight audit execution error: {pf_err}")
 
+        # Spawn macOS sleep prevention assertion (caffeinate) to protect runtime watchdogs
+        self.caffeinate_proc = None
+        if sys.platform == "darwin":
+            try:
+                import subprocess
+                self.caffeinate_proc = subprocess.Popen(
+                    ["caffeinate", "-i", "-s", "-m", "-w", str(os.getpid())],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                logger.info(f"☕ [Host Power Sentry] macOS caffeinate assertion active (PID: {self.caffeinate_proc.pid}) — sleep disabled.")
+            except Exception as caf_err:
+                logger.debug(f"macOS caffeinate notice: {caf_err}")
+
         t_scanner = threading.Thread(target=self.run_scanner_worker, name="ScannerThread", daemon=True)
         t_watchdog = threading.Thread(target=self.run_watchdog_worker, name="WatchdogThread", daemon=True)
         t_maint = threading.Thread(target=self.run_maintenance_worker, name="MaintThread", daemon=True)
@@ -379,6 +393,12 @@ class UnifiedSovereignSupervisor:
         # Keep main thread alive
         while self.running:
             time.sleep(1)
+
+        if self.caffeinate_proc:
+            try:
+                self.caffeinate_proc.terminate()
+            except Exception:
+                pass
 
         logger.info("Unified Supervisor shutdown complete.")
 
