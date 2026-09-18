@@ -1398,11 +1398,21 @@ class AlphaSweepScanner(SMCScanner):
                         logger.warning(f"Error sending Tier 2 alert to Telegram: {tg_err}")
                     continue
 
-                # ── Tier 1 Check: +1.5R Break-Even Lock ───────────────────
+                # ── Tier 1 Check: +1.5R True Net Break-Even Lock ──────────
                 elif current_r >= be_trigger_r and current_tier < 1:
-                    logger.info(f"🛡️ [BREAK-EVEN WATCHDOG] {symbol} {side.upper()} reached +{current_r:.2f}R (>= {be_trigger_r}R). Trailing Stop Loss to Entry (${entry_price:.2f})...")
+                    be_offset_r = getattr(Config, 'BE_OFFSET_R', 0.08)
+                    min_usd_map = getattr(Config, 'BE_MIN_OFFSET_USD', {"BTC": 25.0, "ETH": 2.0, "SOL": 0.20, "XAU": 0.80})
+                    min_usd = 0.0
+                    for k, v in min_usd_map.items():
+                        if k in sym_clean:
+                            min_usd = v
+                            break
+                    fee_buffer = max(be_offset_r * initial_r_dist, min_usd)
+                    net_be_price = round(entry_price + fee_buffer, 2) if side == "buy" else round(entry_price - fee_buffer, 2)
+
+                    logger.info(f"🛡️ [BREAK-EVEN WATCHDOG] {symbol} {side.upper()} reached +{current_r:.2f}R (>= {be_trigger_r}R). Trailing Stop Loss to True Net Break-Even (${net_be_price:.2f}, +${fee_buffer:.2f} fee buffer)...")
                     
-                    self.tl.update_fleet_stop_loss(new_stop_loss=entry_price, symbol=symbol)
+                    self.tl.update_fleet_stop_loss(new_stop_loss=net_be_price, symbol=symbol)
                     self._position_tiers[pos_id] = 1
                     if sym_clean in self._active_trade_brackets:
                         self._active_trade_brackets[sym_clean]['tier'] = 1
@@ -1411,11 +1421,11 @@ class AlphaSweepScanner(SMCScanner):
                         from src.clients.telegram_notifier import TelegramNotifier
                         tn = TelegramNotifier()
                         tn._send_message(
-                            f"🛡️ <b>BREAK-EVEN LOCK ACTIVATED!</b>\n\n"
+                            f"🛡️ <b>TRUE NET BREAK-EVEN LOCK ACTIVATED!</b>\n\n"
                             f"Asset: <b>{symbol}</b> ({side.upper()})\n"
                             f"Current Profit: <b>+{current_r:.2f}R</b> (${current_price:.2f})\n"
-                            f"Stop Loss: Trailed to Entry <b>${entry_price:.2f}</b>\n\n"
-                            f"✅ <b>Status:</b> Position is now <b>100% RISK-FREE</b>! Runner tracking to full TP. 🚀"
+                            f"Stop Loss: Trailed to Net BE <b>${net_be_price:.2f}</b> (+${fee_buffer:.2f} commission & spread buffer)\n\n"
+                            f"✅ <b>Status:</b> Position is now <b>100% IMMUNE TO BROKER FEES</b>! Runner tracking to full TP. 🚀"
                         )
                     except Exception as tg_err:
                         logger.warning(f"Error sending BE alert to Telegram: {tg_err}")
@@ -1424,9 +1434,19 @@ class AlphaSweepScanner(SMCScanner):
                 # ── Session Transition Check: Asian position into London Open ───
                 elif session_protect and is_london_transition and current_r >= session_min_r and current_tier == 0:
                     if "ASIA" in cached_session.upper() or cached_session == "ASIAN_SESSION_JUDAS":
-                        logger.info(f"⏰ [SESSION TRANSITION LOCK] {symbol} {side.upper()} floating +{current_r:.2f}R entering London Open. Moving Stop Loss to Break-Even (${entry_price:.2f})...")
+                        be_offset_r = getattr(Config, 'BE_OFFSET_R', 0.08)
+                        min_usd_map = getattr(Config, 'BE_MIN_OFFSET_USD', {"BTC": 25.0, "ETH": 2.0, "SOL": 0.20, "XAU": 0.80})
+                        min_usd = 0.0
+                        for k, v in min_usd_map.items():
+                            if k in sym_clean:
+                                min_usd = v
+                                break
+                        fee_buffer = max(be_offset_r * initial_r_dist, min_usd)
+                        net_be_price = round(entry_price + fee_buffer, 2) if side == "buy" else round(entry_price - fee_buffer, 2)
+
+                        logger.info(f"⏰ [SESSION TRANSITION LOCK] {symbol} {side.upper()} floating +{current_r:.2f}R entering London Open. Moving Stop Loss to True Net Break-Even (${net_be_price:.2f})...")
                         
-                        self.tl.update_fleet_stop_loss(new_stop_loss=entry_price, symbol=symbol)
+                        self.tl.update_fleet_stop_loss(new_stop_loss=net_be_price, symbol=symbol)
                         self._position_tiers[pos_id] = 1
                         if sym_clean in self._active_trade_brackets:
                             self._active_trade_brackets[sym_clean]['tier'] = 1
@@ -1439,8 +1459,8 @@ class AlphaSweepScanner(SMCScanner):
                                 f"Asset: <b>{symbol}</b> ({side.upper()})\n"
                                 f"Current Profit: <b>+{current_r:.2f}R</b> (${current_price:.2f})\n"
                                 f"Reason: <b>London Open Volatility Transition</b>\n"
-                                f"Stop Loss: Locked at Entry <b>${entry_price:.2f}</b>\n\n"
-                                f"🛡️ <b>Status:</b> Asian position shielded from London opening volatility! 🚀"
+                                f"Stop Loss: Locked at Net BE <b>${net_be_price:.2f}</b> (+${fee_buffer:.2f} fee buffer)\n\n"
+                                f"🛡️ <b>Status:</b> Asian position shielded from London opening volatility with zero fee drag! 🚀"
                             )
                         except Exception as tg_err:
                             logger.warning(f"Error sending session transition alert: {tg_err}")

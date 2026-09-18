@@ -219,7 +219,7 @@ class UnifiedSovereignSupervisor:
                         is_scaled_out = sym_data.get("scaleout_executed") or self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed")
                         if r_multiple >= be_trigger and not is_scaled_out:
                             logger.info(f"💰 [AUTO SCALE-OUT] {symbol} reached {r_multiple:.2f}R! Executing 50% fleet closure & Break-Even trail...")
-                            self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"+{be_trigger:.1f}R Target Reached")
+                            self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"+{be_trigger:.1f}R Target Reached", side=side, initial_sl=sl)
                             sym_data["scaleout_executed"] = True
                             self.watchdog.alerted_trades[t_id]["scaleout_executed"] = True
                             self.watchdog.save_state()
@@ -233,7 +233,7 @@ class UnifiedSovereignSupervisor:
                             retrace = peak_r - r_multiple
                             if retrace >= mfe_max_retrace and not is_mfe_scaled:
                                 logger.warning(f"🛡️ [MFE PEAK RATCHET] {symbol} peaked at +{peak_r:.2f}R, retraced {retrace:.2f}R! Banking profit at market...")
-                                self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"MFE Peak Retracement (+{peak_r:.2f}R -> +{r_multiple:.2f}R)")
+                                self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"MFE Peak Retracement (+{peak_r:.2f}R -> +{r_multiple:.2f}R)", side=side, initial_sl=sl)
                                 sym_data["mfe_scaleout_executed"] = True
                                 self.watchdog.alerted_trades[t_id]["mfe_scaleout_executed"] = True
                                 self.watchdog.save_state()
@@ -248,7 +248,7 @@ class UnifiedSovereignSupervisor:
                                 is_safe, cal_reason = CalendarFilter().is_safe_to_trade(symbol)
                                 if not is_safe and "⛔ MACRO BLACKOUT" in str(cal_reason):
                                     logger.warning(f"⚡ [PRE-MACRO DEFENSE] {symbol} at +{r_multiple:.2f}R approaching macro event! Banking profit & locking BE...")
-                                    self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"Pre-Macro Defense: {cal_reason}")
+                                    self.watchdog.execute_fleet_scaleout(symbol, entry, reason=f"Pre-Macro Defense: {cal_reason}", side=side, initial_sl=sl)
                                     sym_data["macro_scaleout_executed"] = True
                                     self.watchdog.alerted_trades[t_id]["macro_scaleout_executed"] = True
                                     self.watchdog.save_state()

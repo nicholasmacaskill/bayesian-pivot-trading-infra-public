@@ -393,6 +393,78 @@ class TestWatchdogAndScaleoutInvariants(unittest.TestCase):
             # new_sl would be 97.0, but position is already at 100.0 (BE) -> must NOT overwrite to 97.0!
             watchdog.execute_stepped_defense("BTCUSD", entry_price=100.0, initial_sl=90.0, side="BUY", locked_r=-0.3)
 
+    @patch.object(TradeLockerHelper, 'modify_position_bracket')
+    @patch.object(TradeLockerHelper, 'get_open_positions')
+    def test_execute_fleet_scaleout_net_break_even_buy(self, mock_get_pos, mock_modify):
+        """Verify BUY trade trails SL to True Net Break-Even (entry + fee buffer) to cover commission."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier = MagicMock()
+        mock_modify.return_value = True
+
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "token"
+        helper.account_id = "acc_1"
+        # Entry 80000, initial SL 79600 (risk = 400). 0.08R = 32.0 pts offset (> 25.0 min buffer)
+        mock_get_pos.return_value = [
+            {"id": "pos_buy_be_test", "symbol": "BTCUSD", "side": "BUY", "price": 80000.0, "stopLoss": 79600.0, "qty": 0.10}
+        ]
+        helper.get_open_positions = mock_get_pos
+        helper.modify_position_bracket = mock_modify
+        watchdog.tl.helpers = [helper]
+
+        with patch("time.sleep"):
+            watchdog.execute_fleet_scaleout("BTCUSD", entry_price=80000.0, reason="+1.5R Target Reached", side="BUY", initial_sl=79600.0)
+
+        # Expected net BE: 80000.0 + 32.0 = 80032.0
+        mock_modify.assert_called_once_with("pos_buy_be_test", stop_loss=80032.0)
+
+    @patch.object(TradeLockerHelper, 'modify_position_bracket')
+    @patch.object(TradeLockerHelper, 'get_open_positions')
+    def test_execute_fleet_scaleout_net_break_even_sell(self, mock_get_pos, mock_modify):
+        """Verify SELL trade trails SL to True Net Break-Even (entry - fee buffer) to cover commission."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier = MagicMock()
+        mock_modify.return_value = True
+
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "token"
+        helper.account_id = "acc_1"
+        # Entry 80000, initial SL 80400 (risk = 400). 0.08R = 32.0 pts offset (> 25.0 min buffer)
+        mock_get_pos.return_value = [
+            {"id": "pos_sell_be_test", "symbol": "BTCUSD", "side": "SELL", "price": 80000.0, "stopLoss": 80400.0, "qty": 0.10}
+        ]
+        helper.get_open_positions = mock_get_pos
+        helper.modify_position_bracket = mock_modify
+        watchdog.tl.helpers = [helper]
+
+        with patch("time.sleep"):
+            watchdog.execute_fleet_scaleout("BTCUSD", entry_price=80000.0, reason="+1.5R Target Reached", side="SELL", initial_sl=80400.0)
+
+        # Expected net BE: 80000.0 - 32.0 = 79968.0
+        mock_modify.assert_called_once_with("pos_sell_be_test", stop_loss=79968.0)
+
+    @patch.object(TradeLockerHelper, 'modify_position_bracket')
+    @patch.object(TradeLockerHelper, 'get_open_positions')
+    def test_update_fleet_stop_loss_never_loosens_sl(self, mock_get_pos, mock_modify):
+        """Verify TradeLockerClient.update_fleet_stop_loss never loosens an existing tighter Stop Loss."""
+        from src.clients.tl_client import TradeLockerClient
+        client = TradeLockerClient()
+        mock_modify.return_value = True
+
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "token"
+        helper.account_id = "acc_1"
+        # BUY position already at 80100.0 SL. Requested new SL is 80032.0 (looser) -> must be skipped!
+        mock_get_pos.return_value = [
+            {"id": "pos_tight_buy", "symbol": "BTCUSD", "side": "BUY", "price": 80000.0, "stopLoss": 80100.0, "qty": 0.10}
+        ]
+        helper.get_open_positions = mock_get_pos
+        helper.modify_position_bracket = mock_modify
+        client.helpers = [helper]
+
+        with patch("time.sleep"):
+            client.update_fleet_stop_loss(new_stop_loss=80032.0, symbol="BTCUSD")
+
         mock_modify.assert_not_called()
 
 if __name__ == "__main__":

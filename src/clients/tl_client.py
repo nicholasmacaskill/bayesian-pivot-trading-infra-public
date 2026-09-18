@@ -741,6 +741,19 @@ class TradeLockerClient:
                     if symbol.replace('/', '').upper() in sym.replace('/', '').upper():
                         pos_id = p.get('id')
                         if pos_id:
+                            # Invariant: Never loosen an existing Stop Loss
+                            side = str(p.get('side', '')).upper()
+                            curr_sl = p.get('stopLoss')
+                            if curr_sl is not None:
+                                try:
+                                    curr_sl_val = float(curr_sl)
+                                    if curr_sl_val > 0:
+                                        if side == "BUY" and curr_sl_val >= float(new_stop_loss):
+                                            continue
+                                        elif side != "BUY" and curr_sl_val <= float(new_stop_loss):
+                                            continue
+                                except (ValueError, TypeError):
+                                    pass
                             res = helper.modify_position_bracket(pos_id, stop_loss=new_stop_loss)
                             results.append(res)
             except Exception as e:

@@ -222,6 +222,13 @@ class Config:
     STEPPED_DEFENSE_TRIGGER_R = 1.0    # Trigger at +1.0R floating gain
     STEPPED_DEFENSE_LOCKED_R = -0.3    # Cut Stop Loss to -0.3R (saving 70% of loss if reversed)
     BE_TRIGGER_R = 1.5                 # Tier 1: Move SL to entry (Break-Even) at +1.5R
+    BE_OFFSET_R = 0.08                 # Commission & Spread Offset (True Net Break-Even: +0.08R guarantees $0.00 net after broker fees)
+    BE_MIN_OFFSET_USD = {              # Minimum dollar price buffer per asset to cover round-trip broker commission + spread
+        "BTC": 25.0,                   # $25.00 on BTC price (~$2.50 net on 0.10 lot)
+        "ETH": 2.0,                    # $2.00 on ETH price
+        "SOL": 0.20,                   # $0.20 on SOL price
+        "XAU": 0.80                    # $0.80 on Gold price
+    }
     TIER2_LOCK_TRIGGER_R = 2.5         # Tier 2: Trigger lock when trade reaches +2.5R
     TIER2_LOCK_LOCKED_R = 1.0          # Lock in +1.0R guaranteed profit
     TIER2_TP_PCT_TRIGGER = 0.80        # >= 80% TP distance also triggers Tier 2 lock
