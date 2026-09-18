@@ -1081,6 +1081,51 @@ class AlphaSweepScanner(SMCScanner):
                 log_scan(scan_payload, ai_result)
             except Exception as e:
                 logger.error(f"Error logging scan to DB: {e}")
+
+            # ── Shadow Challenger: Local Bayesian Pivot (Ollama) ─────────────
+            try:
+                from src.engines.local_llm_handler import LocalLLMHandler
+                local_llm = LocalLLMHandler(model="bayesian-pivot")
+                if local_llm.is_available():
+                    local_scoring = local_llm.score_setup(
+                        setup={
+                            "symbol": symbol,
+                            "pattern": pattern_str,
+                            "direction": setup['direction'],
+                            "bias": setup.get('trend', setup.get('direction', 'UNKNOWN')),
+                            "entry": entry_price,
+                            "stop_loss": sl_price,
+                            "atr_percentile": round(setup.get('atr_percentile', 50.0), 1)
+                        },
+                        hurst=float(setup.get('hurst', 0.5)),
+                        session_info={"name": killzone}
+                    )
+                    local_score = float(local_scoring.get("score", 0.0))
+                    local_verdict = str(local_scoring.get("verdict", "UNKNOWN"))
+                    local_reason = str(local_scoring.get("reasoning", ""))
+                    logger.info(f"🦙 [SHADOW CHALLENGER: Local Bayesian Pivot] {symbol} {setup['direction']} -> Score: {local_score:.1f}/10 | Verdict: {local_verdict} | {local_reason}")
+
+                    self.counterfactual_tracker.register_shadow_trade(
+                        setup={
+                            "symbol": symbol,
+                            "direction": setup['direction'],
+                            "pattern": f"[CHALLENGER_LOCAL_OLLAMA] {pattern_str}",
+                            "price": entry_price,
+                            "stop_loss": sl_price,
+                            "take_profit": tp_price,
+                            "regime": setup.get('regime', 'UNKNOWN'),
+                            "hurst": float(setup.get('hurst', 0.5))
+                        },
+                        account_key="CHALLENGER_LOCAL_OLLAMA",
+                        strategy_mode="CHALLENGER_LOCAL_OLLAMA",
+                        rejection_reasons=[
+                            f"LOCAL_OLLAMA_SCORE_{local_score:.1f}",
+                            f"VERDICT_{local_verdict}",
+                            f"CLOUD_SCORE_{shadow_score:.1f}"
+                        ]
+                    )
+            except Exception as local_challenger_err:
+                logger.debug(f"Local LLM Shadow Challenger non-blocking warning: {local_challenger_err}")
                 
             # Register in Counterfactual Database for 30-Day Shadow Lab Analytics
             if is_shadow_strategy:

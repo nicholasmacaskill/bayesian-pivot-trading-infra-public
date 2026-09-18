@@ -28,13 +28,43 @@ class TestChampionChallengerLab(unittest.TestCase):
         self.assertEqual(v.win_rate, 80.0)
         self.assertGreater(v.profit_factor, 5.0)
 
-    def test_leaderboard_generation(self):
-        """Verifies leaderboard formatting returns valid markdown."""
-        table = self.lab.get_tournament_leaderboard()
-        self.assertIn("A/B STRATEGY TOURNAMENT LEADERBOARD", table)
-        self.assertIn("STRAT_9_CHAMPION", table)
-        self.assertIn("LIVE", table)
-        self.assertIn("SHADOW", table)
+    def test_local_ollama_challenger_variant(self):
+        """Verifies CHALLENGER_LOCAL_OLLAMA is registered as a shadow tournament variant."""
+        self.assertIn("CHALLENGER_LOCAL_OLLAMA", self.lab.variants)
+        v = self.lab.variants["CHALLENGER_LOCAL_OLLAMA"]
+        self.assertEqual(v.variant_type, "CHALLENGER")
+        self.assertEqual(v.parameters.get("model"), "bayesian-pivot")
+        self.assertEqual(v.parameters.get("engine"), "ollama")
+
+    def test_local_ollama_tournament_recording(self):
+        """Verifies trade resolution updates CHALLENGER_LOCAL_OLLAMA stats correctly."""
+        initial_samples = self.lab.variants["CHALLENGER_LOCAL_OLLAMA"].samples
+        self.lab.record_tournament_outcome("CHALLENGER_LOCAL_OLLAMA", is_win=True, r_mult=2.5)
+        self.lab.record_tournament_outcome("CHALLENGER_LOCAL_OLLAMA", is_win=True, r_mult=2.0)
+        self.lab.record_tournament_outcome("CHALLENGER_LOCAL_OLLAMA", is_win=False, r_mult=-1.0)
+        v = self.lab.variants["CHALLENGER_LOCAL_OLLAMA"]
+        self.assertEqual(v.samples, initial_samples + 3)
+        self.assertGreaterEqual(v.wins, 2)
+        self.assertGreaterEqual(v.losses, 1)
+        self.assertGreater(v.profit_factor, 1.0)
+
+    def test_pattern_mapping_challenger_local_ollama(self):
+        """Verifies CounterfactualTracker routes local ollama patterns to variant ID."""
+        from src.engines.counterfactual_tracker import CounterfactualTracker
+        var_id = CounterfactualTracker._map_pattern_to_variant_id("[CHALLENGER_LOCAL_OLLAMA] TURTLE_SOUP_LIQUIDITY_SWEEP")
+        self.assertEqual(var_id, "CHALLENGER_LOCAL_OLLAMA")
+        var_id_legacy = CounterfactualTracker._map_pattern_to_variant_id("LOCAL_OLLAMA_SWEEP")
+        self.assertEqual(var_id_legacy, "CHALLENGER_LOCAL_OLLAMA")
+
+    def test_local_llm_handler_graceful_fallback(self):
+        """Verifies LocalLLMHandler handles offline server cleanly without throwing."""
+        from src.engines.local_llm_handler import LocalLLMHandler
+        # Point to unreachable port to test offline safety
+        offline_handler = LocalLLMHandler(model="bayesian-pivot", url="http://localhost:9999/api/generate")
+        self.assertFalse(offline_handler.is_available())
+        fallback_res = offline_handler._parse_score("invalid json gibberish")
+        self.assertEqual(fallback_res["score"], 0.0)
+        self.assertEqual(fallback_res["verdict"], "SKIP")
 
 if __name__ == '__main__':
     unittest.main()

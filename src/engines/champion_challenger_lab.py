@@ -332,6 +332,21 @@ class ChampionChallengerLab:
                     "target_rr": 2.5
                 },
                 created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # ──────────────────────────────────────────────────────────────────
+            # LOCAL OLLAMA CHALLENGER (A/B Test vs. Cloud Validators)
+            # ──────────────────────────────────────────────────────────────────
+            "CHALLENGER_LOCAL_OLLAMA": StrategyVariant(
+                variant_id="CHALLENGER_LOCAL_OLLAMA",
+                strategy_id="LOCAL_LLM_BAYESIAN_PIVOT",
+                variant_type="CHALLENGER",
+                parameters={
+                    "model": "bayesian-pivot",
+                    "engine": "ollama",
+                    "min_score": 7.0,
+                    "target_rr": 2.5
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
             )
         }
 
