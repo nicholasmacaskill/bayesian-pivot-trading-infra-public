@@ -20,8 +20,8 @@ STATE_FILE_PATH = os.path.join(
 )
 
 class PositionWatchdog:
-    def __init__(self):
-        self.tl = TradeLockerClient()
+    def __init__(self, tl_client=None):
+        self.tl = tl_client if tl_client is not None else TradeLockerClient()
         self.sb = SupabaseBridge()
         self.notifier = TelegramNotifier()
         self.alerted_trades = {} # {trade_id: {r_level: bool}}

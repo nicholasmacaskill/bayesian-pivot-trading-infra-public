@@ -14,19 +14,29 @@ logger = logging.getLogger(__name__)
 
 class TradeLockerHelper:
     """Helper to manage a single TradeLocker account session using User-provided logic."""
-    def __init__(self, email, password, server, base_url):
+    _shared_instruments_cache = {}
+    _shared_symbol_cache = {}
+
+    def __init__(self, email, password, server_id="UPCOMS", base_url="https://demo.tradelocker.com"):
         self.email = email
         self.password = password
-        self.server_id = server
-        self.base_url = base_url.rstrip('/')
+        self.server_id = server_id
+        self.base_url = base_url
         self.access_token = None
+        self.refresh_token = None
         self.account_id = None
-        self.acc_num = None # New Field for 'accNum' header
-        self._instruments_cache = {}
-        self._symbol_cache = {}
+        self.acc_num = None
+        self.balance = 0.0
+        self.status = "ACTIVE"
+        self._instruments_cache = dict(TradeLockerHelper._shared_instruments_cache)
+        self._symbol_cache = dict(TradeLockerHelper._shared_symbol_cache)
         
     def sync_instruments(self):
         """Discovers and caches all tradable instruments and routes directly from the broker API."""
+        if TradeLockerHelper._shared_instruments_cache:
+            self._instruments_cache = TradeLockerHelper._shared_instruments_cache
+            self._symbol_cache = TradeLockerHelper._shared_symbol_cache
+            return True
         if not self.access_token:
             return False
         try:
@@ -48,7 +58,9 @@ class TradeLockerHelper:
                         'type': inst.get('type')
                     }
                     self._symbol_cache[tradable_id] = inst.get('name')
-                logger.info(f"✅ Synced {len(self._instruments_cache)} broker instruments for {self.email}")
+                TradeLockerHelper._shared_instruments_cache = self._instruments_cache
+                TradeLockerHelper._shared_symbol_cache = self._symbol_cache
+                logger.info(f"✅ Synced {len(self._instruments_cache)} broker instruments for {self.email} (cached fleet-wide)")
                 return True
         except Exception as e:
             logger.debug(f"Broker instrument sync note: {e}")
@@ -815,11 +827,16 @@ class TradeLockerClient:
         return total_equity
 
     def get_recent_history(self, hours=24):
-        """Aggregates history from all accounts with 2.0s rate-limit pacing."""
+        """Aggregates history from active accounts with 2.0s rate-limit pacing, skipping decommissioned accounts."""
         all_trades = []
+        queried_count = 0
         for i, helper in enumerate(self.helpers):
-            if i > 0:
+            # Skip decommissioned or liquidation-only accounts (Accounts 4, 5, 8)
+            if getattr(helper, 'status', '') == 'LIQUIDATION_ONLY' or i in [3, 4, 7]:
+                continue
+            if queried_count > 0:
                 time.sleep(2.0)
+            queried_count += 1
             try:
                 trades = helper.get_recent_history(hours)
                 all_trades.extend(trades)

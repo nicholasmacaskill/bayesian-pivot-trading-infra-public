@@ -38,7 +38,14 @@ class UnifiedSovereignSupervisor:
         self.running = True
         self.scanner = None
         self.watchdog = None
+        self.tl_client = None
         self._setup_signals()
+
+    def get_tl_client(self):
+        if self.tl_client is None:
+            from src.clients.tl_client import TradeLockerClient
+            self.tl_client = TradeLockerClient()
+        return self.tl_client
 
     def _setup_signals(self):
         signal.signal(signal.SIGINT, self._handle_exit)
@@ -120,7 +127,7 @@ class UnifiedSovereignSupervisor:
         logger.info("🛡️ [Worker: Watchdog] Starting Risk & Fleet Scale-Out watchdog...")
         try:
             from scripts.position_watchdog import PositionWatchdog
-            self.watchdog = PositionWatchdog()
+            self.watchdog = PositionWatchdog(tl_client=self.get_tl_client())
         except Exception as e:
             logger.error(f"Failed to initialize PositionWatchdog: {e}")
             return
@@ -288,8 +295,7 @@ class UnifiedSovereignSupervisor:
                 # 3. Synchronize Broker Positions & Closed History into SQLite journal
                 try:
                     from datetime import datetime, timezone
-                    from src.clients.tl_client import TradeLockerClient
-                    tl_sync = TradeLockerClient()
+                    tl_sync = self.get_tl_client()
                     open_pos = tl_sync.get_open_positions()
                     history = tl_sync.get_recent_history(hours=72)
                     if open_pos or history:
@@ -318,9 +324,9 @@ class UnifiedSovereignSupervisor:
             except Exception as e:
                 logger.debug(f"Maintenance error: {e}")
 
-            # Run broker sync and maintenance every 2 minutes (120s) for real-time circuit breaker tracking
+            # Run broker sync and maintenance every 3 minutes (180s) to maintain healthy API pacing
             slept = 0
-            while slept < 120 and self.running:
+            while slept < 180 and self.running:
                 time.sleep(5)
                 slept += 5
 
@@ -336,7 +342,7 @@ class UnifiedSovereignSupervisor:
 
         while self.running:
             try:
-                report = governor.run_runtime_audit(tl_client=getattr(self.watchdog, 'tl', None))
+                report = governor.run_runtime_audit(tl_client=self.get_tl_client())
                 if report.get("status") == "CRITICAL":
                     logger.critical(f"🚨 [QUALITY GOVERNOR ALARM] {len(report.get('violations', []))} Invariant Violation(s) Detected!")
             except Exception as e:
