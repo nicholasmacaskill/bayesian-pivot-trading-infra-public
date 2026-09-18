@@ -334,7 +334,24 @@ class ChampionChallengerLab:
                 created_at=datetime.now(timezone.utc).isoformat()
             ),
             # ──────────────────────────────────────────────────────────────────
-            # LOCAL OLLAMA CHALLENGER (A/B Test vs. Cloud Validators)
+            # LOCAL MLX-M4 LORA CHALLENGER (A/B Test vs. Cloud Validators)
+            # ──────────────────────────────────────────────────────────────────
+            "CHALLENGER_LOCAL_MLX": StrategyVariant(
+                variant_id="CHALLENGER_LOCAL_MLX",
+                strategy_id="LOCAL_MLX_BAYESIAN_PIVOT_LORA",
+                variant_type="CHALLENGER",
+                parameters={
+                    "model": "Qwen2.5-Coder-1.5B-Instruct-4bit",
+                    "adapter": "adapters/bayesian-pivot-lora",
+                    "engine": "mlx-lm",
+                    "min_score": 7.5,
+                    "target_rr": 2.5,
+                    "live_risk": 0.0
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # ──────────────────────────────────────────────────────────────────
+            # LOCAL OLLAMA CHALLENGER (Fallback A/B Test)
             # ──────────────────────────────────────────────────────────────────
             "CHALLENGER_LOCAL_OLLAMA": StrategyVariant(
                 variant_id="CHALLENGER_LOCAL_OLLAMA",
@@ -344,7 +361,8 @@ class ChampionChallengerLab:
                     "model": "bayesian-pivot",
                     "engine": "ollama",
                     "min_score": 7.0,
-                    "target_rr": 2.5
+                    "target_rr": 2.5,
+                    "live_risk": 0.0
                 },
                 created_at=datetime.now(timezone.utc).isoformat()
             )

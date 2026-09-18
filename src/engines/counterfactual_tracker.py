@@ -239,7 +239,9 @@ class CounterfactualTracker:
     def _map_pattern_to_variant_id(pattern: str) -> Optional[str]:
         """Maps free-text pattern string to tournament variant ID."""
         p = (pattern or "").upper()
-        if "CHALLENGER_LOCAL_OLLAMA" in p or "LOCAL_OLLAMA" in p:
+        if "CHALLENGER_LOCAL_MLX" in p or "LOCAL_MLX" in p:
+            return "CHALLENGER_LOCAL_MLX"
+        elif "CHALLENGER_LOCAL_OLLAMA" in p or "LOCAL_OLLAMA" in p:
             return "CHALLENGER_LOCAL_OLLAMA"
         elif "JUDAS" in p or "INDUCEMENT" in p:
             return "STRAT_9_CHALLENGER"

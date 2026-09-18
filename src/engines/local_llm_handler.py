@@ -1,143 +1,375 @@
 import requests
 import json
 import logging
+import re
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-SETUP_SCORING_PROMPT = """You are Bayesian Pivot, an elite institutional quantitative trading AI validator.
-Analyze this trade setup and return a JSON object with exactly these fields:
-{{
-  "score": <float 0-10, precision 1 decimal>,
+SYSTEM_PROMPT = """You are Bayesian Pivot, an elite institutional quantitative trading AI validator specialized in Inner Circle Trader (ICT) and Smart Money Concepts (SMC) order flow mechanics.
+Analyze this candidate trade setup and return a structured JSON evaluation with exactly these fields:
+{
+  "score": <float 0.0-10.0 continuous probability>,
   "verdict": "<FLOW_GO|SHADOW_OBSERVATION|REJECTED>",
-  "reasoning": "<max 2 sentences, why this setup does or doesn't qualify>",
+  "reasoning": "<1-2 sentences on specific institutional confluence or trap veto>",
+  "risk_multiplier": <float 0.0 to 1.33>,
   "risk_level": "<LOW|MEDIUM|HIGH>"
-}}
-
-Scoring rubric:
-- 8.5-10: Unicorn setup — all confluence aligned, killzone confirmed, HTF POI as draw on liquidity
-- 7.0-8.4: High alpha — strong pattern, clean bias, session timing confirmed
-- 5.0-6.9: Watchlist — some confluence, but missing key confirmation
-- 0-4.9: Skip — weak or conflicting signals
-
-Setup to analyze:
-SYMBOL: {symbol}
-PATTERN: {pattern}
-DIRECTION: {direction}
-HTF BIAS: {bias}
-HURST EXPONENT: {hurst} ({hurst_regime})
-SESSION: {session}
-ENTRY: {entry}
-STOP LOSS: {stop_loss}
-INTERMARKET: DXY={dxy_trend}, NQ={nq_trend}
-ATR%ILE: {atr_percentile}
-
-Return ONLY the JSON object. No markdown, no explanation, just the raw JSON."""
+}
+Scoring Rubric:
+- 8.5-10.0: Tier 1 Unicorn (Sweep of HTF POI + strong SMT divergence + verified CVD limit absorption)
+- 7.5-8.4: A-Tier Production Alpha (Clean killzone timing + HTF trend alignment)
+- 5.0-7.4: Sub-Threshold (Quarantined to $0 risk shadow observation)
+- 0.0-4.9: Toxic Retail Trap / Invalidation (Veto / Reject immediately)"""
 
 
 class LocalLLMHandler:
     """
-    Offline AI redundancy using a local LLM via Ollama.
-    Ensures analysis uptime even if all cloud APIs are unreachable.
-    Provides full structured scoring at zero API cost.
+    Offline & Redundant Local AI Engine for Bayesian Pivot.
+    Primary: Local MLX server running fine-tuned LoRA on Apple Silicon GPU (port 8080).
+    Secondary: Local Ollama server (port 11434).
+    Provides structured 5-Pillar orderflow validation at $0 API cost and zero live risk.
     """
-    def __init__(self, model: str = "bayesian-pivot", url: str = "http://localhost:11434/api/generate"):
+    def __init__(
+        self,
+        model: str = "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        mlx_url: str = "http://127.0.0.1:8080/v1",
+        ollama_url: str = "http://localhost:11434/api",
+        timeout: int = 15
+    ):
         self.model = model
-        self.url = url
-        self._timeout = 30
+        self.mlx_url = mlx_url.rstrip("/")
+        self.ollama_url = ollama_url.rstrip("/")
+        self._timeout = timeout
+        self.active_backend: Optional[str] = None
+        self.active_provider: str = "Local-LLM"
 
     def is_available(self) -> bool:
-        """Checks if the local Ollama server is running."""
+        """
+        Checks local AI availability:
+        1. Checks MLX local server on port 8080 (Primary M4 LoRA).
+        2. Falls back to Ollama on port 11434.
+        """
+        # Priority 1: MLX Local Server (Apple Silicon LoRA)
         try:
-            response = requests.get(
-                self.url.replace("/api/generate", "/api/tags"),
-                timeout=2
-            )
-            return response.status_code == 200
-        except:
-            return False
+            resp = requests.get(f"{self.mlx_url}/models", timeout=1.5)
+            if resp.status_code == 200:
+                self.active_backend = "mlx"
+                self.active_provider = "MLX-LoRA-Local-M4"
+                return True
+        except Exception:
+            pass
 
-    def score_setup(self, setup: Dict[str, Any], market_context: Optional[Dict] = None,
-                    hurst: float = 0.5, session_info: Optional[Dict] = None) -> Dict[str, Any]:
+        # Priority 2: Ollama Local Server
+        try:
+            resp = requests.get(f"{self.ollama_url}/tags", timeout=1.5)
+            if resp.status_code == 200:
+                self.active_backend = "ollama"
+                self.active_provider = "Ollama-Local"
+                return True
+        except Exception:
+            pass
+
+        self.active_backend = None
+        return False
+
+    def build_5pillar_prompt(
+        self,
+        setup: Dict[str, Any],
+        market_context: Optional[Dict] = None,
+        hurst: float = 0.5,
+        session_info: Optional[Dict] = None
+    ) -> str:
         """
-        Score a trade setup using the local Llama3 model.
-        Returns the same schema as cloud validators: {score, verdict, reasoning, risk_level}.
+        Constructs the institutional 5-Pillar prompt matching the training distribution:
+        SESSION, PD ARRAY, VOLUME, SMT CONFLUENCE, HTF STRUCTURE, ORDERFLOW.
         """
-        hurst_regime = "Mean-Reverting (Turtle Soup)" if hurst < 0.45 else (
-            "Trending (Displacement)" if hurst > 0.55 else "Neutral"
+        # 1. Archetype & Direction
+        raw_pattern = str(setup.get("pattern", "")).upper()
+        direction = str(setup.get("direction", setup.get("bias", "LONG"))).upper()
+        symbol = str(setup.get("symbol", "BTC/USD"))
+
+        if "TURTLE" in raw_pattern or "SWEEP" in raw_pattern or "JUDAS" in raw_pattern:
+            archetype = "TURTLE_SOUP_FADER"
+        elif "EXPANSION" in raw_pattern or "TREND" in raw_pattern:
+            archetype = "TREND_EXPANSION"
+        else:
+            archetype = "CORE_ANCHOR"
+
+        # 2. Session Context
+        session_name = (session_info.get("name") if session_info else setup.get("session", "UNKNOWN")).upper()
+        if "NY" in session_name or "NEW YORK" in session_name:
+            session_desc = "New York AM Session (Institutional Expansion)"
+        elif "LONDON" in session_name:
+            session_desc = "London Open Killzone (Institutional Drive)"
+        elif "ASIA" in session_name:
+            session_desc = "Asian Session (Retail Liquidity Accumulation)"
+        elif "MACRO" in session_name or "SILVER" in session_name:
+            session_desc = "Institutional Macro Window (High Liquidity)"
+        else:
+            session_desc = f"{session_name} Session"
+
+        # 3. PD Array Dealing Range
+        pd_array = setup.get("pd_array")
+        if not pd_array:
+            discount_pct = setup.get("discount_pct", None)
+            if discount_pct is not None:
+                if direction == "LONG" and discount_pct >= 0.5:
+                    pd_array = f"Discount Dealing Range ({discount_pct*100:.0f}% Discount POI)"
+                elif direction == "SHORT" and discount_pct <= 0.5:
+                    pd_array = f"Premium Dealing Range ({(1-discount_pct)*100:.0f}% Premium POI)"
+                else:
+                    pd_array = "Equilibrium Dealing Range"
+            else:
+                if direction == "LONG":
+                    pd_array = "Discount Dealing Range (HTF Bullish FVG / Order Block)"
+                else:
+                    pd_array = "Premium Dealing Range (HTF Bearish FVG / Order Block)"
+
+        # 4. Volume Expansion
+        vol_mult = setup.get("relative_volume", setup.get("vol_mult", 1.0))
+        if vol_mult >= 1.5:
+            volume_desc = f"{vol_mult:.1f}x Relative Volume Expansion"
+        elif vol_mult <= 0.5:
+            volume_desc = f"{vol_mult:.1f}x Relative Volume Trickle (Weak Retail)"
+        else:
+            volume_desc = f"{vol_mult:.1f}x Relative Volume (Neutral)"
+
+        # 5. SMT Confluence
+        smt_desc = setup.get("smt_confluence")
+        if not smt_desc:
+            smt_strength = setup.get("smt_strength", 0.0)
+            if smt_strength > 0.4:
+                smt_desc = f"Confirmed Intermarket SMT Divergence (Strength: {smt_strength:.2f})"
+            elif market_context and market_context.get("DXY", {}).get("trend"):
+                dxy_trend = market_context.get("DXY", {}).get("trend")
+                smt_desc = f"Macro Dollar Bias: DXY {dxy_trend}"
+            else:
+                smt_desc = "N/A"
+
+        # 6. HTF Structure
+        htf_desc = setup.get("htf_structure")
+        if not htf_desc:
+            trend = setup.get("trend", setup.get("bias", "NEUTRAL"))
+            hurst_text = f"Hurst {hurst:.2f}"
+            htf_desc = f"{trend} Trend Alignment ({hurst_text})"
+
+        # 7. Orderflow Dynamics
+        orderflow_desc = setup.get("orderflow")
+        if not orderflow_desc:
+            cvd_abs = setup.get("cvd_absorption", False)
+            if cvd_abs:
+                orderflow_desc = "Verified CVD limit absorption at liquidity pool"
+            else:
+                orderflow_desc = "Orderflow displacement confirming institutional participation"
+
+        prompt = (
+            f"EVALUATE INSTITUTIONAL SETUP:\n"
+            f"ARCHETYPE: [{archetype}] | PROVENANCE: [ERA_4_SHADOW_LAB]\n"
+            f"SYMBOL: {symbol} | DIRECTION: {direction}\n"
+            f"SESSION: {session_desc}\n"
+            f"PD ARRAY: {pd_array}\n"
+            f"VOLUME: {volume_desc}\n"
+            f"SMT CONFLUENCE: {smt_desc}\n"
+            f"HTF STRUCTURE: {htf_desc}\n"
+            f"ORDERFLOW: {orderflow_desc}"
         )
-        dxy_trend = "N/A"
-        nq_trend = "N/A"
-        if market_context:
-            dxy_trend = market_context.get("DXY", {}).get("trend", "N/A")
-            nq_trend = market_context.get("NQ", {}).get("trend", "N/A")
+        return prompt
 
-        session = session_info.get("name", "Unknown") if session_info else "Unknown"
-        atr_pct = setup.get("atr_percentile", "N/A")
+    def score_setup(
+        self,
+        setup: Dict[str, Any],
+        market_context: Optional[Dict] = None,
+        hurst: float = 0.5,
+        session_info: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """
+        Scores candidate trade setup using local Apple Silicon MLX LoRA or Ollama.
+        Returns unified schema: {score, verdict, reasoning, risk_multiplier, risk_level, provider}.
+        """
+        if not self.is_available():
+            return {
+                "score": 0.0,
+                "verdict": "REJECTED",
+                "reasoning": "Local LLM server is offline.",
+                "risk_multiplier": 0.0,
+                "risk_level": "HIGH",
+                "provider": "Offline"
+            }
 
-        prompt = SETUP_SCORING_PROMPT.format(
-            symbol=setup.get("symbol", "N/A"),
-            pattern=setup.get("pattern", "N/A"),
-            direction=setup.get("direction", setup.get("bias", "N/A")),
-            bias=setup.get("bias", "N/A"),
-            hurst=f"{hurst:.3f}",
-            hurst_regime=hurst_regime,
-            session=session,
-            entry=setup.get("entry", "N/A"),
-            stop_loss=setup.get("stop_loss", "N/A"),
-            dxy_trend=dxy_trend,
-            nq_trend=nq_trend,
-            atr_percentile=atr_pct,
+        prompt = self.build_5pillar_prompt(
+            setup=setup,
+            market_context=market_context,
+            hurst=hurst,
+            session_info=session_info
         )
 
-        raw = self.analyze(prompt)
-        result = self._parse_score(raw)
-        result["provider"] = "Llama3-Local"
-        return result
+        try:
+            if self.active_backend == "mlx":
+                # MLX HTTP Chat Completions (OpenAI Compatible)
+                payload = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT + "\nKeep reasoning under 30 words so the JSON object closes cleanly."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 350
+                }
+                resp = requests.post(
+                    f"{self.mlx_url}/chat/completions",
+                    json=payload,
+                    timeout=self._timeout
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                raw_text = data["choices"][0]["message"]["content"]
+                result = self._parse_score(raw_text)
+                result["provider"] = "MLX-LoRA-Local-M4"
+                result["backend"] = "mlx"
+                return result
+
+            elif self.active_backend == "ollama":
+                # Ollama Generate endpoint
+                payload = {
+                    "model": "bayesian-pivot",
+                    "prompt": f"{SYSTEM_PROMPT}\n\n{prompt}",
+                    "stream": False,
+                    "format": "json",
+                    "options": {"temperature": 0.1, "num_predict": 300}
+                }
+                resp = requests.post(
+                    f"{self.ollama_url}/generate",
+                    json=payload,
+                    timeout=self._timeout
+                )
+                resp.raise_for_status()
+                raw_text = resp.json().get("response", "{}")
+                result = self._parse_score(raw_text)
+                result["provider"] = "Ollama-Local"
+                result["backend"] = "ollama"
+                return result
+
+        except Exception as e:
+            logger.warning(f"Local LLM inference error: {e}")
+
+        # Safe fallback — never crash production
+        return {
+            "score": 0.0,
+            "verdict": "REJECTED",
+            "reasoning": "Local LLM inference fallback triggered.",
+            "risk_multiplier": 0.0,
+            "risk_level": "HIGH",
+            "provider": self.active_provider
+        }
 
     def analyze(self, prompt: str, image_path: Optional[str] = None) -> str:
         """
-        Perform text analysis using the local model. Returns raw response string.
-        Note: Llama3 8B is text-only — image_path is accepted but ignored.
+        Generic text inference method for ai_hub fallback compatibility.
         """
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "format": "json",
-            "keep_alive": "30s",  # Automatically unload from RAM after 30 seconds
-            "options": {
-                "temperature": 0.1,   # Low temp for structured/consistent scoring
-                "num_predict": 256,   # Cap tokens to keep RAM/latency tight
-            }
-        }
+        if not self.is_available():
+            raise RuntimeError("Local LLM server is not available.")
+
         try:
-            response = requests.post(self.url, json=payload, timeout=self._timeout)
-            response.raise_for_status()
-            raw = response.json().get('response', '{}')
-            logger.info(f"🦙 Llama3 response received ({len(raw)} chars)")
-            return raw
+            if self.active_backend == "mlx":
+                payload = {
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.1,
+                    "max_tokens": 350
+                }
+                resp = requests.post(
+                    f"{self.mlx_url}/chat/completions",
+                    json=payload,
+                    timeout=self._timeout
+                )
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"]
+            else:
+                payload = {
+                    "model": "bayesian-pivot",
+                    "prompt": prompt,
+                    "stream": False,
+                    "format": "json",
+                    "options": {"temperature": 0.1, "num_predict": 300}
+                }
+                resp = requests.post(
+                    f"{self.ollama_url}/generate",
+                    json=payload,
+                    timeout=self._timeout
+                )
+                resp.raise_for_status()
+                return resp.json().get("response", "{}")
         except Exception as e:
-            logger.error(f"Local LLM Error: {e}")
+            logger.error(f"Local LLM analyze error: {e}")
             raise e
 
     def _parse_score(self, raw: str) -> Dict[str, Any]:
-        """Parse and validate the scoring response, with safe fallback."""
-        import re
-        try:
-            # Strip any surrounding markdown/noise
-            json_match = re.search(r'\{.*\}', raw, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-                score = float(data.get("score", 0))
-                score = max(0.0, min(10.0, score))  # Clamp to valid range
+        """Parse structured JSON scoring response with multi-pattern fallback."""
+        clean = raw.strip()
+        if clean.startswith("```json"):
+            clean = clean[7:]
+        elif clean.startswith("```"):
+            clean = clean[3:]
+        if clean.endswith("```"):
+            clean = clean[:-3]
+        clean = clean.strip()
+
+        # Strategy 1: Direct or Regex JSON load
+        match = re.search(r"\{.*\}", clean, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+                score = float(data.get("score", 0.0))
+                score = max(0.0, min(10.0, score))
+                verdict = str(data.get("verdict", "SHADOW_OBSERVATION")).upper()
+                if verdict not in ["FLOW_GO", "SHADOW_OBSERVATION", "REJECTED"]:
+                    verdict = "SHADOW_OBSERVATION"
+                reasoning = str(data.get("reasoning", "Local AI evaluation."))
+                risk_mult = float(data.get("risk_multiplier", 1.0 if verdict == "FLOW_GO" else 0.0))
+                risk_mult = max(0.0, min(1.33, risk_mult))
+                risk_lvl = str(data.get("risk_level", "MEDIUM")).upper()
+
                 return {
-                    "score": score,
-                    "verdict": data.get("verdict", "SKIP"),
-                    "reasoning": data.get("reasoning", "Local LLM analysis."),
-                    "risk_level": data.get("risk_level", "MEDIUM"),
+                    "score": round(score, 2),
+                    "verdict": verdict,
+                    "reasoning": reasoning,
+                    "risk_multiplier": round(risk_mult, 2),
+                    "risk_level": risk_lvl
+                }
+            except Exception:
+                pass
+
+        # Strategy 2: Resilient field extraction if JSON closing brace was truncated
+        try:
+            score_m = re.search(r'"score"\s*:\s*([0-9.]+)', clean)
+            verdict_m = re.search(r'"verdict"\s*:\s*"([^"]+)"', clean)
+            reasoning_m = re.search(r'"reasoning"\s*:\s*"([^"]+)"', clean)
+            risk_m = re.search(r'"risk_multiplier"\s*:\s*([0-9.]+)', clean)
+            level_m = re.search(r'"risk_level"\s*:\s*"([^"]+)"', clean)
+
+            if score_m or verdict_m:
+                score = float(score_m.group(1)) if score_m else 5.0
+                score = max(0.0, min(10.0, score))
+                verdict = verdict_m.group(1).upper() if verdict_m else ("FLOW_GO" if score >= 7.5 else "REJECTED")
+                reasoning = reasoning_m.group(1) if reasoning_m else clean[:120].replace("\n", " ")
+                risk_mult = float(risk_m.group(1)) if risk_m else (1.0 if verdict == "FLOW_GO" else 0.0)
+                risk_mult = max(0.0, min(1.33, risk_mult))
+                risk_lvl = level_m.group(1).upper() if level_m else "MEDIUM"
+
+                return {
+                    "score": round(score, 2),
+                    "verdict": verdict,
+                    "reasoning": reasoning,
+                    "risk_multiplier": round(risk_mult, 2),
+                    "risk_level": risk_lvl
                 }
         except Exception as e:
-            logger.warning(f"Llama3 parse error: {e} | Raw: {raw[:100]}")
-        # Safe fallback — never crash the pipeline
-        return {"score": 0.0, "verdict": "SKIP", "reasoning": "Local LLM parse error.", "risk_level": "HIGH"}
+            logger.warning(f"Resilient parse error: {e}")
+
+        return {
+            "score": 0.0,
+            "verdict": "REJECTED",
+            "reasoning": "Output parsing fallback.",
+            "risk_multiplier": 0.0,
+            "risk_level": "HIGH"
+        }

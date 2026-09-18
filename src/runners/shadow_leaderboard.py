@@ -51,11 +51,16 @@ def main():
         
         # Add Promotion Status Column
         def get_status(row):
+            archetype = str(row['strategy_archetype'])
             samples = row['total_samples']
             wr = row['win_rate_pct']
             r = row['total_r_multiple']
-            if "TURTLE_SOUP" in str(row['strategy_archetype']) or "SILVER_BULLET" in str(row['strategy_archetype']):
+            if "TURTLE_SOUP" in archetype or "SILVER_BULLET" in archetype:
                 return "👑 LIVE MASTER WEAPON"
+            elif "CHALLENGER_LOCAL_MLX" in archetype:
+                if samples >= 30 and wr is not None and wr >= 55.0 and r > 10.0:
+                    return "🚀 QUALIFIED FOR LIVE PROMOTION"
+                return "🤖 M4 LOCAL LORA CHALLENGER ($0 RISK)"
             elif samples >= 30 and wr is not None and wr >= 55.0 and r > 10.0:
                 return "🚀 QUALIFIED FOR LIVE PROMOTION"
             elif samples >= 15:

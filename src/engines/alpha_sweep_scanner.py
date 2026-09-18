@@ -1082,11 +1082,14 @@ class AlphaSweepScanner(SMCScanner):
             except Exception as e:
                 logger.error(f"Error logging scan to DB: {e}")
 
-            # ── Shadow Challenger: Local Bayesian Pivot (Ollama) ─────────────
+            # ── Shadow Challenger: Local Bayesian Pivot (Apple Silicon MLX LoRA / Ollama) ─────────────
             try:
                 from src.engines.local_llm_handler import LocalLLMHandler
-                local_llm = LocalLLMHandler(model="bayesian-pivot")
+                local_llm = LocalLLMHandler()
                 if local_llm.is_available():
+                    provider_tag = "MLX" if local_llm.active_backend == "mlx" else "OLLAMA"
+                    variant_key = f"CHALLENGER_LOCAL_{provider_tag}"
+
                     local_scoring = local_llm.score_setup(
                         setup={
                             "symbol": symbol,
@@ -1095,7 +1098,12 @@ class AlphaSweepScanner(SMCScanner):
                             "bias": setup.get('trend', setup.get('direction', 'UNKNOWN')),
                             "entry": entry_price,
                             "stop_loss": sl_price,
-                            "atr_percentile": round(setup.get('atr_percentile', 50.0), 1)
+                            "atr_percentile": round(setup.get('atr_percentile', 50.0), 1),
+                            "relative_volume": round(setup.get('vol_mult', setup.get('volume_mult', 1.0)), 2),
+                            "smt_confluence": "Confirmed Divergence" if setup.get('smt_divergence') else None,
+                            "smt_strength": float(setup.get('smt_strength', 0.0)),
+                            "cvd_absorption": setup.get('cvd_absorption', False),
+                            "discount_pct": setup.get('discount_pct', None)
                         },
                         hurst=float(setup.get('hurst', 0.5)),
                         session_info={"name": killzone}
@@ -1103,23 +1111,24 @@ class AlphaSweepScanner(SMCScanner):
                     local_score = float(local_scoring.get("score", 0.0))
                     local_verdict = str(local_scoring.get("verdict", "UNKNOWN"))
                     local_reason = str(local_scoring.get("reasoning", ""))
-                    logger.info(f"🦙 [SHADOW CHALLENGER: Local Bayesian Pivot] {symbol} {setup['direction']} -> Score: {local_score:.1f}/10 | Verdict: {local_verdict} | {local_reason}")
+                    local_provider = str(local_scoring.get("provider", local_llm.active_provider))
+                    logger.info(f"🤖 [SHADOW TOURNAMENT: {local_provider}] {symbol} {setup['direction']} -> Score: {local_score:.1f}/10 | Verdict: {local_verdict} | {local_reason}")
 
                     self.counterfactual_tracker.register_shadow_trade(
                         setup={
                             "symbol": symbol,
                             "direction": setup['direction'],
-                            "pattern": f"[CHALLENGER_LOCAL_OLLAMA] {pattern_str}",
+                            "pattern": f"[{variant_key}] {pattern_str}",
                             "price": entry_price,
                             "stop_loss": sl_price,
                             "take_profit": tp_price,
                             "regime": setup.get('regime', 'UNKNOWN'),
                             "hurst": float(setup.get('hurst', 0.5))
                         },
-                        account_key="CHALLENGER_LOCAL_OLLAMA",
-                        strategy_mode="CHALLENGER_LOCAL_OLLAMA",
+                        account_key=variant_key,
+                        strategy_mode=variant_key,
                         rejection_reasons=[
-                            f"LOCAL_OLLAMA_SCORE_{local_score:.1f}",
+                            f"LOCAL_SCORE_{local_score:.1f}",
                             f"VERDICT_{local_verdict}",
                             f"CLOUD_SCORE_{shadow_score:.1f}"
                         ]
