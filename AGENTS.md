@@ -45,7 +45,7 @@
 
 ### 7. Upcomers 20% Consistency Rule & Fleet-Wide Payout Target Protocol
 * **RULE:** The **20% Consistency Rule** mandates that **no single trading day may account for more than 20.0% of total cumulative net profit** at the time of payout request.
-  * Formula: $\text{Daily Profit} \le 0.20 \times \text{Total Target Profit}$
+  * Formula: Daily Profit <= 0.20 * Total Target Profit
   * Payout eligibility requires at least 5 distinct profitable trading days; the system targets **15 to 25 consistent sessions** to guarantee spotless prop audit compliance.
 
 * **FLEET TARGET & CONSISTENCY ALLOCATION:**
@@ -61,13 +61,26 @@
     * Target Net Profit: **+$4,000.00** (Payout Unlock Balance: **$54,000.00**).
     * Max Single-Day Profit: **$800.00** (20% ceiling; system clamped to **$760.00**).
     * Current Status & Decoupled Starting Risk:
-      * **Account 9 (`jfcuue7er3` - Fresh Oracle Lead Striker):** Balance **$50,000.00** ($2,500 full buffer; Floor $47,500). **Base Risk: $100.00** (2-Phase Buffer Ramp: **25.0 losses runway**, 4.3% ruin rate; scales to **$120.00** after ~2 wins / cushion $\ge +\$350$, scales to **$180.00** once trailing floor permanently locks at $50,000 Even Equity / cushion $\ge +\$2,500$).
+      * **Account 9 (`jfcuue7er3` - Fresh Oracle Lead Striker):** Balance **$50,000.00** ($2,500 full buffer; Floor $47,500). **Base Risk: $100.00** (2-Phase Buffer Ramp: **25.0 losses runway**, 4.3% ruin rate; scales to **$120.00** after ~2 wins / cushion >= +$350, scales to **$180.00** once trailing floor permanently locks at $50,000 Even Equity / cushion >= +$2,500).
       * **Account 2 (`498svcbpfi`):** Balance ~$48,567 (-$1,433 DD; Floor $47,500). **Base Risk: $70.00** (**15.2 losses runway** on $1,067 buffer; scales to $120 at buffer > $1,800).
       * **Account 6 (`dwundrtxjv`):** Balance ~$48,801 (-$1,199 DD; Floor $47,500). **Base Risk: $80.00** (**16.2 losses runway** on $1,301 buffer; scales to $120 at buffer > $1,800).
   * **$10k Tier (Accounts 4, 5, 8):**
     * **Permanently Decommissioned / Liquidation-Only.** Sizing set to **$0.00** (quarantined).
 
+### 8. Strict Communication & Output Formatting Protocols (No LaTeX / Clean English)
+* **RULE:** **NEVER** use LaTeX math formatting, dollar sign equation delimiters (`$...$`, `$$...$$`), or raw equation markup (`\ge`, `\le`, `\to`, `\times`, `\text{...}`, `\frac`) in agent responses or documentation.
+* **MANDATORY STYLE:**
+  - Always write clean, plain English and standard keyboard characters.
+  - Write `>=` or "greater than or equal to" (never `$\ge$`).
+  - Write `<=` or "less than or equal to" (never `$\le$`).
+  - Write `->` or "to" (never `$\to$`).
+  - Write `*` or `x` (never `$\times$`).
+  - Write `+2.8R`, `-1.0R`, `1.5R` as plain text (never `$+2.8\text{R}$`).
+  - Write simple formulas in plain text: `Daily Profit <= 0.20 * Total Profit` or `MFE = (Peak - Entry) / Risk`.
+  - Keep all tables, bullet points, numbers, and summaries crisp, plain, and readable.
+
 ---
 
 ### Incident Post-Mortem Reference
 * Full forensic documentation: `docs/INCIDENT_2026-08-26_TRADELOCKER_STOP_ORDER_DUPLICATION.md`
+
