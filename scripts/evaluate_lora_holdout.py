@@ -27,14 +27,14 @@ except ImportError:
     sys.exit(1)
 
 def extract_json_payload(raw_text: str) -> dict:
-    """Extract and parse JSON object from raw LLM output text."""
+    """Extract and parse JSON object from raw LLM output text with resilient regex fallback."""
     # Try direct parse
     try:
         return json.loads(raw_text.strip())
     except Exception:
         pass
     
-    # Try finding first { ... }
+    # Try finding first complete { ... }
     match = re.search(r"\{.*\}", raw_text, re.DOTALL)
     if match:
         try:
@@ -42,7 +42,22 @@ def extract_json_payload(raw_text: str) -> dict:
         except Exception:
             pass
             
-    # Fallback default if generation was interrupted or malformed
+    # Resilient Token Scanning (Tier 2 Fallback)
+    score_match = re.search(r'"score"\s*:\s*([0-9.]+)', raw_text)
+    verdict_match = re.search(r'"verdict"\s*:\s*"([^"]+)"', raw_text)
+    risk_match = re.search(r'"risk_multiplier"\s*:\s*([0-9.]+)', raw_text)
+    reasoning_match = re.search(r'"reasoning"\s*:\s*"([^"]+)"', raw_text)
+
+    if score_match and verdict_match:
+        return {
+            "score": float(score_match.group(1)),
+            "verdict": verdict_match.group(1),
+            "reasoning": reasoning_match.group(1) if reasoning_match else "Recovered via token scanner",
+            "risk_multiplier": float(risk_match.group(1)) if risk_match else 0.0,
+            "risk_level": "LOW" if float(score_match.group(1)) >= 7.5 else "HIGH"
+        }
+
+    # Fallback default if generation was interrupted before producing tokens
     return {
         "score": 5.0,
         "verdict": "SHADOW_OBSERVATION",
@@ -103,7 +118,7 @@ def main():
             model,
             tokenizer,
             prompt=prompt,
-            max_tokens=180,
+            max_tokens=250,
             verbose=False
         )
 

@@ -160,7 +160,7 @@ class LocalLLMHandler:
             if cvd_abs:
                 orderflow_desc = "Verified CVD limit absorption at liquidity pool"
             else:
-                orderflow_desc = "Orderflow displacement confirming institutional participation"
+                orderflow_desc = "Intra-candle friction at entry zone (neutral CVD)"
 
         prompt = (
             f"EVALUATE INSTITUTIONAL SETUP:\n"
@@ -326,6 +326,8 @@ class LocalLLMHandler:
                     verdict = "SHADOW_OBSERVATION"
                 reasoning = str(data.get("reasoning", "Local AI evaluation."))
                 risk_mult = float(data.get("risk_multiplier", 1.0 if verdict == "FLOW_GO" else 0.0))
+                if verdict != "FLOW_GO" or score < 7.5:
+                    risk_mult = 0.0
                 risk_mult = max(0.0, min(1.33, risk_mult))
                 risk_lvl = str(data.get("risk_level", "MEDIUM")).upper()
 
@@ -353,6 +355,8 @@ class LocalLLMHandler:
                 verdict = verdict_m.group(1).upper() if verdict_m else ("FLOW_GO" if score >= 7.5 else "REJECTED")
                 reasoning = reasoning_m.group(1) if reasoning_m else clean[:120].replace("\n", " ")
                 risk_mult = float(risk_m.group(1)) if risk_m else (1.0 if verdict == "FLOW_GO" else 0.0)
+                if verdict != "FLOW_GO" or score < 7.5:
+                    risk_mult = 0.0
                 risk_mult = max(0.0, min(1.33, risk_mult))
                 risk_lvl = level_m.group(1).upper() if level_m else "MEDIUM"
 
