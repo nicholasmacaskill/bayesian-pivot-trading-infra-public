@@ -322,5 +322,78 @@ class TestWatchdogAndScaleoutInvariants(unittest.TestCase):
         self.assertEqual(len(watchdog.alerted_trades), 0)
         watchdog.save_state.assert_called_once()
 
+    @patch.object(TradeLockerHelper, 'modify_position_bracket')
+    @patch.object(TradeLockerHelper, 'get_open_positions')
+    def test_stepped_defense_buy_calculates_and_tightens_sl(self, mock_get_pos, mock_modify):
+        """Verify BUY trade tightens SL from -1.0R to -0.3R at +1.0R gain."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier = MagicMock()
+        mock_modify.return_value = True
+
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "token"
+        helper.account_id = "acc_1"
+        mock_get_pos.return_value = [
+            {"id": "pos_buy_1", "symbol": "BTCUSD", "price": 100.0, "stopLoss": 90.0, "qty": 1.0}
+        ]
+        helper.get_open_positions = mock_get_pos
+        helper.modify_position_bracket = mock_modify
+        watchdog.tl.helpers = [helper]
+
+        with patch("time.sleep"):
+            # entry=100, initial_sl=90 (risk=10). locked_r=-0.3 -> new_sl = 100 - 3 = 97.0
+            watchdog.execute_stepped_defense("BTCUSD", entry_price=100.0, initial_sl=90.0, side="BUY", locked_r=-0.3)
+
+        mock_modify.assert_called_once_with("pos_buy_1", stop_loss=97.0)
+
+    @patch.object(TradeLockerHelper, 'modify_position_bracket')
+    @patch.object(TradeLockerHelper, 'get_open_positions')
+    def test_stepped_defense_sell_calculates_and_tightens_sl(self, mock_get_pos, mock_modify):
+        """Verify SELL trade tightens SL from -1.0R to -0.3R at +1.0R gain."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier = MagicMock()
+        mock_modify.return_value = True
+
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "token"
+        helper.account_id = "acc_1"
+        mock_get_pos.return_value = [
+            {"id": "pos_sell_1", "symbol": "BTCUSD", "price": 100.0, "stopLoss": 110.0, "qty": 1.0}
+        ]
+        helper.get_open_positions = mock_get_pos
+        helper.modify_position_bracket = mock_modify
+        watchdog.tl.helpers = [helper]
+
+        with patch("time.sleep"):
+            # entry=100, initial_sl=110 (risk=10). locked_r=-0.3 -> new_sl = 100 + 3 = 103.0
+            watchdog.execute_stepped_defense("BTCUSD", entry_price=100.0, initial_sl=110.0, side="SELL", locked_r=-0.3)
+
+        mock_modify.assert_called_once_with("pos_sell_1", stop_loss=103.0)
+
+    @patch.object(TradeLockerHelper, 'modify_position_bracket')
+    @patch.object(TradeLockerHelper, 'get_open_positions')
+    def test_stepped_defense_does_not_loosen_sl_if_already_at_break_even(self, mock_get_pos, mock_modify):
+        """Verify stepped defense never loosens SL if already at Break-Even or better."""
+        watchdog = PositionWatchdog()
+        watchdog.notifier = MagicMock()
+        mock_modify.return_value = True
+
+        helper = TradeLockerHelper("test@upcomers.com", "p", "s", "http://fake")
+        helper.access_token = "token"
+        helper.account_id = "acc_1"
+        # Position SL is already at 100.0 (Break-Even)
+        mock_get_pos.return_value = [
+            {"id": "pos_buy_be", "symbol": "BTCUSD", "price": 100.0, "stopLoss": 100.0, "qty": 1.0}
+        ]
+        helper.get_open_positions = mock_get_pos
+        helper.modify_position_bracket = mock_modify
+        watchdog.tl.helpers = [helper]
+
+        with patch("time.sleep"):
+            # new_sl would be 97.0, but position is already at 100.0 (BE) -> must NOT overwrite to 97.0!
+            watchdog.execute_stepped_defense("BTCUSD", entry_price=100.0, initial_sl=90.0, side="BUY", locked_r=-0.3)
+
+        mock_modify.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()

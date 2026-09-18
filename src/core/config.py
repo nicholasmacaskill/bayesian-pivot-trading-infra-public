@@ -218,6 +218,9 @@ class Config:
     # ── AI Risk Logic & Tiered Profit Protection ─────────────
     ROI_OPTIMIZATION_ENABLED = True
     TP1_RATIO = 0.5                    # 50% scale out at TP1
+    STEPPED_DEFENSE_ENABLED = True     # Tier 0.5: Stepped Risk Reduction at +1.0R
+    STEPPED_DEFENSE_TRIGGER_R = 1.0    # Trigger at +1.0R floating gain
+    STEPPED_DEFENSE_LOCKED_R = -0.3    # Cut Stop Loss to -0.3R (saving 70% of loss if reversed)
     BE_TRIGGER_R = 1.5                 # Tier 1: Move SL to entry (Break-Even) at +1.5R
     TIER2_LOCK_TRIGGER_R = 2.5         # Tier 2: Trigger lock when trade reaches +2.5R
     TIER2_LOCK_LOCKED_R = 1.0          # Lock in +1.0R guaranteed profit

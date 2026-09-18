@@ -325,6 +325,10 @@ class VisualVectorEngine:
         analogs = self.find_visual_analogs(
             query_vector, symbol=symbol, direction=direction, top_k=3, regime_type=regime_type
         )
+        return self.evaluate_analogs(analogs)
+
+    def evaluate_analogs(self, analogs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Evaluates a list of retrieved visual analogs and classifies setup into PASS_CONFIRMED, REJECT_TRAP, or NEUTRAL."""
         if not analogs:
             return {
                 'recommendation': 'NEUTRAL',
@@ -335,19 +339,22 @@ class VisualVectorEngine:
                 'key_reason': 'No close visual matches in database yet.'
             }
 
-        wins = sum(1 for a in analogs if a['outcome'] == 'WIN' or a['realized_r'] > 0)
-        traps = sum(1 for a in analogs if a['outcome'] in ['LOSS', 'TRAP'] or a['realized_r'] <= 0)
+        wins = sum(1 for a in analogs if a.get('outcome') == 'WIN' or a.get('realized_r', 0) > 0)
+        traps = sum(1 for a in analogs if a.get('outcome') in ['LOSS', 'TRAP'] or a.get('realized_r', 0) <= 0)
         avg_sim = float(np.mean([a['similarity'] for a in analogs]))
-        avg_r = float(np.mean([a['realized_r'] for a in analogs]))
+        avg_r = float(np.mean([a.get('realized_r', 0.0) for a in analogs]))
         win_rate = (wins / len(analogs)) * 100.0
 
         top_match = analogs[0]
-        if avg_sim >= 0.85 and traps >= 2:
+        # Multi-tiered Trap Detection:
+        # Tier 1: Severe Trap — >=85% similarity with >=2 traps
+        # Tier 2: Strong Precedent Trap — >=75% similarity with >=2 traps AND <=25% win rate (e.g. 0% WR)
+        if (avg_sim >= 0.85 and traps >= 2) or (avg_sim >= 0.75 and traps >= 2 and win_rate <= 25.0):
             recommendation = 'REJECT_TRAP'
-            reason = f"⚠️ Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps (Avg R: {avg_r:.1f}R). 0% live capital risk recommended."
+            reason = f"⚠️ Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps ({win_rate:.0f}% win rate, Avg R: {avg_r:.1f}R). 0% live capital risk recommended."
         elif avg_sim >= 0.85 and wins >= 2:
             recommendation = 'PASS_CONFIRMED'
-            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to verified historical winners (Avg R: +{avg_r:.1f}R, Top match: {top_match['pattern']})."
+            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to verified historical winners (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')})."
         else:
             recommendation = 'NEUTRAL'
             reason = f"Visual similarity balanced ({win_rate:.0f}% win rate across {len(analogs)} historical analogs, similarity: {avg_sim:.1%})."

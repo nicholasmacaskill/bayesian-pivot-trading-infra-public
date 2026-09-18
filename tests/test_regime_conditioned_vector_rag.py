@@ -195,5 +195,31 @@ class TestRegimeConditionedVectorRAG(unittest.TestCase):
         )
         self.assertTrue(passed)
 
+    def test_visual_vector_sentry_trap_detection_and_veto(self):
+        """Verify tightened trap detection (>=75% similarity, >=2 traps, <=25% win rate) yields REJECT_TRAP."""
+        # 3 historical analogs: 81.3% average similarity, 0% win rate (all 3 losses / traps)
+        trap_analogs = [
+            {"similarity": 0.82, "outcome": "LOSS", "realized_r": -1.0, "pattern": "FalseSweepTrap"},
+            {"similarity": 0.81, "outcome": "LOSS", "realized_r": -1.0, "pattern": "FalseSweepTrap"},
+            {"similarity": 0.81, "outcome": "LOSS", "realized_r": -1.0, "pattern": "FalseSweepTrap"}
+        ]
+
+        result = self.vector_engine.evaluate_analogs(trap_analogs)
+        self.assertEqual(result["recommendation"], "REJECT_TRAP")
+        self.assertIn("Visual Vector Trap", result["key_reason"])
+        self.assertIn("0% win rate", result["key_reason"])
+
+    def test_visual_vector_winner_precedent_recommendation(self):
+        """Verify verified winner precedent (>=85% similarity, >=2 wins) yields PASS_CONFIRMED."""
+        winner_analogs = [
+            {"similarity": 0.88, "outcome": "WIN", "realized_r": 2.5, "pattern": "CleanLiquiditySweep"},
+            {"similarity": 0.87, "outcome": "WIN", "realized_r": 3.0, "pattern": "CleanLiquiditySweep"},
+            {"similarity": 0.83, "outcome": "LOSS", "realized_r": -1.0, "pattern": "ChoppyStopOut"}
+        ]
+
+        result = self.vector_engine.evaluate_analogs(winner_analogs)
+        self.assertEqual(result["recommendation"], "PASS_CONFIRMED")
+        self.assertIn("Visual Vector Precedent", result["key_reason"])
+
 if __name__ == '__main__':
     unittest.main()

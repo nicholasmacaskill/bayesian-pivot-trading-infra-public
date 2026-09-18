@@ -163,11 +163,13 @@ class UnifiedSovereignSupervisor:
                         clean_sym = symbol.replace("/", "").replace("_", "").upper()
                         entry = float(pos.get('price') or 0.0)
                         pnl = float(pos.get('pnl') or 0.0)
+                        side = pos.get('side', 'BUY')
                         
                         if t_id not in self.watchdog.alerted_trades:
                             self.watchdog.alerted_trades[t_id] = {}
 
                         sym_data = self.watchdog.symbol_state.setdefault(clean_sym, {
+                            "stepped_defense_executed": False,
                             "scaleout_executed": False,
                             "mfe_scaleout_executed": False,
                             "macro_scaleout_executed": False,
@@ -199,7 +201,20 @@ class UnifiedSovereignSupervisor:
                             self.watchdog.alerted_trades[t_id]["peak_r"] = peak_r
                             self.watchdog.save_state()
 
-                        # 2. Autonomous Fleet Scale-Out at BE Trigger (+1.5R) (Deduplicated per Symbol)
+                        # 2. Stepped Stop Loss Defense at +1.0R (Tier 0.5: cut SL to -0.3R) (Deduplicated per Symbol)
+                        stepped_enabled = getattr(Config, 'STEPPED_DEFENSE_ENABLED', True)
+                        stepped_trigger = getattr(Config, 'STEPPED_DEFENSE_TRIGGER_R', 1.0)
+                        stepped_locked_r = getattr(Config, 'STEPPED_DEFENSE_LOCKED_R', -0.3)
+                        is_stepped = sym_data.get("stepped_defense_executed") or self.watchdog.alerted_trades.get(t_id, {}).get("stepped_defense_executed")
+                        is_scaled_out = sym_data.get("scaleout_executed") or self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed")
+                        if stepped_enabled and r_multiple >= stepped_trigger and not is_stepped and not is_scaled_out:
+                            logger.info(f"🛡️ [STEPPED DEFENSE] {symbol} reached {r_multiple:.2f}R! Tightening Stop Loss to {stepped_locked_r:.1f}R across fleet...")
+                            self.watchdog.execute_stepped_defense(symbol, entry, sl, side=side, locked_r=stepped_locked_r)
+                            sym_data["stepped_defense_executed"] = True
+                            self.watchdog.alerted_trades[t_id]["stepped_defense_executed"] = True
+                            self.watchdog.save_state()
+
+                        # 3. Autonomous Fleet Scale-Out at BE Trigger (+1.5R) (Deduplicated per Symbol)
                         be_trigger = getattr(Config, 'BE_TRIGGER_R', 1.5)
                         is_scaled_out = sym_data.get("scaleout_executed") or self.watchdog.alerted_trades.get(t_id, {}).get("scaleout_executed")
                         if r_multiple >= be_trigger and not is_scaled_out:
@@ -209,7 +224,7 @@ class UnifiedSovereignSupervisor:
                             self.watchdog.alerted_trades[t_id]["scaleout_executed"] = True
                             self.watchdog.save_state()
 
-                        # 3. MFE Peak Retracement Ratchet (Deduplicated per Symbol)
+                        # 4. MFE Peak Retracement Ratchet (Deduplicated per Symbol)
                         mfe_enabled = getattr(Config, 'MFE_PEAK_RATCHET_ENABLED', True)
                         mfe_min_peak = getattr(Config, 'MFE_MIN_PEAK_R', 2.0)
                         mfe_max_retrace = getattr(Config, 'MFE_MAX_RETRACEMENT_R', 0.75)

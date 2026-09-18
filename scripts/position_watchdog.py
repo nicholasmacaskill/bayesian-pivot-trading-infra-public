@@ -125,6 +125,7 @@ class PositionWatchdog:
                         self.alerted_trades[t_id] = {}
 
                     sym_data = self.symbol_state.setdefault(clean_sym, {
+                        "stepped_defense_executed": False,
                         "scaleout_executed": False,
                         "mfe_scaleout_executed": False,
                         "macro_scaleout_executed": False,
@@ -159,7 +160,20 @@ class PositionWatchdog:
                         self.alerted_trades[t_id]["peak_r"] = peak_r
                         self.save_state()
 
-                    # 4. Standard Automated Fleet Scale-Out at BE Trigger (+1.5R) (Deduplicated per Symbol)
+                    # 4. Stepped Stop Loss Defense at +1.0R (Tier 0.5: cut SL to -0.3R) (Deduplicated per Symbol)
+                    stepped_enabled = getattr(Config, 'STEPPED_DEFENSE_ENABLED', True)
+                    stepped_trigger = getattr(Config, 'STEPPED_DEFENSE_TRIGGER_R', 1.0)
+                    stepped_locked_r = getattr(Config, 'STEPPED_DEFENSE_LOCKED_R', -0.3)
+                    is_stepped = sym_data.get("stepped_defense_executed") or self.alerted_trades.get(t_id, {}).get("stepped_defense_executed")
+                    is_scaled_out = sym_data.get("scaleout_executed") or self.alerted_trades.get(t_id, {}).get("scaleout_executed")
+                    if stepped_enabled and r_multiple >= stepped_trigger and not is_stepped and not is_scaled_out:
+                        print(f"🛡️ [STEPPED DEFENSE] {symbol} hit {r_multiple:.2f}R (>= +{stepped_trigger:.1f}R)! Tightening Stop Loss to {stepped_locked_r:.1f}R across fleet...")
+                        self.execute_stepped_defense(symbol, entry, sl, side=side, locked_r=stepped_locked_r)
+                        sym_data["stepped_defense_executed"] = True
+                        self.alerted_trades[t_id]["stepped_defense_executed"] = True
+                        self.save_state()
+
+                    # 5. Standard Automated Fleet Scale-Out at BE Trigger (+1.5R) (Deduplicated per Symbol)
                     be_trigger = getattr(Config, 'BE_TRIGGER_R', 1.5)
                     is_scaled_out = sym_data.get("scaleout_executed") or self.alerted_trades.get(t_id, {}).get("scaleout_executed")
                     if r_multiple >= be_trigger and not is_scaled_out:
@@ -311,6 +325,89 @@ class PositionWatchdog:
             print(f"✅ Fleet Scale-Out Complete: Trailed={trailed_count}, Closed={closed_count}")
         except Exception as e:
             print(f"Error executing fleet scaleout: {e}")
+
+    def execute_stepped_defense(self, symbol: str, entry_price: float, initial_sl: float, side: str = "BUY", locked_r: float = -0.3):
+        """
+        Tier 0.5: Stepped Stop Loss Defense at +1.0R.
+        Tightens Stop Loss from -1.0R to -0.3R across all fleet positions.
+        Cuts 70% of downside risk without suffocating normal market breathing room.
+        Pacing: 2.0s adaptive pacing between accounts (AGENTS.md Rule 5).
+        """
+        try:
+            trailed_count = 0
+            target_sym = symbol.replace("/", "").replace("_", "").upper()
+            side_upper = str(side).upper()
+            risk_dist = abs(entry_price - initial_sl)
+            if risk_dist <= 0:
+                return
+
+            entry_str = str(entry_price).rstrip('0')
+            dec = len(entry_str.split('.')[1]) if '.' in entry_str else 2
+            dec = max(2, min(5, dec))
+
+            if side_upper == "BUY":
+                new_sl = round(entry_price - abs(locked_r) * risk_dist, dec)
+                if new_sl <= initial_sl or new_sl >= entry_price:
+                    print(f"⚠️ [STEPPED DEFENSE] BUY invariant violated: initial_sl={initial_sl}, new_sl={new_sl}, entry={entry_price}")
+                    return
+            else:
+                new_sl = round(entry_price + abs(locked_r) * risk_dist, dec)
+                if new_sl >= initial_sl or new_sl <= entry_price:
+                    print(f"⚠️ [STEPPED DEFENSE] SELL invariant violated: initial_sl={initial_sl}, new_sl={new_sl}, entry={entry_price}")
+                    return
+
+            for acc_idx, helper in enumerate(self.tl.helpers):
+                if acc_idx > 0:
+                    time.sleep(2.0)  # Adaptive 2.0s pacing per AGENTS.md Rule 5
+
+                # Skip decommissioned liquidation-only accounts
+                if getattr(helper, 'status', '') == 'LIQUIDATION_ONLY' or acc_idx in [3, 4, 7]:
+                    continue
+
+                if not helper.access_token and not helper.login():
+                    continue
+
+                try:
+                    positions = helper.get_open_positions()
+                    target_pos = [
+                        p for p in positions
+                        if target_sym in str(p.get("symbol", "")).replace("/", "").replace("_", "").upper()
+                    ]
+                    if not target_pos:
+                        continue
+
+                    for p in target_pos:
+                        pid = p.get("id") or p.get("positionId")
+                        curr_sl = p.get("stopLoss")
+                        if curr_sl:
+                            try:
+                                curr_sl_val = float(curr_sl)
+                                # Never loosen SL: if already at or better than new_sl (e.g. BE), skip
+                                if side_upper == "BUY" and curr_sl_val >= new_sl:
+                                    continue
+                                elif side_upper != "BUY" and curr_sl_val <= new_sl:
+                                    continue
+                            except (ValueError, TypeError):
+                                pass
+
+                        if helper.modify_position_bracket(pid, stop_loss=new_sl):
+                            trailed_count += 1
+                except Exception as acc_err:
+                    print(f"Error executing stepped defense on account {acc_idx+1}: {acc_err}")
+
+            defense_msg = (
+                f"🛡️ <b>STEPPED STOP LOSS DEFENSE (+1.0R)</b>\n\n"
+                f"Symbol: <code>{symbol}</code>\n"
+                f"Side: <b>{side_upper}</b>\n"
+                f"Entry: <b>{entry_price}</b> | Initial SL: <b>{initial_sl}</b>\n"
+                f"🔒 <b>Tightened Stop Loss:</b> <code>{new_sl}</code> ({locked_r:.1f}R)\n"
+                f"✅ <b>Downside Risk Reduction:</b> 70% risk eliminated across {trailed_count} positions\n"
+                f"🎯 <b>Next Defense:</b> Break-Even (0.0R) at +1.5R target"
+            )
+            self.notifier._send_message(defense_msg)
+            print(f"✅ Stepped Defense Complete: {symbol} SL tightened to {new_sl} on {trailed_count} positions")
+        except Exception as e:
+            print(f"Error executing stepped defense: {e}")
 
 if __name__ == "__main__":
     PositionWatchdog().run()

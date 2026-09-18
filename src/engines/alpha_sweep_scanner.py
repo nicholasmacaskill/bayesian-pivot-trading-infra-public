@@ -992,10 +992,11 @@ class AlphaSweepScanner(SMCScanner):
                 ai_approved = True
                 dynamic_risk_mult = 1.0
 
-            if is_counter_regime and not getattr(Config, 'VARIANT_SIZING_SHADOW_MODE', True):
-                lots = round(lots * 0.5, 4) # Throttle to 50% probe size if taking counter-regime setup
-            
-            passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved
+            is_vec_trap = (vec_result.get('recommendation') == 'REJECT_TRAP')
+            if is_vec_trap:
+                logger.warning(f"🔮 [VISUAL VECTOR VETO] {symbol} {setup['direction']} rejected by Visual Vector Sentry: {vec_result.get('key_reason')}")
+
+            passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved and (not is_vec_trap)
             
             is_symbol_shadow = is_shadow or (symbol in getattr(Config, 'SHADOW_SYMBOLS', []))
             # is_low_density_sweep: sweep hit a noise level with density < 6.0 — never risk live capital
@@ -1010,7 +1011,7 @@ class AlphaSweepScanner(SMCScanner):
                 or is_symbol_shadow
                 or is_low_density_sweep  # Hard density gate: noise sweeps → shadow only
             )
-            is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator)
+            is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator) or is_vec_trap
             
             ai_score_val = shadow_score
             verdict_str = "SHADOW_OBSERVATION" if is_shadow_strategy else "CONFIRMED"

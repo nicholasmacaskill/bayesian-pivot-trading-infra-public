@@ -17,10 +17,10 @@ class TradeLockerHelper:
     _shared_instruments_cache = {}
     _shared_symbol_cache = {}
 
-    def __init__(self, email, password, server_id="UPCOMS", base_url="https://demo.tradelocker.com"):
+    def __init__(self, email, password, server_id="UPCOMS", base_url="https://demo.tradelocker.com", server=None, **kwargs):
         self.email = email
         self.password = password
-        self.server_id = server_id
+        self.server_id = server or server_id or "UPCOMS"
         self.base_url = base_url
         self.access_token = None
         self.refresh_token = None
