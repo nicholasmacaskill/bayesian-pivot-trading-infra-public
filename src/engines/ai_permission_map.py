@@ -40,7 +40,13 @@ class AIPermissionMap:
             "conviction_score": round(float(conviction_score), 2),
             "regime": regime,
             "rag_similarity": round(float(rag_similarity), 2),
-            "authorized_archetypes": authorized_archetypes or ["JUDAS_INDUCEMENT_SNIPER", "LONDON_CLOSE_SILVER_BULLET", "TURTLE_SOUP_LIQUIDITY_SWEEP"],
+            "authorized_archetypes": authorized_archetypes or [
+                "JUDAS_INDUCEMENT_SNIPER",
+                "LONDON_CLOSE_SILVER_BULLET",
+                "TURTLE_SOUP_LIQUIDITY_SWEEP",
+                "STRAT_5_XAU_GOLD_50PCT_CE_LONG",
+                "FVG_50PCT_CE_REVERSAL_LONG"
+            ],
             "notes": notes
         }
         cls._write_file(data)
@@ -68,7 +74,13 @@ class AIPermissionMap:
                 "conviction_score": 7.5,
                 "regime": "MEAN_REVERSION",
                 "rag_similarity": 50.0,
-                "authorized_archetypes": ["JUDAS_INDUCEMENT_SNIPER", "LONDON_CLOSE_SILVER_BULLET", "TURTLE_SOUP_LIQUIDITY_SWEEP"],
+                "authorized_archetypes": [
+                    "JUDAS_INDUCEMENT_SNIPER",
+                    "LONDON_CLOSE_SILVER_BULLET",
+                    "TURTLE_SOUP_LIQUIDITY_SWEEP",
+                    "STRAT_5_XAU_GOLD_50PCT_CE_LONG",
+                    "FVG_50PCT_CE_REVERSAL_LONG"
+                ],
                 "notes": "Default baseline permission"
             }
             

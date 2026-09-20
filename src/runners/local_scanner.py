@@ -894,7 +894,13 @@ class LocalScannerRunner:
                         conviction_score=8.5 if not bias_data['bias_conflict'] else 6.0,
                         regime=strategy_mode,
                         rag_similarity=85.0 if not bias_data['bias_conflict'] else 50.0,
-                        authorized_archetypes=["JUDAS_INDUCEMENT_SNIPER", "LONDON_CLOSE_SILVER_BULLET", "TURTLE_SOUP_LIQUIDITY_SWEEP"],
+                        authorized_archetypes=[
+                            "JUDAS_INDUCEMENT_SNIPER",
+                            "LONDON_CLOSE_SILVER_BULLET",
+                            "TURTLE_SOUP_LIQUIDITY_SWEEP",
+                            "STRAT_5_XAU_GOLD_50PCT_CE_LONG",
+                            "FVG_50PCT_CE_REVERSAL_LONG"
+                        ],
                         notes=f"Daily: {daily_bias} | 4H: {htf_bias} | Hurst: {hurst_val:.2f}"
                     )
                 except Exception as perm_err:
