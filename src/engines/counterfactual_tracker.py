@@ -92,18 +92,9 @@ class CounterfactualTracker:
                 t_id = t["id"]
                 symbol = t["symbol"]
                 direction = t["direction"]
-                entry = float(t["entry_price"])
-                sl = float(t["stop_loss"])
-                tp = float(t["take_profit_1"])
-
-                # Fetch recent bars
-                df = scanner.fetch_data(symbol, "5m", limit=30)
-                if df is None or df.empty:
-                    continue
-
-                recent_high = float(df["high"].max())
-                recent_low = float(df["low"].min())
-                last_price = float(df["close"].iloc[-1])
+                entry = float(t.get("entry_price") or 0.0)
+                sl = float(t.get("stop_loss") or 0.0)
+                tp = float(t.get("take_profit_1") or 0.0)
 
                 created_at = datetime.fromisoformat(t["timestamp"].replace("Z", "+00:00"))
                 if created_at.tzinfo is None:
@@ -111,31 +102,43 @@ class CounterfactualTracker:
 
                 age_hours = (now_utc - created_at).total_seconds() / 3600.0
 
+                # Fetch recent bars for symbol
+                df = None
+                try:
+                    if scanner and hasattr(scanner, 'fetch_data'):
+                        df = scanner.fetch_data(symbol, "5m", limit=288)
+                except Exception as _f_err:
+                    logger.debug(f"Data fetch error during shadow evaluation for {symbol}: {_f_err}")
+
                 outcome = None
                 pnl = 0.0
                 r_mult = 0.0
 
-                if direction in ["BUY", "LONG"]:
-                    if tp > 0 and recent_high >= tp:
-                        outcome = "HIT_TP"
-                        r_mult = 2.5
-                        pnl = 250.0
-                    elif sl > 0 and recent_low <= sl:
-                        outcome = "HIT_SL"
-                        r_mult = -1.0
-                        pnl = -100.0
-                else: # SELL / SHORT
-                    if tp > 0 and recent_low <= tp:
-                        outcome = "HIT_TP"
-                        r_mult = 2.5
-                        pnl = 250.0
-                    elif sl > 0 and recent_high >= sl:
-                        outcome = "HIT_SL"
-                        r_mult = -1.0
-                        pnl = -100.0
+                if df is not None and not df.empty:
+                    recent_high = float(df["high"].max())
+                    recent_low = float(df["low"].min())
 
-                # Auto-expire stale shadow trades after 48h
-                if not outcome and age_hours > 48:
+                    if direction in ["BUY", "LONG"]:
+                        if tp > 0 and recent_high >= tp:
+                            outcome = "HIT_TP"
+                            r_mult = 2.5
+                            pnl = 250.0
+                        elif sl > 0 and recent_low <= sl:
+                            outcome = "HIT_SL"
+                            r_mult = -1.0
+                            pnl = -100.0
+                    else: # SELL / SHORT
+                        if tp > 0 and recent_low <= tp:
+                            outcome = "HIT_TP"
+                            r_mult = 2.5
+                            pnl = 250.0
+                        elif sl > 0 and recent_high >= sl:
+                            outcome = "HIT_SL"
+                            r_mult = -1.0
+                            pnl = -100.0
+
+                # Auto-expire stale shadow trades after 48h regardless of data fetch
+                if not outcome and age_hours > 48.0:
                     outcome = "EXPIRED"
                     r_mult = 0.0
                     pnl = 0.0
@@ -151,7 +154,7 @@ class CounterfactualTracker:
                         """,
                         (outcome, pnl, r_mult, closed_iso, t_id)
                     )
-                    logger.info(f"🏁 Counterfactual Trade #{t_id} [{t['account_key']}] Resolved: {outcome} (${pnl:+.2f}, {r_mult:+.1f}R)")
+                    logger.info(f"🏁 Counterfactual Trade #{t_id} [{t.get('account_key', 'SHADOW')}] Resolved: {outcome} (${pnl:+.2f}, {r_mult:+.1f}R)")
 
                     # ── Real-Time Continuous Bayesian Retraining & Tournament Recording ──
                     if outcome in ["HIT_TP", "HIT_SL"]:
@@ -163,7 +166,6 @@ class CounterfactualTracker:
                                 ChampionChallengerLab().record_tournament_outcome(var_id, is_win=(outcome == "HIT_TP"), r_mult=r_mult)
                         except Exception as _tourn_err:
                             logger.debug(f"Tournament record error: {_tourn_err}")
-
 
             conn.commit()
             conn.close()
@@ -243,12 +245,40 @@ class CounterfactualTracker:
             return "CHALLENGER_LOCAL_MLX"
         elif "CHALLENGER_LOCAL_OLLAMA" in p or "LOCAL_OLLAMA" in p:
             return "CHALLENGER_LOCAL_OLLAMA"
+        elif "CHRONOS" in p:
+            if "TURTLE" in p or "SOUP" in p:
+                return "STRAT_8_CHRONOS_SHADOW_CHALLENGER"
+            elif "SMT" in p:
+                return "STRAT_3_CHRONOS_SHADOW_CHALLENGER"
+            else:
+                return "STRAT_9_CHRONOS_SHADOW_CHALLENGER"
+        elif "VISUAL" in p:
+            if "TURTLE" in p or "SOUP" in p:
+                return "STRAT_8_VISUAL_VECTOR_CHALLENGER"
+            elif "SMT" in p:
+                return "STRAT_3_VISUAL_VECTOR_CHALLENGER"
+            else:
+                return "STRAT_9_VISUAL_VECTOR_CHALLENGER"
         elif "JUDAS" in p or "INDUCEMENT" in p:
             return "STRAT_9_CHALLENGER"
         elif "ASIAN" in p or "FADE" in p:
             return "STRAT_1_CHALLENGER"
         elif "TURTLE" in p or "SOUP" in p or "SWEEP" in p:
             return "STRAT_8_CHALLENGER"
+        elif "SMT" in p:
+            return "STRAT_3_SMT_DIVERGENCE_CHALLENGER"
+        elif "50%" in p or "CE" in p or "EQUILIBRIUM" in p:
+            return "STRAT_5_50PCT_CE_MT_CHALLENGER"
+        elif "VALUE_AREA" in p or "AMT" in p:
+            return "STRAT_AMT_VALUE_REJECTION"
+        elif "AVWAP" in p or "SNAPBACK" in p:
+            return "STRAT_AVWAP_SIGMA_SNAPBACK"
+        elif "ICEBERG" in p or "DELTA_ABSORPTION" in p:
+            return "STRAT_DELTA_ABSORPTION"
+        elif "WYCKOFF" in p or "SPRING" in p or "UPTHRUST" in p:
+            return "STRAT_WYCKOFF_VSA_SPRING"
+        elif "SOL" in p:
+            return "SOL_SHADOW_CHALLENGER"
         return None
 
 

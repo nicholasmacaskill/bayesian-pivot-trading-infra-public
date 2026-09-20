@@ -307,12 +307,33 @@ class UnifiedSovereignSupervisor:
                 except Exception as hyg_err:
                     logger.debug(f"System hygiene sweep notice: {hyg_err}")
 
-                # 3. Synchronize Broker Positions & Closed History into SQLite journal
+                # 3. Continuous Shadow Trade Resolution & Lifecycle Management
+                try:
+                    from src.engines.counterfactual_tracker import CounterfactualTracker
+                    cf_tracker = CounterfactualTracker()
+                    resolved_ct = cf_tracker.evaluate_open_shadow_trades(self.scanner)
+                    if resolved_ct > 0:
+                        logger.info(f"🏁 [Shadow Lifecycle] Automatically resolved {resolved_ct} open counterfactual trades.")
+                except Exception as cf_err:
+                    logger.debug(f"Shadow trade resolution error: {cf_err}")
+
+                # 4. Synchronize Broker Positions & Closed History into SQLite journal
                 try:
                     from datetime import datetime, timezone
+                    now_utc = datetime.now(timezone.utc)
+                    is_weekend = now_utc.weekday() in [5, 6]
+
                     tl_sync = self.get_tl_client()
                     open_pos = tl_sync.get_open_positions()
-                    history = tl_sync.get_recent_history(hours=72)
+
+                    # Skip ordersHistory during weekend maintenance window to avoid 503 log spam
+                    history = []
+                    if not is_weekend:
+                        try:
+                            history = tl_sync.get_recent_history(hours=72)
+                        except Exception as _hist_err:
+                            logger.debug(f"History fetch notice: {_hist_err}")
+
                     if open_pos or history:
                         sync_conn = get_db_connection()
                         sc = sync_conn.cursor()
