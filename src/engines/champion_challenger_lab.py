@@ -386,6 +386,7 @@ class ChampionChallengerLab:
         }
 
         # Save defaults to SQLite if not present
+        conn = None
         try:
             conn = get_db_connection()
             for v in defaults.values():
@@ -400,9 +401,14 @@ class ChampionChallengerLab:
                     1 if v.is_active else 0, v.created_at
                 ))
             conn.commit()
-            conn.close()
         except Exception as e:
             logger.debug(f"Variant sync error: {e}")
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         return defaults
 
@@ -429,6 +435,7 @@ class ChampionChallengerLab:
             v.profit_factor = round(gross_win / gross_loss, 2)
 
         # Persist to SQLite
+        conn = None
         try:
             conn = get_db_connection()
             conn.execute("""
@@ -438,10 +445,15 @@ class ChampionChallengerLab:
                 WHERE variant_id = ?
             """, (v.samples, v.wins, v.losses, v.total_r, v.profit_factor, v.win_rate, variant_id))
             conn.commit()
-            conn.close()
             logger.info(f"🏆 [A/B TOURNAMENT] {variant_id} ({v.variant_type}): Samples={v.samples} | WinRate={v.win_rate}% | PF={v.profit_factor}")
         except Exception as e:
             logger.debug(f"Tournament outcome record error: {e}")
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         # Check if challenger qualifies for promotion
         if v.variant_type == "CHALLENGER":

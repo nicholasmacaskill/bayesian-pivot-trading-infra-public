@@ -99,6 +99,7 @@ class QualityGovernor:
             issues.append(f"Database file not found: {db_path}")
             return False, issues
 
+        conn = None
         try:
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
@@ -116,8 +117,6 @@ class QualityGovernor:
                     if rc not in journal_cols:
                         issues.append(f"Missing required column in journal table: {rc}")
 
-            conn.close()
-
             # Verify daily setup lock JSON file
             lock_file = "data/daily_setup_lock.json"
             if os.path.exists(lock_file):
@@ -127,6 +126,12 @@ class QualityGovernor:
                         issues.append(f"Malformed daily_setup_lock.json format: {lock_data}")
         except Exception as e:
             issues.append(f"Database schema verification error: {e}")
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         return len(issues) == 0, issues
 

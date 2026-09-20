@@ -28,12 +28,12 @@ def execute_db_write_with_retry(query: str, params: tuple = (), max_retries: int
     import random
     
     for attempt in range(max_retries):
+        conn = None
         try:
             conn = get_db_connection()
             c = conn.cursor()
             c.execute(query, params)
             conn.commit()
-            conn.close()
             return True
         except sqlite3.OperationalError as e:
             if "locked" in str(e).lower() and attempt < max_retries - 1:
@@ -41,6 +41,12 @@ def execute_db_write_with_retry(query: str, params: tuple = (), max_retries: int
                 time.sleep(sleep_sec)
                 continue
             raise e
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 
 

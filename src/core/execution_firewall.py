@@ -144,16 +144,23 @@ class ExecutionFirewall:
             from datetime import datetime, timezone
             db_path = getattr(Config, 'DB_PATH', os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "smc_alpha.db"))
             if os.path.exists(db_path):
-                conn = sqlite3.connect(db_path, timeout=5.0)
-                cur = conn.cursor()
-                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                cur.execute("""
-                    SELECT timestamp, symbol, side, pnl FROM journal 
-                    WHERE timestamp LIKE ? AND status = 'CLOSED' AND strategy != 'ROGUE'
-                    ORDER BY id DESC LIMIT 50
-                """, (f"{today_str}%",))
-                rows = cur.fetchall()
-                conn.close()
+                conn = None
+                try:
+                    conn = sqlite3.connect(db_path, timeout=5.0)
+                    cur = conn.cursor()
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    cur.execute("""
+                        SELECT timestamp, symbol, side, pnl FROM journal 
+                        WHERE timestamp LIKE ? AND status = 'CLOSED' AND strategy != 'ROGUE'
+                        ORDER BY id DESC LIMIT 50
+                    """, (f"{today_str}%",))
+                    rows = cur.fetchall()
+                finally:
+                    if conn:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
 
                 if not rows:
                     return True, "OK"

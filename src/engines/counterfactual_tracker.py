@@ -62,12 +62,17 @@ class CounterfactualTracker:
                 )
             )
             conn.commit()
-            conn.close()
             logger.info(f"👻 Counterfactual Shadow Agent registered for {account_key} ({symbol} {direction}): {reasons_json}")
             return True
         except Exception as e:
             logger.error(f"Failed to register counterfactual shadow trade: {e}")
             return False
+        finally:
+            if 'conn' in locals() and conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def evaluate_open_shadow_trades(self, scanner) -> int:
         """
@@ -168,11 +173,16 @@ class CounterfactualTracker:
                             logger.debug(f"Tournament record error: {_tourn_err}")
 
             conn.commit()
-            conn.close()
             return resolved_count
         except Exception as e:
             logger.error(f"Error evaluating open shadow trades: {e}")
             return 0
+        finally:
+            if 'conn' in locals() and conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def _update_bayesian_weight_realtime(self, pattern: str, outcome: str, r_mult: float):
         """Instant per-trade Bayesian posterior weight update."""
