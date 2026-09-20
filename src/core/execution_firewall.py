@@ -281,7 +281,8 @@ class ExecutionFirewall:
         open_positions: Optional[List[Dict[str, Any]]] = None,
         bypass_cooldown: bool = False,
         bypass_circuit_breaker: bool = False,
-        hurst_exponent: Optional[float] = None
+        hurst_exponent: Optional[float] = None,
+        bypass_weekend: bool = False
     ) -> Tuple[bool, str]:
         """
         Audits an incoming trade request against all 10 Ironclad Invariants.
@@ -299,15 +300,16 @@ class ExecutionFirewall:
             return False, err
 
         # ── INVARIANT 2: Universal Weekend & Friday Pre-Close Quarantine ──
-        if weekday in (5, 6):  # Saturday or Sunday
-            err = f"FIREWALL REJECTION (Gate 2): Weekend Execution Locked (Weekday={weekday}). Zero live capital risk on weekends."
-            logger.warning(f"🛡️ [FIREWALL BLOCKED] {err}")
-            return False, err
+        if not bypass_weekend:
+            if weekday in (5, 6):  # Saturday or Sunday
+                err = f"FIREWALL REJECTION (Gate 2): Weekend Execution Locked (Weekday={weekday}). Zero live capital risk on weekends."
+                logger.warning(f"🛡️ [FIREWALL BLOCKED] {err}")
+                return False, err
 
-        if weekday == 4 and utc_hour >= 18.0:  # Friday after 18:00 UTC
-            err = f"FIREWALL REJECTION (Gate 2): Friday Pre-Weekend Lockout active ({utc_hour:.2f} UTC >= 18:00). Prohibiting new entries before market close."
-            logger.warning(f"🛡️ [FIREWALL BLOCKED] {err}")
-            return False, err
+            if weekday == 4 and utc_hour >= 18.0:  # Friday after 18:00 UTC
+                err = f"FIREWALL REJECTION (Gate 2): Friday Pre-Weekend Lockout active ({utc_hour:.2f} UTC >= 18:00). Prohibiting new entries before market close."
+                logger.warning(f"🛡️ [FIREWALL BLOCKED] {err}")
+                return False, err
 
         # ── INVARIANT 3: London & NY Prime Killzone Gate ──
         if not bypass_killzone:

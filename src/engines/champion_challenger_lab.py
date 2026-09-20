@@ -165,7 +165,24 @@ class ChampionChallengerLab:
                 },
                 created_at=datetime.now(timezone.utc).isoformat()
             ),
-            # Strategy 5: 50% Consequent Encroachment (CE) FVG Midpoint Fill
+            # Strategy 5: XAU/USD Gold 50% Consequent Encroachment (CE) Longs (GRADUATED CHAMPION)
+            "STRAT_5_XAU_GOLD_50PCT_CE_LONG": StrategyVariant(
+                variant_id="STRAT_5_XAU_GOLD_50PCT_CE_LONG",
+                strategy_id="STRATEGY_5_50PCT_CE_MT",
+                variant_type="CHAMPION",
+                parameters={
+                    "symbol": "XAU/USD",
+                    "direction": "LONG",
+                    "min_htf_trend": "BULLISH",
+                    "sessions": ["LONDON", "NY_AM"],
+                    "min_ce_mitigation_depth": 0.50,
+                    "target_rr": 2.5,
+                    "stop_buffer_atr": 0.25,
+                    "weekdays_only": True
+                },
+                created_at=datetime.now(timezone.utc).isoformat()
+            ),
+            # Strategy 5: 50% Consequent Encroachment (CE) FVG Midpoint Fill (Shadow Challenger)
             "STRAT_5_CHALLENGER": StrategyVariant(
                 variant_id="STRAT_5_50PCT_CE_MT_CHALLENGER",
                 strategy_id="STRATEGY_5_50PCT_CE_MT",

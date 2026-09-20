@@ -268,6 +268,8 @@ class CounterfactualTracker:
         elif "SMT" in p:
             return "STRAT_3_SMT_DIVERGENCE_CHALLENGER"
         elif "50%" in p or "CE" in p or "EQUILIBRIUM" in p:
+            if "CHAMPION" in p or "GOLD" in p or "XAU" in p or "STRAT_5_XAU" in p:
+                return "STRAT_5_XAU_GOLD_50PCT_CE_LONG"
             return "STRAT_5_50PCT_CE_MT_CHALLENGER"
         elif "VALUE_AREA" in p or "AMT" in p:
             return "STRAT_AMT_VALUE_REJECTION"

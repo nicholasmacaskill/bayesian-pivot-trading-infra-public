@@ -51,9 +51,9 @@ class TestTieredTrailingAndSessionLock(unittest.TestCase):
 
         self.scanner.check_and_trail_positions()
         
-        # Should have updated SL to entry (77725.0)
+        # Should have updated SL to entry minus BE offset (77725.0 - 25.0 = 77700.0)
         self.scanner.tl.update_fleet_stop_loss.assert_called_once_with(
-            new_stop_loss=77725.0,
+            new_stop_loss=77700.0,
             symbol='BTC/USD'
         )
         self.assertEqual(self.scanner._position_tiers.get('pos_1'), 1)
@@ -138,7 +138,7 @@ class TestTieredTrailingAndSessionLock(unittest.TestCase):
             self.scanner.check_and_trail_positions()
 
         self.scanner.tl.update_fleet_stop_loss.assert_called_once_with(
-            new_stop_loss=77725.0,
+            new_stop_loss=77700.0,
             symbol='BTC/USD'
         )
         self.assertEqual(self.scanner._position_tiers.get('pos_4'), 1)

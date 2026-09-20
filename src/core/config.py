@@ -96,6 +96,16 @@ class Config:
     STRATEGY_9_BYPASS_GENERIC_AI = False # Requires full 8.0+ AI Validator gate
     STRATEGY_9_AUTO_EXECUTE = True      # ✅ GRADUATED: Live Fleet Auto-Execution Enabled
 
+    # ── Strategy 5: XAU/USD 50% Consequent Encroachment Longs (GRADUATED CHAMPION: 65.4% WR / 4.72 PF) ───
+    STRATEGY_5_ENABLED = True
+    STRATEGY_5_CE_FILL_PCT = 0.50       # Exact 50% midpoint of 1H/15m FVG
+    STRATEGY_5_TARGET_RR = 2.5          # 2.5R Target (Calibrated to peak mathematical expectancy)
+    STRATEGY_5_STOP_BUFFER_ATR = 0.25   # 0.25 ATR stop buffer below FVG bottom
+    STRATEGY_5_RISK_USD = 40.0          # Base dollar risk per trade ($35 on $25k, $70 on $50k)
+    STRATEGY_5_AUTO_EXECUTE = True      # ✅ GRADUATED: Live Fleet Auto-Execution Enabled (Weekdays Only, Gold Longs Only)
+    STRATEGY_5_LONGS_ONLY = True        # Strict Directional Gate: Never trade CE shorts (12.8% toxic failure)
+    STRATEGY_5_REQUIRE_HTF_BULLISH = True # Mandatory 4H/Daily macro structural alignment
+
     
     # Prop Firm Execution Profiles
     ACTIVE_FIRM = "UPCOMERS"

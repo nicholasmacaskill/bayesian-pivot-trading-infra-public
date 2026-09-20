@@ -77,6 +77,13 @@ class SMCScanner:
             # But usually 'coinbase' is the correct one for public market data now
             self.exchange = ccxt.coinbasepro({'enableRateLimit': True})
             
+        # Dedicated exchange for commodities/metals (Gold) to eliminate basis discrepancy
+        try:
+            self.bybit_exchange = ccxt.bybit({'enableRateLimit': True})
+        except Exception as e:
+            logger.warning(f"Could not initialize Bybit for metals/gold: {e}")
+            self.bybit_exchange = None
+
         self.intermarket = IntermarketEngine()
         self.news = NewsFilter()
         self.kalman_filter = KalmanStateFilter()
@@ -357,21 +364,28 @@ class SMCScanner:
         try:
             tf_to_seconds = {'1m': 60, '5m': 300, '1h': 3600, '4h': 14400, '1d': 86400}
             
-            # Map Gold to PAXG/USD if using Coinbase for data feeds
+            # Map Gold to Bybit continuous contract (XAU/USDT:USDT) to eliminate $64 PAXG basis gap
+            is_gold = symbol in ["XAU/USD", "XAUUSD", "GOLD"]
+            target_exchange = self.exchange
             fetch_symbol = symbol
-            if symbol in ["XAU/USD", "XAUUSD", "GOLD"] and self.exchange.id == 'coinbase':
-                fetch_symbol = "PAXG/USD"
+
+            if is_gold:
+                if getattr(self, 'bybit_exchange', None):
+                    target_exchange = self.bybit_exchange
+                    fetch_symbol = "XAU/USDT:USDT"
+                elif self.exchange.id == 'coinbase':
+                    fetch_symbol = "PAXG/USD"
 
             # 1. Fetch Primary Stream
-            # Coinbase doesn't natively support 4H in CCXT, so if timeframe is 4h, we fallback to 1h then aggregate
-            if timeframe == '4h' and self.exchange.id == 'coinbase':
-                df_raw_main = self.exchange.fetch_ohlcv(fetch_symbol, '1h', limit=limit*4)
+            # If Coinbase and 4H, aggregate from 1h; otherwise fetch natively from target exchange
+            if timeframe == '4h' and target_exchange.id == 'coinbase':
+                df_raw_main = target_exchange.fetch_ohlcv(fetch_symbol, '1h', limit=limit*4)
                 if not df_raw_main: return None
                 main_df_base = pd.DataFrame(df_raw_main, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 main_df_base['timestamp'] = pd.to_datetime(main_df_base['timestamp'], unit='ms')
                 main_df = self._aggregate_ohlcv(main_df_base, '4h')
             else:
-                df_raw_main = self.exchange.fetch_ohlcv(fetch_symbol, timeframe, limit=limit)
+                df_raw_main = target_exchange.fetch_ohlcv(fetch_symbol, timeframe, limit=limit)
                 if not df_raw_main: return None
                 main_df = pd.DataFrame(df_raw_main, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 main_df['timestamp'] = pd.to_datetime(main_df['timestamp'], unit='ms')
@@ -384,15 +398,15 @@ class SMCScanner:
             if timeframe != '4h': timeframes_to_check.append('4h')
             
             for tf in timeframes_to_check:
-                if tf == '4h':
-                    # Native aggregation for 4H
-                    df_base_raw = self.exchange.fetch_ohlcv(fetch_symbol, '1h', limit=limit*4)
+                if tf == '4h' and target_exchange.id == 'coinbase':
+                    # Native aggregation for 4H on Coinbase
+                    df_base_raw = target_exchange.fetch_ohlcv(fetch_symbol, '1h', limit=limit*4)
                     if not df_base_raw: continue
                     df_base = pd.DataFrame(df_base_raw, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     df_base['timestamp'] = pd.to_datetime(df_base['timestamp'], unit='ms')
                     df_tf = self._aggregate_ohlcv(df_base, '4h')
                 else:
-                    df_raw = self.exchange.fetch_ohlcv(fetch_symbol, tf, limit=10)
+                    df_raw = target_exchange.fetch_ohlcv(fetch_symbol, tf, limit=10)
                     if not df_raw: continue
                     df_tf = pd.DataFrame(df_raw, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     df_tf['timestamp'] = pd.to_datetime(df_tf['timestamp'], unit='ms')
@@ -412,6 +426,9 @@ class SMCScanner:
                 allowed_drift = Config.get('SYNC_LATENCY_SEC_MAX', 120) + tf_sec
                 
                 if drift > allowed_drift:
+                    if is_gold and now_utc.weekday() >= 5:
+                        logger.debug(f"Weekend gold stream {tf} drift: {drift:.1f}s. Skipping blocking wait.")
+                        return None
                     logger.warning(f"🚨 DATA_DESYNC: Stream {tf} drift is {drift:.1f}s (Limit: {allowed_drift}s). Pausing 10s for stream sync...")
                     time.sleep(10)
                     return None # Triggers "HOLD" state in runner
@@ -1453,7 +1470,7 @@ For research enquiries: github.com/nicholasmacaskill/bayesian-pivot-trading-infr
             mins = news_data['minutes_until']
         else:
             # TODO: Add news mocking for backtest
-            is_safe, event, mins = self.news.is_news_safe()
+            is_safe, event, mins = self.news.is_news_safe(symbol=symbol)
         
         news_context = "Clear"
         if not is_safe:

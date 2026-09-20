@@ -34,7 +34,8 @@ class TestExecutionFirewallExtended(unittest.TestCase):
             stop_loss=76000.0,
             take_profit=79000.0,
             ai_score=7.5,
-            bypass_killzone=True
+            bypass_killzone=True,
+            bypass_weekend=True
         )
         self.assertFalse(approved)
         self.assertTrue("Gate 4" in reason or "8.0/10.0 threshold" in reason)
@@ -53,7 +54,8 @@ class TestExecutionFirewallExtended(unittest.TestCase):
             ai_score=9.0,
             bypass_killzone=True,
             open_positions=open_positions,
-            bypass_cooldown=True
+            bypass_cooldown=True,
+            bypass_weekend=True
         )
         self.assertFalse(approved)
         self.assertTrue("Gate 6" in reason or "Anti-Stacking" in reason)
@@ -75,7 +77,8 @@ class TestExecutionFirewallExtended(unittest.TestCase):
                 ai_score=9.0,
                 bypass_killzone=True,
                 open_positions=open_positions,
-                bypass_cooldown=True
+                bypass_cooldown=True,
+                bypass_weekend=True
             )
             self.assertFalse(approved)
             self.assertTrue("Gate 7" in reason or "Max Concurrent Fleet Positions" in reason)
@@ -97,7 +100,8 @@ class TestExecutionFirewallExtended(unittest.TestCase):
                     ai_score=9.0,
                     bypass_killzone=True,
                     open_positions=[],
-                    bypass_cooldown=False
+                    bypass_cooldown=False,
+                    bypass_weekend=True
                 )
                 self.assertFalse(approved)
                 self.assertTrue("Gate 8" in reason or "Debounce Cooldown" in reason)

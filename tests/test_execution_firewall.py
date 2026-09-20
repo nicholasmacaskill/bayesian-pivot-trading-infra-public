@@ -18,7 +18,8 @@ def test_firewall_blocks_sub_8_ai_scores():
         stop_loss=2400.0,
         take_profit=2500.0,
         ai_score=7.2,  # Sub-8.0 score
-        bypass_killzone=True
+        bypass_killzone=True,
+        bypass_weekend=True
     )
     assert not approved
     assert "below the mandatory 8.0/10.0 threshold" in reason
@@ -31,7 +32,8 @@ def test_firewall_blocks_5m_candle_bypasses():
         take_profit=2500.0,
         ai_score=9.5,
         is_htf_confirmed=False,  # No 1H HTF confirmation
-        bypass_killzone=True
+        bypass_killzone=True,
+        bypass_weekend=True
     )
     assert not approved
     assert "Single 5-minute candle bypasses are prohibited" in reason
@@ -46,7 +48,8 @@ def test_firewall_approves_valid_master_trade():
         is_htf_confirmed=True,
         bypass_killzone=True,
         bypass_cooldown=True,
-        bypass_circuit_breaker=True
+        bypass_circuit_breaker=True,
+        bypass_weekend=True
     )
     assert approved
     assert reason == "APPROVED_BY_FIREWALL"

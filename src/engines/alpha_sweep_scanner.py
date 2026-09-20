@@ -603,7 +603,8 @@ class AlphaSweepScanner(SMCScanner):
     def check_fvg_50pct_ce_midpoint_shadow(self, symbol, df_5m, df_1h, killzone):
         """
         Scans for 50% Consequent Encroachment (CE) FVG Midpoint Reversals.
-        100% SHADOW LAB ONLY - ZERO LIVE CAPITAL RISK.
+        Strategy 5: Graduated to Live Execution for Gold Longs (XAU/USD).
+        Shorts and non-killzone/counter-trend setups are strictly quarantined to Shadow Lab.
         """
         if len(df_1h) < 5 or len(df_5m) < 5:
             return None
@@ -616,6 +617,16 @@ class AlphaSweepScanner(SMCScanner):
             c_low_5m = df_5m.iloc[-2]['low']
             c_high_5m = df_5m.iloc[-2]['high']
             
+            is_gold = symbol in ["XAU/USD", "XAUUSD", "GOLD"]
+            now_utc = datetime.now(timezone.utc)
+            is_weekday = now_utc.weekday() < 5
+            kz_str = str(killzone or "").upper()
+            is_gold_liquid_session = any(k in kz_str for k in ["LONDON", "NY_AM", "CONTINUOUS", "NEW_YORK"])
+            
+            # 1H HTF Trend Check (Mandatory Bullish Structure for Longs)
+            ema50_1h = df_1h['close'].ewm(span=min(50, len(df_1h))).mean().iloc[-1]
+            htf_bullish = df_1h['close'].iloc[-1] >= ema50_1h
+
             # Scan 1H for recent unmitigated Fair Value Gaps
             for i in range(len(df_1h) - 4, len(df_1h) - 1):
                 c1_high = float(df_1h.iloc[i-1]['high'])
@@ -629,27 +640,53 @@ class AlphaSweepScanner(SMCScanner):
                     if c_low_5m <= ce_level and c_close_5m > ce_level:
                         closes_1h = df_1h['close'].values
                         hurst = self.get_hurst_exponent(closes_1h)
+                        
+                        # Stop loss placed below FVG bottom (c1_high) with ATR buffer
+                        stop_buffer = atr_5m * getattr(Config, 'STRATEGY_5_STOP_BUFFER_ATR', 0.25)
+                        sl_price = c1_high - stop_buffer
+                        stop_dist = abs(c_close_5m - sl_price)
+                        target_rr = getattr(Config, 'STRATEGY_5_TARGET_RR', 2.5)
+                        tp_price = c_close_5m + (stop_dist * target_rr)
+
+                        # Determine if qualified for Live Champion Execution
+                        strat_5_auto = getattr(Config, 'STRATEGY_5_AUTO_EXECUTE', False)
+                        is_live_qualified = (
+                            is_gold 
+                            and is_weekday 
+                            and is_gold_liquid_session 
+                            and htf_bullish 
+                            and strat_5_auto
+                        )
+
                         return {
                             "direction": "LONG",
                             "level": ce_level,
                             "hurst": hurst,
                             "trend": "50PCT_CE_FVG_REVERSAL",
                             "regime": "FVG_CONSEQUENT_ENCROACHMENT",
-                            "pattern_type": "FVG_50PCT_CE_REVERSAL_SHADOW",
+                            "pattern_type": "STRAT_5_XAU_GOLD_50PCT_CE_LONG" if is_live_qualified else "FVG_50PCT_CE_REVERSAL_SHADOW",
+                            "strategy_id": "STRATEGY_5_50PCT_CE_MT",
                             "sweep_dist": abs(c_close_5m - ce_level),
                             "atr": atr_5m,
                             "price": c_close_5m,
-                            "is_shadow_only": True,
+                            "stop_loss": sl_price,
+                            "take_profit": tp_price,
+                            "is_shadow_only": not is_live_qualified,
                             "fvg_top": c3_low,
                             "fvg_bottom": c1_high
                         }
                         
                 # Bearish FVG: Gap between C1 Low and C3 High
                 if c3_high < c1_low:
+                    # Directional Rule: Strategy 5 prohibits shorting Gold (12.8% WR toxic failure)
+                    # Shorts remain 100% Shadow Only for research
                     ce_level = (c1_low + c3_high) / 2.0
                     if c_high_5m >= ce_level and c_close_5m < ce_level:
                         closes_1h = df_1h['close'].values
                         hurst = self.get_hurst_exponent(closes_1h)
+                        sl_price = c1_low + (atr_5m * 0.25)
+                        stop_dist = abs(sl_price - c_close_5m)
+                        tp_price = c_close_5m - (stop_dist * 2.5)
                         return {
                             "direction": "SHORT",
                             "level": ce_level,
@@ -657,10 +694,13 @@ class AlphaSweepScanner(SMCScanner):
                             "trend": "50PCT_CE_FVG_REVERSAL",
                             "regime": "FVG_CONSEQUENT_ENCROACHMENT",
                             "pattern_type": "FVG_50PCT_CE_REVERSAL_SHADOW",
+                            "strategy_id": "STRATEGY_5_50PCT_CE_MT",
                             "sweep_dist": abs(c_close_5m - ce_level),
                             "atr": atr_5m,
                             "price": c_close_5m,
-                            "is_shadow_only": True,
+                            "stop_loss": sl_price,
+                            "take_profit": tp_price,
+                            "is_shadow_only": True, # Always shadow for shorts
                             "fvg_top": c1_low,
                             "fvg_bottom": c3_high
                         }
@@ -998,11 +1038,24 @@ class AlphaSweepScanner(SMCScanner):
 
             passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved and (not is_vec_trap)
             
-            is_symbol_shadow = is_shadow or (symbol in getattr(Config, 'SHADOW_SYMBOLS', []))
-            # is_low_density_sweep: sweep hit a noise level with density < 6.0 — never risk live capital
+            # If Strategy 5 Gold Longs are graduated and active, exempt XAU/USD from blanket shadow quarantine
+            is_strat_5_gold_live = (
+                symbol in ["XAU/USD", "XAUUSD", "GOLD"]
+                and setup.get('direction') == "LONG"
+                and pattern_type in ["STRAT_5_XAU_GOLD_50PCT_CE_LONG", "FVG_50PCT_CE_REVERSAL_LONG", "FVG_50PCT_CE_REVERSAL"]
+                and getattr(Config, 'STRATEGY_5_AUTO_EXECUTE', False)
+                and not setup.get('is_shadow_only', False)
+            )
+            is_symbol_shadow = (is_shadow or (symbol in getattr(Config, 'SHADOW_SYMBOLS', []))) and not is_strat_5_gold_live
+
+            is_fvg_ce = ("FVG" in pattern_type or "50PCT" in pattern_type or "STRAT_5" in pattern_type)
+            is_low_density_sweep = (not is_dense_liq) and (not is_fvg_ce)
+
             authorized_live_patterns = ["TURTLE_SOUP_LIQUIDITY_SWEEP", "LONDON_CLOSE_SILVER_BULLET"]
             if getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', False):
                 authorized_live_patterns.extend(["JUDAS_INDUCEMENT_SNIPER", "STRATEGY_9_JUDAS_INDUCEMENT"])
+            if getattr(Config, 'STRATEGY_5_AUTO_EXECUTE', False):
+                authorized_live_patterns.extend(["STRAT_5_XAU_GOLD_50PCT_CE_LONG", "FVG_50PCT_CE_REVERSAL_LONG", "FVG_50PCT_CE_REVERSAL"])
 
             is_archetype_shadow = (
                 (pattern_type not in authorized_live_patterns)

@@ -48,14 +48,28 @@ class NewsFilter:
             logger.error(f"Error fetching news calendar: {e}")
         return False
 
-    def is_news_safe(self, buffer_pre_mins=1, buffer_post_mins=2):
+    def is_news_safe(self, symbol=None, buffer_pre_mins=None, buffer_post_mins=None, buffer_minutes=None):
         """
-        Checks if we are in the exact T=0 spread-spike window of a Tier-1 event.
-        - Returns False ONLY during [event_time - 1m, event_time + 2m] to protect against spread spikes.
-        - Returns True for post-news Judas Reversal execution (T+2m to T+15m).
+        Checks if we are in the high-impact news blackout window.
+        - Crypto (BTC/ETH/SOL): Pre-news 1m, Post-news 2m (allows Post-News Judas Reversals T+2m to T+15m).
+        - Commodities / Gold (XAU/USD): Pre-news 5m, Post-news 5m to shield against spread blowouts & extreme volatility.
+        - Custom buffer_minutes or buffer_pre_mins/buffer_post_mins can override.
         """
         if not self.last_fetch or (datetime.now() - self.last_fetch).total_seconds() > 86400:
             self.fetch_calendar()
+
+        is_gold = symbol and any(g in str(symbol).upper() for g in ["XAU", "GOLD"])
+
+        if buffer_minutes is not None:
+            pre_mins = buffer_minutes
+            post_mins = buffer_minutes
+        else:
+            if is_gold:
+                pre_mins = 5 if buffer_pre_mins is None else buffer_pre_mins
+                post_mins = 5 if buffer_post_mins is None else buffer_post_mins
+            else:
+                pre_mins = 1 if buffer_pre_mins is None else buffer_pre_mins
+                post_mins = 2 if buffer_post_mins is None else buffer_post_mins
 
         now = datetime.now(pytz.timezone('US/Eastern'))
         
@@ -64,13 +78,17 @@ class NewsFilter:
                 event_time = datetime.fromisoformat(event['date'])
                 diff_mins = (event_time - now).total_seconds() / 60.0
                 
-                # Block only during T-1m to T+2m to avoid T=0 spread spikes
-                if -buffer_post_mins <= diff_mins <= buffer_pre_mins:
+                # Block during [-post_mins, pre_mins]
+                if -post_mins <= diff_mins <= pre_mins:
                     return False, event['title'], int(diff_mins)
             except Exception:
                 continue
                 
         return True, None, 0
+
+    def is_trade_allowed(self, symbol="BTC/USD"):
+        """Convenience method returning (is_allowed, event_title, diff_mins) for a specific symbol."""
+        return self.is_news_safe(symbol=symbol)
 
     def get_upcoming_catalyst(self, window_mins=15):
         """Returns details if a Tier-1 Crypto Macro catalyst is within `window_mins`."""
