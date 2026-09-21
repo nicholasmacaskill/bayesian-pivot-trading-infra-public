@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 from src.core.config import Config
-from src.core.database import get_db_connection
+from src.core.database import get_db_connection, execute_db_write_with_retry
 
 logger = logging.getLogger("VisualVectorEngine")
 
@@ -186,24 +186,23 @@ class VisualVectorEngine:
     ) -> bool:
         """Stores a computed vector embedding and its verified outcome in SQLite."""
         try:
-            conn = get_db_connection()
             embedding_id = f"VEC_{signal_id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             vector_blob = vector.astype(np.float32).tobytes()
 
-            conn.execute("""
+            query = """
                 INSERT OR REPLACE INTO chart_visual_embeddings (
                     embedding_id, signal_id, timestamp, symbol, pattern, 
                     session, direction, outcome, realized_r, pnl, 
                     vector, vector_dim, notes, regime_type, hurst, atr_percentile, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
+            """
+            params = (
                 embedding_id, str(signal_id), str(timestamp), str(symbol), str(pattern),
                 str(session), str(direction), str(outcome), float(realized_r), float(pnl),
                 vector_blob, len(vector), str(notes), str(regime_type), float(hurst), float(atr_percentile),
                 datetime.now(timezone.utc).isoformat()
-            ))
-            conn.commit()
-            conn.close()
+            )
+            execute_db_write_with_retry(query, params)
             return True
         except Exception as e:
             logger.error(f"Failed to store visual embedding: {e}")

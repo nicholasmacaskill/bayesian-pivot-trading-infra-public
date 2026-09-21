@@ -10,11 +10,11 @@ def get_db_connection():
     if not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
     
-    conn = sqlite3.connect(Config.DB_PATH, timeout=10.0)
+    conn = sqlite3.connect(Config.DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA busy_timeout=5000;")
+        conn.execute("PRAGMA busy_timeout=30000;")
     except Exception:
         pass
     return conn

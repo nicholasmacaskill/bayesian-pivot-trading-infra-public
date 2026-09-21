@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from src.core.database import get_db_connection
+from src.core.database import get_db_connection, execute_db_write_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -28,40 +28,34 @@ class CounterfactualTracker:
         try:
             symbol = setup.get("symbol", "BTC/USD")
             direction = setup.get("direction", setup.get("bias", "BUY")).upper()
-            pattern = setup.get("pattern", setup.get("formations", "UNKNOWN"))
+            pattern = setup.get("pattern_type", setup.get("pattern", "UNKNOWN"))
             entry_price = float(setup.get("price", setup.get("entry_price", 0.0)))
             stop_loss = float(setup.get("stop_loss", 0.0))
-            tp1 = float(setup.get("take_profit", setup.get("tp1", 0.0)))
-            tp2 = float(setup.get("tp2", 0.0))
-
-            if entry_price <= 0 or stop_loss <= 0:
-                return False
+            tp1 = float(setup.get("take_profit", setup.get("take_profit_1", 0.0)))
+            tp2 = float(setup.get("take_profit_2", 0.0))
 
             now_iso = datetime.now(timezone.utc).isoformat()
             reasons_json = json.dumps(rejection_reasons)
 
-            conn = get_db_connection()
             regime_type = setup.get("regime", "UNKNOWN")
             entry_hurst = float(setup.get("hurst", setup.get("hurst_exponent", 0.5)))
             adx_at_entry = float(setup.get("adx", 20.0))
             vol_percentile = float(setup.get("vol_percentile", 50.0))
 
-            conn.execute(
-                """
+            query = """
                 INSERT INTO counterfactual_trades (
                     timestamp, account_key, symbol, direction, pattern, strategy_mode,
                     entry_price, stop_loss, take_profit_1, take_profit_2,
                     rejection_reasons, status, outcome, simulated_pnl, simulated_r,
                     regime_type, entry_hurst, adx_at_entry, vol_percentile
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', 'PENDING', 0.0, 0.0, ?, ?, ?, ?)
-                """,
-                (
-                    now_iso, account_key, symbol, direction, pattern, strategy_mode,
-                    entry_price, stop_loss, tp1, tp2, reasons_json,
-                    regime_type, entry_hurst, adx_at_entry, vol_percentile
-                )
+            """
+            params = (
+                now_iso, account_key, symbol, direction, pattern, strategy_mode,
+                entry_price, stop_loss, tp1, tp2, reasons_json,
+                regime_type, entry_hurst, adx_at_entry, vol_percentile
             )
-            conn.commit()
+            execute_db_write_with_retry(query, params)
             logger.info(f"👻 Counterfactual Shadow Agent registered for {account_key} ({symbol} {direction}): {reasons_json}")
             return True
         except Exception as e:

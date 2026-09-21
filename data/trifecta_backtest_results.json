@@ -1,675 +1,15 @@
 [
   {
-    "timestamp":"2026-05-18T12:00:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":77275.96,
-    "ai_score":8.0,
-    "pnl_r":-1.0597234819,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":-1.0597234819
-  },
-  {
-    "timestamp":"2026-05-20T12:55:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":77617.26,
-    "ai_score":8.0,
-    "pnl_r":1.9215086255,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":0.8617851436
-  },
-  {
-    "timestamp":"2026-05-21T13:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":76778.98,
-    "ai_score":8.0,
-    "pnl_r":-1.0622966387,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":-0.2005114951
-  },
-  {
-    "timestamp":"2026-05-22T02:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":77624.99,
-    "ai_score":9.0,
-    "pnl_r":-1.0833333333,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":-1.2838448284
-  },
-  {
-    "timestamp":"2026-05-25T15:10:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":77711.99,
-    "ai_score":8.5,
-    "pnl_r":1.9373488431,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":0.6535040147
-  },
-  {
-    "timestamp":"2026-05-27T12:20:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":75864.0,
-    "ai_score":9.5,
-    "pnl_r":1.9552631703,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":2.608767185
-  },
-  {
-    "timestamp":"2026-05-27T17:55:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":74860.42,
-    "ai_score":8.0,
-    "pnl_r":0.6848202419,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":3.293587427
-  },
-  {
-    "timestamp":"2026-05-28T14:05:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":72868.46,
-    "ai_score":8.5,
-    "pnl_r":0.7038740292,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":3.9974614561
-  },
-  {
-    "timestamp":"2026-05-29T14:25:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BULLISH",
-    "entry":72722.64,
-    "ai_score":9.0,
-    "pnl_r":1.7930491042,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":5.7905105603
-  },
-  {
-    "timestamp":"2026-05-29T17:15:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":74227.58,
-    "ai_score":9.0,
-    "pnl_r":1.9516447031,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":7.7421552634
-  },
-  {
-    "timestamp":"2026-06-01T16:10:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BULLISH",
-    "entry":70884.01,
-    "ai_score":8.5,
-    "pnl_r":1.7916411939,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":9.5337964573
-  },
-  {
-    "timestamp":"2026-06-03T12:00:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":67106.0,
-    "ai_score":8.5,
-    "pnl_r":-1.0653649395,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":8.4684315178
-  },
-  {
-    "timestamp":"2026-06-03T15:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BULLISH",
-    "entry":66309.19,
-    "ai_score":8.0,
-    "pnl_r":-1.0621814103,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":7.4062501075
-  },
-  {
-    "timestamp":"2026-06-08T14:55:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BEARISH",
-    "entry":63964.08,
-    "ai_score":8.0,
-    "pnl_r":-1.0762061649,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":6.3300439425
-  },
-  {
-    "timestamp":"2026-06-09T12:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BULLISH",
-    "entry":62570.71,
-    "ai_score":8.0,
-    "pnl_r":-1.0642868963,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":5.2657570463
-  },
-  {
-    "timestamp":"2026-06-09T13:30:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":62300.0,
-    "ai_score":8.5,
-    "pnl_r":1.9483330569,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":7.2140901032
-  },
-  {
-    "timestamp":"2026-06-10T15:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BEARISH",
-    "entry":62298.0,
-    "ai_score":8.0,
-    "pnl_r":-1.0403652146,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":6.1737248885
-  },
-  {
-    "timestamp":"2026-06-11T15:50:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BULLISH",
-    "entry":62638.32,
-    "ai_score":8.0,
-    "pnl_r":-1.0833333333,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":5.0903915552
-  },
-  {
-    "timestamp":"2026-06-15T17:10:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":66896.66,
-    "ai_score":8.0,
-    "pnl_r":-1.0406177741,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":4.0497737811
-  },
-  {
-    "timestamp":"2026-06-17T01:20:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BULLISH",
-    "entry":65568.01,
-    "ai_score":9.0,
-    "pnl_r":1.7666666667,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":5.8164404477
-  },
-  {
-    "timestamp":"2026-06-17T14:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":65087.99,
-    "ai_score":10.0,
-    "pnl_r":1.9605911376,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":7.7770315854
-  },
-  {
-    "timestamp":"2026-06-26T12:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":59227.99,
-    "ai_score":8.0,
-    "pnl_r":0.7192392897,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":8.496270875
-  },
-  {
-    "timestamp":"2026-06-30T14:00:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BEARISH",
-    "entry":59019.37,
-    "ai_score":8.0,
-    "pnl_r":1.8111309907,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":10.3074018658
-  },
-  {
-    "timestamp":"2026-07-01T12:05:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BULLISH",
-    "entry":58541.43,
-    "ai_score":8.0,
-    "pnl_r":-1.0833333333,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":9.2240685324
-  },
-  {
-    "timestamp":"2026-07-03T13:50:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":62132.0,
-    "ai_score":9.0,
-    "pnl_r":0.6861302313,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":9.9101987638
-  },
-  {
-    "timestamp":"2026-07-07T14:00:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BULLISH",
-    "entry":63100.0,
-    "ai_score":8.0,
-    "pnl_r":-1.0495041737,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":8.86069459
-  },
-  {
-    "timestamp":"2026-07-07T15:35:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BEARISH",
-    "entry":63848.01,
-    "ai_score":8.0,
-    "pnl_r":-1.0622809328,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":7.7984136573
-  },
-  {
-    "timestamp":"2026-07-09T12:30:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":62791.65,
-    "ai_score":9.5,
-    "pnl_r":-1.0622297218,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":6.7361839354
-  },
-  {
-    "timestamp":"2026-07-10T01:50:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":63819.72,
-    "ai_score":8.5,
-    "pnl_r":-1.0578078054,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":5.6783761301
-  },
-  {
-    "timestamp":"2026-07-13T13:20:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BULLISH",
-    "entry":62536.84,
-    "ai_score":9.5,
-    "pnl_r":-1.0609199609,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":4.6174561692
-  },
-  {
-    "timestamp":"2026-07-13T14:15:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":62474.0,
-    "ai_score":8.5,
-    "pnl_r":-1.0334650351,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":3.5839911341
-  },
-  {
-    "timestamp":"2026-07-14T17:10:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":64601.24,
-    "ai_score":9.0,
-    "pnl_r":-0.0946296837,
-    "outcome":"LOSS",
-    "exit_reason":"TIMED_EXIT",
-    "cum_r":3.4893614504
-  },
-  {
-    "timestamp":"2026-07-15T12:05:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":64703.99,
-    "ai_score":8.5,
-    "pnl_r":1.9166666667,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":5.4060281171
-  },
-  {
-    "timestamp":"2026-07-15T17:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":65008.54,
-    "ai_score":8.0,
-    "pnl_r":1.9427122069,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":7.348740324
-  },
-  {
-    "timestamp":"2026-07-16T13:35:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":64300.0,
-    "ai_score":8.5,
-    "pnl_r":-1.0581479472,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":6.2905923768
-  },
-  {
-    "timestamp":"2026-07-20T00:50:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":64588.0,
-    "ai_score":8.0,
-    "pnl_r":0.689947635,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":6.9805400118
-  },
-  {
-    "timestamp":"2026-07-21T14:05:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BEARISH",
-    "entry":66823.79,
-    "ai_score":8.5,
-    "pnl_r":1.7781760214,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":8.7587160332
-  },
-  {
-    "timestamp":"2026-07-29T00:05:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":64051.99,
-    "ai_score":8.0,
-    "pnl_r":0.6843966173,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":9.4431126505
-  },
-  {
-    "timestamp":"2026-08-03T13:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BEARISH",
-    "entry":62982.01,
-    "ai_score":8.0,
-    "pnl_r":-1.0774294028,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":8.3656832477
-  },
-  {
-    "timestamp":"2026-08-03T14:15:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BEARISH",
-    "entry":63341.85,
-    "ai_score":9.0,
-    "pnl_r":-1.0630486046,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":7.3026346431
-  },
-  {
-    "timestamp":"2026-08-04T13:40:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BEARISH",
-    "entry":64013.8,
-    "ai_score":8.5,
-    "pnl_r":0.6666666667,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":7.9693013098
-  },
-  {
-    "timestamp":"2026-08-04T15:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BEARISH",
-    "entry":64145.08,
-    "ai_score":9.5,
-    "pnl_r":-1.0833333333,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":6.8859679764
-  },
-  {
-    "timestamp":"2026-08-05T12:20:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":64465.24,
-    "ai_score":8.0,
-    "pnl_r":1.9242967166,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":8.810264693
-  },
-  {
-    "timestamp":"2026-08-06T02:20:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":64548.78,
-    "ai_score":9.0,
-    "pnl_r":0.6717640503,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":9.4820287433
-  },
-  {
-    "timestamp":"2026-08-06T13:30:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BULLISH",
-    "entry":64234.21,
-    "ai_score":8.5,
-    "pnl_r":1.7666666667,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":11.2486954099
-  },
-  {
-    "timestamp":"2026-08-10T01:50:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BEARISH",
-    "entry":65208.0,
-    "ai_score":8.5,
-    "pnl_r":1.9419758535,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":13.1906712635
-  },
-  {
-    "timestamp":"2026-08-10T04:40:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":65009.33,
-    "ai_score":8.5,
-    "pnl_r":0.6666666667,
-    "outcome":"WIN",
-    "exit_reason":"BREAKEVEN_AFTER_TP1",
-    "cum_r":13.8573379301
-  },
-  {
-    "timestamp":"2026-08-12T12:15:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BEARISH",
-    "entry":64309.99,
-    "ai_score":8.0,
-    "pnl_r":1.7666666667,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":15.6240045968
-  },
-  {
-    "timestamp":"2026-08-13T13:45:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":63845.82,
-    "ai_score":9.0,
-    "pnl_r":-1.0634426471,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":14.5605619498
-  },
-  {
-    "timestamp":"2026-08-13T14:35:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BEARISH",
-    "entry":63948.01,
-    "ai_score":9.0,
-    "pnl_r":1.7666666667,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":16.3272286164
-  },
-  {
-    "timestamp":"2026-08-14T13:00:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BULLISH",
-    "entry":62716.01,
-    "ai_score":8.5,
-    "pnl_r":1.7666666667,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":18.0938952831
-  },
-  {
-    "timestamp":"2026-08-14T14:55:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"LONDON_CLOSE_SILVER_BULLET",
-    "direction":"BULLISH",
-    "entry":62620.01,
-    "ai_score":8.5,
-    "pnl_r":1.7666666667,
-    "outcome":"WIN",
-    "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":19.8605619498
-  },
-  {
-    "timestamp":"2026-08-17T14:50:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"TURTLE_SOUP_SWEEP",
-    "direction":"BEARISH",
-    "entry":63765.25,
-    "ai_score":8.0,
-    "pnl_r":-1.0833333333,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":18.7772286164
-  },
-  {
-    "timestamp":"2026-08-18T12:30:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":64303.82,
-    "ai_score":8.0,
-    "pnl_r":-1.0833333333,
-    "outcome":"LOSS",
-    "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":17.6938952831
-  },
-  {
-    "timestamp":"2026-08-19T15:30:00",
-    "symbol":"BTC\/USDT",
-    "strategy":"JUDAS_INDUCEMENT_SNIPER",
-    "direction":"BULLISH",
-    "entry":68492.15,
-    "ai_score":8.0,
-    "pnl_r":1.1026702307,
-    "outcome":"WIN",
-    "exit_reason":"TIMED_EXIT",
-    "cum_r":18.7965655138
-  },
-  {
     "timestamp":"2026-08-24T01:50:00",
     "symbol":"BTC\/USDT",
     "strategy":"TURTLE_SOUP_SWEEP",
     "direction":"BULLISH",
     "entry":77204.74,
-    "ai_score":9.5,
+    "ai_score":8.5,
     "pnl_r":-1.0833333333,
     "outcome":"LOSS",
     "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":17.7132321805
+    "cum_r":-1.0833333333
   },
   {
     "timestamp":"2026-08-24T13:45:00",
@@ -677,11 +17,11 @@
     "strategy":"JUDAS_INDUCEMENT_SNIPER",
     "direction":"BULLISH",
     "entry":78296.0,
-    "ai_score":10.0,
+    "ai_score":9.0,
     "pnl_r":1.967340469,
     "outcome":"WIN",
     "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":19.6805726495
+    "cum_r":0.8840071357
   },
   {
     "timestamp":"2026-08-25T02:40:00",
@@ -693,7 +33,7 @@
     "pnl_r":1.816014735,
     "outcome":"WIN",
     "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":21.4965873845
+    "cum_r":2.7000218707
   },
   {
     "timestamp":"2026-08-26T14:45:00",
@@ -705,7 +45,7 @@
     "pnl_r":-1.0787151609,
     "outcome":"LOSS",
     "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":20.4178722236
+    "cum_r":1.6213067098
   },
   {
     "timestamp":"2026-08-28T01:30:00",
@@ -717,7 +57,19 @@
     "pnl_r":1.9549772014,
     "outcome":"WIN",
     "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":22.372849425
+    "cum_r":3.5762839112
+  },
+  {
+    "timestamp":"2026-08-31T16:55:00",
+    "symbol":"BTC\/USDT",
+    "strategy":"TURTLE_SOUP_SWEEP",
+    "direction":"BEARISH",
+    "entry":78639.57,
+    "ai_score":8.0,
+    "pnl_r":-1.0541789827,
+    "outcome":"LOSS",
+    "exit_reason":"STOP_LOSS_HIT",
+    "cum_r":2.5221049285
   },
   {
     "timestamp":"2026-09-01T02:10:00",
@@ -729,7 +81,31 @@
     "pnl_r":1.7666666667,
     "outcome":"WIN",
     "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":24.1395160916
+    "cum_r":4.2887715952
+  },
+  {
+    "timestamp":"2026-09-02T03:15:00",
+    "symbol":"BTC\/USDT",
+    "strategy":"TURTLE_SOUP_SWEEP",
+    "direction":"BEARISH",
+    "entry":77564.01,
+    "ai_score":8.0,
+    "pnl_r":1.7666666667,
+    "outcome":"WIN",
+    "exit_reason":"TAKE_PROFIT_FULL",
+    "cum_r":6.0554382618
+  },
+  {
+    "timestamp":"2026-09-03T14:35:00",
+    "symbol":"BTC\/USDT",
+    "strategy":"TURTLE_SOUP_SWEEP",
+    "direction":"BEARISH",
+    "entry":79665.27,
+    "ai_score":8.0,
+    "pnl_r":-1.0635030148,
+    "outcome":"LOSS",
+    "exit_reason":"STOP_LOSS_HIT",
+    "cum_r":4.991935247
   },
   {
     "timestamp":"2026-09-04T12:35:00",
@@ -741,7 +117,7 @@
     "pnl_r":-1.0302157006,
     "outcome":"LOSS",
     "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":23.109300391
+    "cum_r":3.9617195464
   },
   {
     "timestamp":"2026-09-07T13:35:00",
@@ -753,7 +129,7 @@
     "pnl_r":-1.0833333333,
     "outcome":"LOSS",
     "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":22.0259670577
+    "cum_r":2.8783862131
   },
   {
     "timestamp":"2026-09-07T14:40:00",
@@ -765,7 +141,7 @@
     "pnl_r":-1.0833333333,
     "outcome":"LOSS",
     "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":20.9426337244
+    "cum_r":1.7950528797
   },
   {
     "timestamp":"2026-09-08T13:50:00",
@@ -773,11 +149,11 @@
     "strategy":"JUDAS_INDUCEMENT_SNIPER",
     "direction":"BULLISH",
     "entry":77827.6,
-    "ai_score":8.0,
+    "ai_score":8.5,
     "pnl_r":1.9400092005,
     "outcome":"WIN",
     "exit_reason":"TAKE_PROFIT_FULL",
-    "cum_r":22.8826429248
+    "cum_r":3.7350620802
   },
   {
     "timestamp":"2026-09-11T12:25:00",
@@ -789,6 +165,42 @@
     "pnl_r":-1.044036973,
     "outcome":"LOSS",
     "exit_reason":"STOP_LOSS_HIT",
-    "cum_r":21.8386059518
+    "cum_r":2.6910251072
+  },
+  {
+    "timestamp":"2026-09-15T17:35:00",
+    "symbol":"BTC\/USDT",
+    "strategy":"JUDAS_INDUCEMENT_SNIPER",
+    "direction":"BEARISH",
+    "entry":76965.86,
+    "ai_score":8.0,
+    "pnl_r":1.9609729383,
+    "outcome":"WIN",
+    "exit_reason":"TAKE_PROFIT_FULL",
+    "cum_r":4.6519980455
+  },
+  {
+    "timestamp":"2026-09-17T01:30:00",
+    "symbol":"BTC\/USDT",
+    "strategy":"JUDAS_INDUCEMENT_SNIPER",
+    "direction":"BEARISH",
+    "entry":76633.08,
+    "ai_score":8.0,
+    "pnl_r":0.6751482772,
+    "outcome":"WIN",
+    "exit_reason":"BREAKEVEN_AFTER_TP1",
+    "cum_r":5.3271463227
+  },
+  {
+    "timestamp":"2026-09-18T13:50:00",
+    "symbol":"BTC\/USDT",
+    "strategy":"JUDAS_INDUCEMENT_SNIPER",
+    "direction":"BEARISH",
+    "entry":80044.68,
+    "ai_score":10.0,
+    "pnl_r":-1.034778626,
+    "outcome":"LOSS",
+    "exit_reason":"STOP_LOSS_HIT",
+    "cum_r":4.2923676967
   }
 ]
