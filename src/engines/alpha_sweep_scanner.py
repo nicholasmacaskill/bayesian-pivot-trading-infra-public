@@ -1044,22 +1044,55 @@ class AlphaSweepScanner(SMCScanner):
                 ai_approved = True
                 dynamic_risk_mult = 1.0
 
-            # ── BAYESIAN VISUAL VECTOR CONFLUENCE INTEGRATION ──
-            # Instead of an unconditional hard veto, vector memory dynamically adjusts AI score.
+            # ── LOCAL APPLE SILICON MLX LORA CONFLUENCE BOOSTER ──
+            local_llm_result = None
+            try:
+                from src.engines.local_llm_handler import LocalLLMHandler
+                local_llm = LocalLLMHandler()
+                if local_llm.is_available():
+                    local_scoring = local_llm.score_setup(
+                        setup={
+                            "symbol": symbol,
+                            "pattern": pattern_type,
+                            "direction": setup['direction'],
+                            "bias": setup.get('trend', setup.get('direction', 'UNKNOWN')),
+                            "entry": entry_price,
+                            "stop_loss": sl_price,
+                            "atr_percentile": round(setup.get('atr_percentile', 50.0), 1),
+                            "relative_volume": round(setup.get('vol_mult', setup.get('volume_mult', 1.0)), 2),
+                            "smt_confluence": "Confirmed Divergence" if setup.get('smt_divergence') else None,
+                            "smt_strength": float(setup.get('smt_strength', 0.0)),
+                            "cvd_absorption": setup.get('cvd_absorption', False),
+                            "discount_pct": setup.get('discount_pct', None)
+                        },
+                        hurst=float(setup.get('hurst', 0.5)),
+                        session_info={"name": killzone}
+                    )
+                    local_llm_result = local_scoring
+                    loc_score = float(local_scoring.get("score", 0.0))
+                    loc_verdict = str(local_scoring.get("verdict", "UNKNOWN"))
+                    loc_provider = str(local_scoring.get("provider", local_llm.active_provider))
+
+                    if loc_score >= 7.5 and loc_verdict == "FLOW_GO":
+                        lora_boost = 2.0
+                        shadow_score = min(10.0, round(shadow_score + lora_boost, 1))
+                        logger.info(f"🤖 [MLX LoRA Confluence Booster] {symbol} {setup['direction']} APPROVED by {loc_provider} (Score: {loc_score:.1f}/10) -> +{lora_boost:.1f} Boost applied -> New Score: {shadow_score:.1f}/10")
+                    elif loc_score < 5.0 or loc_verdict == "REJECTED":
+                        logger.info(f"🤖 [MLX LoRA Guardrail] {symbol} {setup['direction']} REJECTED by {loc_provider} (Score: {loc_score:.1f}/10). Zero boost.")
+                    else:
+                        logger.info(f"🤖 [MLX LoRA Neutral] {symbol} {setup['direction']} Scored: {loc_score:.1f}/10 ({loc_verdict}).")
+            except Exception as mlx_boost_err:
+                logger.debug(f"Local MLX LoRA confluence boost fallback: {mlx_boost_err}")
+
+            # ── BAYESIAN VISUAL VECTOR CONFLUENCE INTEGRATION (ADVISORY ONLY) ──
             vec_rec = vec_result.get('recommendation', 'NEUTRAL')
             vec_mod = float(vec_result.get('score_modifier', 0.0))
-            is_severe_vec_trap = vec_result.get('is_severe_trap', False)
 
             if vec_mod != 0.0:
                 shadow_score = max(0.0, min(10.0, round(shadow_score + vec_mod, 1)))
                 logger.info(f"🔮 [Visual Vector Confluence] {symbol} {setup['direction']}: Modifier {vec_mod:+.1f} applied -> Adjusted Score: {shadow_score:.1f}/10 ({vec_rec})")
 
-            # Hard veto is reserved exclusively for severe true twin traps (>=90% sim, 0% WR) where MLX model also lacks high conviction (< 8.0)
-            is_vec_trap_hard = is_severe_vec_trap and (shadow_score < 8.0)
-            if is_vec_trap_hard:
-                logger.warning(f"🔮 [VISUAL VECTOR HARD VETO] {symbol} {setup['direction']} rejected by Visual Vector Sentry: {vec_result.get('key_reason')}")
-
-            passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved and (not is_vec_trap_hard)
+            passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved
             
             # If Strategy 5 Gold Longs are graduated and active, exempt XAU/USD from blanket shadow quarantine
             is_strat_5_gold_live = (
@@ -1087,7 +1120,7 @@ class AlphaSweepScanner(SMCScanner):
                 or is_symbol_shadow
                 or is_low_density_sweep  # Hard density gate: noise sweeps → shadow only
             )
-            is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator) or is_vec_trap_hard
+            is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator)
             
             ai_score_val = shadow_score
             verdict_str = "SHADOW_OBSERVATION" if is_shadow_strategy else "CONFIRMED"
@@ -1166,24 +1199,27 @@ class AlphaSweepScanner(SMCScanner):
                     provider_tag = "MLX" if local_llm.active_backend == "mlx" else "OLLAMA"
                     variant_key = f"CHALLENGER_LOCAL_{provider_tag}"
 
-                    local_scoring = local_llm.score_setup(
-                        setup={
-                            "symbol": symbol,
-                            "pattern": pattern_str,
-                            "direction": setup['direction'],
-                            "bias": setup.get('trend', setup.get('direction', 'UNKNOWN')),
-                            "entry": entry_price,
-                            "stop_loss": sl_price,
-                            "atr_percentile": round(setup.get('atr_percentile', 50.0), 1),
-                            "relative_volume": round(setup.get('vol_mult', setup.get('volume_mult', 1.0)), 2),
-                            "smt_confluence": "Confirmed Divergence" if setup.get('smt_divergence') else None,
-                            "smt_strength": float(setup.get('smt_strength', 0.0)),
-                            "cvd_absorption": setup.get('cvd_absorption', False),
-                            "discount_pct": setup.get('discount_pct', None)
-                        },
-                        hurst=float(setup.get('hurst', 0.5)),
-                        session_info={"name": killzone}
-                    )
+                    if local_llm_result is not None:
+                        local_scoring = local_llm_result
+                    else:
+                        local_scoring = local_llm.score_setup(
+                            setup={
+                                "symbol": symbol,
+                                "pattern": pattern_str,
+                                "direction": setup['direction'],
+                                "bias": setup.get('trend', setup.get('direction', 'UNKNOWN')),
+                                "entry": entry_price,
+                                "stop_loss": sl_price,
+                                "atr_percentile": round(setup.get('atr_percentile', 50.0), 1),
+                                "relative_volume": round(setup.get('vol_mult', setup.get('volume_mult', 1.0)), 2),
+                                "smt_confluence": "Confirmed Divergence" if setup.get('smt_divergence') else None,
+                                "smt_strength": float(setup.get('smt_strength', 0.0)),
+                                "cvd_absorption": setup.get('cvd_absorption', False),
+                                "discount_pct": setup.get('discount_pct', None)
+                            },
+                            hurst=float(setup.get('hurst', 0.5)),
+                            session_info={"name": killzone}
+                        )
                     local_score = float(local_scoring.get("score", 0.0))
                     local_verdict = str(local_scoring.get("verdict", "UNKNOWN"))
                     local_reason = str(local_scoring.get("reasoning", ""))

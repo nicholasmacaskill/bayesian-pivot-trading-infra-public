@@ -370,35 +370,24 @@ class VisualVectorEngine:
         score_modifier = 0.0
         is_severe_trap = False
 
-        # Multi-tiered Bayesian Vector Confluence:
-        # Tier 1: Severe True Twin Trap — >=90% similarity with 0% win rate across >=2 traps
-        if avg_sim >= 0.90 and win_rate == 0.0 and traps >= 2:
-            recommendation = 'REJECT_TRAP'
-            score_modifier = -2.0
-            is_severe_trap = True
-            reason = f"⚠️ Severe Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps ({win_rate:.0f}% win rate, Avg R: {avg_r:.1f}R). Score penalty: -2.0."
+        # Multi-tiered Bayesian Vector Confluence (Advisory Only — Zero Hard Veto):
+        # Tier 1: Strong Verified Winning Twin — >=82% similarity with >=2 wins
+        if avg_sim >= 0.82 and wins >= 2 and win_rate >= 60.0:
+            recommendation = 'PASS_CONFIRMED'
+            score_modifier = +0.5
+            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to verified historical winners (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')}). Score boost: +0.5."
         # Tier 2: Strong Precedent Trap — >=85% similarity with >=2 traps OR >=75% with win rate <=25%
         elif (avg_sim >= 0.85 and traps >= 2) or (avg_sim >= 0.75 and traps >= 2 and win_rate <= 25.0):
             recommendation = 'REJECT_TRAP'
-            score_modifier = -1.5
-            is_severe_trap = False
-            reason = f"⚠️ Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps ({win_rate:.0f}% win rate, Avg R: {avg_r:.1f}R). Score penalty: -1.5."
-        # Tier 3: Strong Verified Winning Twin — >=85% similarity with >=2 wins
-        elif avg_sim >= 0.85 and wins >= 2:
-            recommendation = 'PASS_CONFIRMED'
-            score_modifier = +1.0
-            is_severe_trap = False
-            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to verified historical winners (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')}). Score boost: +1.0."
-        # Tier 4: Moderate Winning Bias — >=80% similarity with >=60% win rate
-        elif avg_sim >= 0.80 and wins >= 2 and win_rate >= 60.0:
+            score_modifier = -0.5
+            reason = f"⚠️ Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps ({win_rate:.0f}% win rate, Avg R: {avg_r:.1f}R). Score penalty: -0.5."
+        elif avg_sim >= 0.80 and wins >= 2:
             recommendation = 'PASS_CONFIRMED'
             score_modifier = +0.5
-            is_severe_trap = False
-            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to winning analogs (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')}). Score boost: +0.5."
+            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to verified historical winners (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')}). Score boost: +0.5."
         else:
             recommendation = 'NEUTRAL'
             score_modifier = 0.0
-            is_severe_trap = False
             reason = f"Visual similarity balanced ({win_rate:.0f}% win rate across {len(analogs)} historical analogs, similarity: {avg_sim:.1%})."
 
         return {
@@ -407,7 +396,7 @@ class VisualVectorEngine:
             'win_rate': win_rate,
             'avg_r': avg_r,
             'score_modifier': score_modifier,
-            'is_severe_trap': is_severe_trap,
+            'is_severe_trap': False,
             'analogs': analogs,
             'key_reason': reason
         }
