@@ -991,26 +991,38 @@ class AlphaSweepScanner(SMCScanner):
             # Trend-aligned setups require standard conviction (>= 7.5); counter-trend setups require high conviction (>= 8.5).
             is_counter_regime = False
             regime_msg = "1H Neutral Structure"
-            try:
-                if df_1h is not None and len(df_1h) >= 20:
-                    ema50_1h = df_1h['close'].ewm(span=min(50, len(df_1h))).mean().iloc[-1]
-                    current_close_1h = df_1h['close'].iloc[-1]
-                    if current_close_1h < ema50_1h:
-                        # 1H Bearish Trend: Shorts are aligned, Longs are counter-trend
-                        if setup['direction'] == "LONG":
-                            is_counter_regime = True
-                            regime_msg = "1H Bearish Trend (Counter-Trend Long)"
-                        else:
-                            regime_msg = "1H Bearish Trend (Aligned Short)"
-                    elif current_close_1h > ema50_1h:
-                        # 1H Bullish Trend: Longs are aligned, Shorts are counter-trend
-                        if setup['direction'] == "SHORT":
-                            is_counter_regime = True
-                            regime_msg = "1H Bullish Trend (Counter-Trend Short)"
-                        else:
-                            regime_msg = "1H Bullish Trend (Aligned Long)"
-            except Exception as htf_err:
-                logger.debug(f"HTF Trend alignment check fallback: {htf_err}")
+
+            # Strategy 5 (Gold 50% CE FVG) Longs are pullback entries into discount gaps.
+            # They are exempt from being penalized as counter-regime when price dips into discount during London/NY.
+            is_gold_fvg_long = (
+                symbol in ["XAU/USD", "XAUUSD", "GOLD"]
+                and setup.get('direction') == "LONG"
+                and any(p in pattern_type for p in ["FVG", "50PCT", "STRAT_5"])
+            )
+
+            if not is_gold_fvg_long:
+                try:
+                    if df_1h is not None and len(df_1h) >= 20:
+                        ema50_1h = df_1h['close'].ewm(span=min(50, len(df_1h))).mean().iloc[-1]
+                        current_close_1h = df_1h['close'].iloc[-1]
+                        if current_close_1h < ema50_1h:
+                            # 1H Bearish Trend: Shorts are aligned, Longs are counter-trend
+                            if setup['direction'] == "LONG":
+                                is_counter_regime = True
+                                regime_msg = "1H Bearish Trend (Counter-Trend Long)"
+                            else:
+                                regime_msg = "1H Bearish Trend (Aligned Short)"
+                        elif current_close_1h > ema50_1h:
+                            # 1H Bullish Trend: Longs are aligned, Shorts are counter-trend
+                            if setup['direction'] == "SHORT":
+                                is_counter_regime = True
+                                regime_msg = "1H Bullish Trend (Counter-Trend Short)"
+                            else:
+                                regime_msg = "1H Bullish Trend (Aligned Long)"
+                except Exception as htf_err:
+                    logger.debug(f"HTF Trend alignment check fallback: {htf_err}")
+            else:
+                regime_msg = "Gold FVG Discount Entry (Regime Exempt)"
 
             ai_validator_threshold = 8.5 if is_counter_regime else getattr(Config, 'AI_VALIDATOR_MIN_SCORE', 7.5)
             
@@ -1032,11 +1044,22 @@ class AlphaSweepScanner(SMCScanner):
                 ai_approved = True
                 dynamic_risk_mult = 1.0
 
-            is_vec_trap = (vec_result.get('recommendation') == 'REJECT_TRAP')
-            if is_vec_trap:
-                logger.warning(f"🔮 [VISUAL VECTOR VETO] {symbol} {setup['direction']} rejected by Visual Vector Sentry: {vec_result.get('key_reason')}")
+            # ── BAYESIAN VISUAL VECTOR CONFLUENCE INTEGRATION ──
+            # Instead of an unconditional hard veto, vector memory dynamically adjusts AI score.
+            vec_rec = vec_result.get('recommendation', 'NEUTRAL')
+            vec_mod = float(vec_result.get('score_modifier', 0.0))
+            is_severe_vec_trap = vec_result.get('is_severe_trap', False)
 
-            passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved and (not is_vec_trap)
+            if vec_mod != 0.0:
+                shadow_score = max(0.0, min(10.0, round(shadow_score + vec_mod, 1)))
+                logger.info(f"🔮 [Visual Vector Confluence] {symbol} {setup['direction']}: Modifier {vec_mod:+.1f} applied -> Adjusted Score: {shadow_score:.1f}/10 ({vec_rec})")
+
+            # Hard veto is reserved exclusively for severe true twin traps (>=90% sim, 0% WR) where MLX model also lacks high conviction (< 8.0)
+            is_vec_trap_hard = is_severe_vec_trap and (shadow_score < 8.0)
+            if is_vec_trap_hard:
+                logger.warning(f"🔮 [VISUAL VECTOR HARD VETO] {symbol} {setup['direction']} rejected by Visual Vector Sentry: {vec_result.get('key_reason')}")
+
+            passed_ai_validator = (shadow_score >= ai_validator_threshold) and ai_approved and (not is_vec_trap_hard)
             
             # If Strategy 5 Gold Longs are graduated and active, exempt XAU/USD from blanket shadow quarantine
             is_strat_5_gold_live = (
@@ -1064,7 +1087,7 @@ class AlphaSweepScanner(SMCScanner):
                 or is_symbol_shadow
                 or is_low_density_sweep  # Hard density gate: noise sweeps → shadow only
             )
-            is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator) or is_vec_trap
+            is_shadow_strategy = is_archetype_shadow or (not passed_ai_validator) or is_vec_trap_hard
             
             ai_score_val = shadow_score
             verdict_str = "SHADOW_OBSERVATION" if is_shadow_strategy else "CONFIRMED"

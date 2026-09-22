@@ -213,12 +213,13 @@ class VisualVectorEngine:
         query_vector: np.ndarray,
         symbol: Optional[str] = None,
         direction: Optional[str] = None,
-        top_k: int = 3,
+        top_k: int = 5,
         regime_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Performs fast cosine similarity search across the visual embeddings library.
-        Optionally pre-filters by regime_type with graceful symbol-only fallback if < 3 matches.
+        Enforces directional isolation (Longs match Longs, Shorts match Shorts)
+        and optionally pre-filters by regime_type with graceful fallback.
         Returns the top-K nearest historical chart analogs with their realized outcomes.
         """
         if query_vector is None or len(query_vector) == 0:
@@ -233,7 +234,7 @@ class VisualVectorEngine:
                 conn.close()
                 return []
 
-            def _query_and_score(apply_regime_filter: bool) -> List[Dict[str, Any]]:
+            def _query_and_score(apply_regime_filter: bool, apply_direction_filter: bool = True) -> List[Dict[str, Any]]:
                 query = """
                     SELECT embedding_id, signal_id, timestamp, symbol, pattern, 
                            direction, outcome, realized_r, pnl, vector, notes,
@@ -246,6 +247,17 @@ class VisualVectorEngine:
                 if symbol:
                     conditions.append("(symbol = ? OR symbol LIKE ?)")
                     params.extend([symbol, f"%{symbol.split('/')[0]}%"])
+
+                dir_clean = str(direction or "").upper()
+                target_dirs = []
+                if dir_clean in ["BUY", "LONG"]:
+                    target_dirs = ["BUY", "LONG"]
+                elif dir_clean in ["SELL", "SHORT"]:
+                    target_dirs = ["SELL", "SHORT"]
+
+                if apply_direction_filter and target_dirs:
+                    conditions.append("(direction = ? OR direction = ?)")
+                    params.extend(target_dirs)
 
                 if apply_regime_filter and regime_type and str(regime_type).upper() != "UNKNOWN":
                     conditions.append("(regime_type = ? OR regime_type IS NULL OR regime_type = 'UNKNOWN')")
@@ -291,13 +303,19 @@ class VisualVectorEngine:
                 similarities.sort(key=lambda x: x['similarity'], reverse=True)
                 return similarities
 
+            # Directionally isolated search
+            analogs = []
             if regime_type and str(regime_type).upper() != "UNKNOWN":
-                analogs = _query_and_score(apply_regime_filter=True)
-                if len(analogs) < 3:
-                    # Fall back gracefully to symbol-only search to guarantee analog availability
-                    analogs = _query_and_score(apply_regime_filter=False)
+                analogs = _query_and_score(apply_regime_filter=True, apply_direction_filter=True)
+                if len(analogs) < top_k:
+                    # Fall back to direction-filtered without regime constraint
+                    analogs = _query_and_score(apply_regime_filter=False, apply_direction_filter=True)
             else:
-                analogs = _query_and_score(apply_regime_filter=False)
+                analogs = _query_and_score(apply_regime_filter=False, apply_direction_filter=True)
+
+            # If no directional matches exist at all (new asset), fallback to direction-free
+            if len(analogs) == 0:
+                analogs = _query_and_score(apply_regime_filter=False, apply_direction_filter=False)
 
             conn.close()
             return analogs[:top_k]
@@ -317,12 +335,14 @@ class VisualVectorEngine:
         Evaluates visual precedent against historical library.
         Returns:
           - recommendation: 'PASS_CONFIRMED', 'REJECT_TRAP', or 'NEUTRAL'
+          - score_modifier: Bayesian score adjustment (-2.0, -1.5, +1.0, 0.0)
+          - is_severe_trap: True only for extreme twin traps (>=90% sim, 0% WR)
           - win_rate: Historical win rate of nearest visual twins
           - avg_r: Expected R-multiple
           - key_reason: Analytical explanation
         """
         analogs = self.find_visual_analogs(
-            query_vector, symbol=symbol, direction=direction, top_k=3, regime_type=regime_type
+            query_vector, symbol=symbol, direction=direction, top_k=5, regime_type=regime_type
         )
         return self.evaluate_analogs(analogs)
 
@@ -334,6 +354,8 @@ class VisualVectorEngine:
                 'confidence': 0.50,
                 'win_rate': 50.0,
                 'avg_r': 0.0,
+                'score_modifier': 0.0,
+                'is_severe_trap': False,
                 'analogs': [],
                 'key_reason': 'No close visual matches in database yet.'
             }
@@ -345,17 +367,38 @@ class VisualVectorEngine:
         win_rate = (wins / len(analogs)) * 100.0
 
         top_match = analogs[0]
-        # Multi-tiered Trap Detection:
-        # Tier 1: Severe Trap — >=85% similarity with >=2 traps
-        # Tier 2: Strong Precedent Trap — >=75% similarity with >=2 traps AND <=25% win rate (e.g. 0% WR)
-        if (avg_sim >= 0.85 and traps >= 2) or (avg_sim >= 0.75 and traps >= 2 and win_rate <= 25.0):
+        score_modifier = 0.0
+        is_severe_trap = False
+
+        # Multi-tiered Bayesian Vector Confluence:
+        # Tier 1: Severe True Twin Trap — >=90% similarity with 0% win rate across >=2 traps
+        if avg_sim >= 0.90 and win_rate == 0.0 and traps >= 2:
             recommendation = 'REJECT_TRAP'
-            reason = f"⚠️ Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps ({win_rate:.0f}% win rate, Avg R: {avg_r:.1f}R). 0% live capital risk recommended."
+            score_modifier = -2.0
+            is_severe_trap = True
+            reason = f"⚠️ Severe Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps ({win_rate:.0f}% win rate, Avg R: {avg_r:.1f}R). Score penalty: -2.0."
+        # Tier 2: Strong Precedent Trap — >=85% similarity with >=2 traps OR >=75% with win rate <=25%
+        elif (avg_sim >= 0.85 and traps >= 2) or (avg_sim >= 0.75 and traps >= 2 and win_rate <= 25.0):
+            recommendation = 'REJECT_TRAP'
+            score_modifier = -1.5
+            is_severe_trap = False
+            reason = f"⚠️ Visual Vector Trap: {avg_sim:.1%} match to historical false sweeps ({win_rate:.0f}% win rate, Avg R: {avg_r:.1f}R). Score penalty: -1.5."
+        # Tier 3: Strong Verified Winning Twin — >=85% similarity with >=2 wins
         elif avg_sim >= 0.85 and wins >= 2:
             recommendation = 'PASS_CONFIRMED'
-            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to verified historical winners (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')})."
+            score_modifier = +1.0
+            is_severe_trap = False
+            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to verified historical winners (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')}). Score boost: +1.0."
+        # Tier 4: Moderate Winning Bias — >=80% similarity with >=60% win rate
+        elif avg_sim >= 0.80 and wins >= 2 and win_rate >= 60.0:
+            recommendation = 'PASS_CONFIRMED'
+            score_modifier = +0.5
+            is_severe_trap = False
+            reason = f"🏆 Visual Vector Precedent: {avg_sim:.1%} match to winning analogs (Avg R: +{avg_r:.1f}R, Top match: {top_match.get('pattern', 'Pattern')}). Score boost: +0.5."
         else:
             recommendation = 'NEUTRAL'
+            score_modifier = 0.0
+            is_severe_trap = False
             reason = f"Visual similarity balanced ({win_rate:.0f}% win rate across {len(analogs)} historical analogs, similarity: {avg_sim:.1%})."
 
         return {
@@ -363,6 +406,8 @@ class VisualVectorEngine:
             'confidence': avg_sim,
             'win_rate': win_rate,
             'avg_r': avg_r,
+            'score_modifier': score_modifier,
+            'is_severe_trap': is_severe_trap,
             'analogs': analogs,
             'key_reason': reason
         }
