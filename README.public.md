@@ -1,117 +1,44 @@
 # BayesianPivot
 
-### High-Confluence Algorithmic Execution & Cognitive Guardrails
-**Classification:** `sovereign_system` | **System ID:** `FL-BAYE` | **Discipline:** `State-Space Estimation, Cognitive Infrastructure & Quantitative Governance`  
-**Architecture:** `Flocano Labs` | **Architect:** Nicholas Alexander MacAskill  
+> **classification:** `sovereign_system` &nbsp;|&nbsp; **sys_id:** `FL-BAYE` &nbsp;|&nbsp; **status:** `production`  
+> **origin:** [Flocano Labs Sovereign R&D Forge](https://www.flocanolabs.com/flocanolabs/case-studies?project=bayesian-pivot)
 
-> **Abstract:** An adaptive statistical execution mesh designed to collapse market non-stationarity into dimensionless volatility manifolds and zero-lag Kalman state estimation. Implements recursive Bayesian belief updating (<0.5ms) across multi-account prop firm fleets, integrating native Apple Silicon Darwin QoS sandboxing, multi-modal Gemini vision RAG, and an autonomous zero-capital genetic shadow tournament lab.
+### *High-Confluence Algorithmic Execution & Cognitive Guardrails*
 
----
-
-## 🏛️ System Pipeline & Architecture
-
-The diagram below maps the complete data ingestion, processing, validation, execution, and continuous learning pipeline of the BayesianPivot trading infrastructure:
-
-```mermaid
-flowchart TD
-    %% Ingestion Layer
-    subgraph Ingestion ["1. Multi-Stream Ingestion & Physical Invariant Buffer"]
-        A1[CCXT Coinbase Pro WebSocket] --> B1[Data Sync Buffer & Drift Audit]
-        A2[Yahoo Finance Real-Time API] --> B1
-        A3[TradeLocker REST API Engine] --> B1
-        A4[Apple HealthKit Biometrics HRV] --> B1
-    end
-
-    %% Quantitative Gating Layer
-    subgraph QG ["2. Dimensionless Physics & Invariant Gating"]
-        B1 --> C1{Gate 1: Hurst Exponent H}
-        C1 -->|H < 0.45| D1[Mean Reversion & Turtle Soup Fader]
-        C1 -->|H > 0.55| D2[Trend Expansion Engine]
-        C1 -->|0.45 <= H <= 0.55| D3[Gaussian Random Walk / HARD KILL]
-        
-        B1 --> C2[Gate 2: Session VWAP Dispersion Z >= 2.2σ]
-        B1 --> C3[Gate 3: Vector SMT Intermarket Divergence]
-        B1 --> C4[Gate 4: Rejection Wick Ratio >= 70% & Vol Spike >= 1.8x ATR]
-        B1 --> C5[Gate 5: Recursive Zero-Lag Kalman Velocity Filter]
-        
-        D1 & D2 & C2 & C3 & C4 & C5 --> E1[Setup Candidates]
-    end
-
-    %% AI Validation Layer
-    subgraph AIV ["3. Cognitive AI & Multi-Modal Vision RAG"]
-        E1 --> F1{Routing Switch}
-        F1 -->|Fast-Lane Math < 2ms| I1[Direct Execution Desk]
-        F1 -->|Deliberative 1H/4H RAG| G1[ShadowChartMemory: Multi-Modal Vision]
-        G1 --> G2[Google Gemini 2.5 Flash Vision]
-        G2 --> G3[Episodic Vector Match: Nearest Twin Proof]
-        G3 --> H1{Score >= 8.5/10?}
-        H1 -->|Approved| I1
-        H1 -->|Vetoed / Below Cutoff| J1[Counterfactual Shadow Lab]
-    end
-
-    %% Execution & Evolution Layer
-    subgraph EE ["4. Multi-Account Fleet Execution & Online Learning"]
-        I1 --> K1[Multi-Account Fleet Dispatcher]
-        K1 -->|Adaptive 2.5s Pacing| L1[Upcomers / TradeLocker 8-Account Mesh]
-        L1 --> M1[Mandatory Brackets: Stop Loss & Take Profit Attached]
-        L1 --> N1[Signed Ledger SQLite WAL]
-        
-        J1 --> P1[Walk-Forward Forward Tracker: $0.00 Capital Risk]
-        P1 --> Q1[Beta-Binomial Bayesian Updating < 0.5ms]
-        N1 --> Q1
-        Q1 -->|Updated Bayesian Weights| C1
-    end
-```
+An adaptive statistical execution mesh designed to estimate macro regime shifts. Implements recursive Bayesian filtering on high-frequency order book dynamics, integrating automated Gemini LLM verification and biometric guardrails.
 
 ---
 
-## ⚡ Empirical Performance & Infrastructure Benchmarks
+### 📊 System Telemetry & Empirical HUD
 
-```text
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                               ARCHITECTURAL PERFORMANCE MATRIX                                         │
-├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                        │
-│ METRIC                           STATIC LEGACY BOT          BAYESIANPIVOT AGENTIC INFRASTRUCTURE       │
-│ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
-│ Fast-Lane Execution Latency      1,500ms - 2,500ms (LLM)    < 2.0ms (Deterministic Invariant Gated)    │
-│ State Matrix Memory Lookup       150ms - 400ms (DB query)   < 0.2ms (In-Memory Matrix Evaluation)      │
-│ Market Structure Shift Lag       10–15 mins (Lagging EMAs)  Candle #1 (Kalman State-Space Derivative)  │
-│ Strategy Calibration Latency     7–14 Days (Batch Retrain)  < 0.5 Milliseconds (Online Bayesian)       │
-│ Parameter Mutation R&D           Live Capital at Risk       $0.00 (Zero-Risk Genetic Shadow Swarm)     │
-│ Cloud Infrastructure Footprint   $150–$300/mo Cloud Bills   $0.00/mo (Multi-Modal Free Tier + Local M4)│
-│ Execution Slippage Rate          0.12% - 0.45%              < 0.01% (Stealth IOC Limit/Market)         │
-│ Risk Governance Lockout          Manual / Delayed Alerts    5.0% Total Hard Drawdown Killswitch        │
-│ Memory Pressure Architecture     Frequent Swap Thrashing    Darwin Mach QoS / 142MB Clamped Swap       │
-│ Toxic Breakouts Quarantined      Unfiltered Capital Drag    269 Trades ($26,900.00 Saved Alpha)        │
-│                                                                                                        │
-└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+| Metric | Production Ground Truth | Description |
+|:---|:---|:---|
+| **execution_slippage** | `< 0.01%` | Stealth IOC market and limit fill slippage |
+| **structural_latency** | `< 50ms` | Local Python/NumPy mathematical gating latency |
+| **state_matrix_lookup** | `< 0.2ms` | In-memory AIPermissionMap evaluation on 5m candle wicks |
+| **token_cost_reduction** | `60% - 90%` | Monthly API credit savings via prompt context compression & token budget gates |
+| **sft_average_pnl_lift** | `+$53.32/trade` | Average PnL lift following supervised fine-tuning loops |
+| **cloud_infrastructure_cost** | `$0.00/mo` | Local Apple Silicon M4 GPU + Free-Tier Multi-Modal Inference |
+| **hardware_swap_containment** | `142 MB` | Darwin Mach kernel memory pressure intercept (97.6% swap debt reduction) |
+| **toxic_breakouts_quarantined** | `269 Trades ($26,900.00)` | Toxic breakout setups neutralized in zero-risk shadow tournament lab |
 
 ---
 
-## 🔬 Core Technology Stack
+### 🏛️ Engineering Disciplines
+* **Quantitative Engineering & Microstructure**
+* **Cognitive AI & Multi-Agent Swarms**
+* **Distributed Systems & High-Throughput State**
 
-- **Core Runtime & Math:** Python 3.12, NumPy, pandas, SciPy, ctypes (Darwin Mach kernel bindings)
-- **Computer Vision & Cognitive AI:** Google Gemini 2.5 Flash / Pro (Google AI Studio API), Pillow, Matplotlib (Multi-Modal Canvas Renderer)
-- **Microstructure & Order Flow:** CCXT (Coinbase Advanced WebSocket), Yahoo Finance API, SQLite WAL (`signed_ledger`, `counterfactual_db`)
-- **Prop Fleet Execution:** TradeLocker `backend-api` (Upcomers-class REST automation), stealth HTTP fingerprinting, adaptive rate-limit pacing
-- **Operating System Governance:** Darwin `libdispatch` (Mach kernel memory pressure interrupts), `taskpolicy -b` (Apple Silicon Efficiency Core affinity sandboxing), macOS LaunchAgents (`com.sovereign.supervisor`, `com.sovereign.watchdog`)
-- **Notifications & Voice Audits:** Telegram Bot API (instant multi-tier telemetry, interactive biometric cognitive prompts)
-
----
-
-## 📑 Modular Engineering Dossier Shards
-
-The system's modular architecture is documented across 19 specialized engineering dossiers:
-
+### 🛠️ Unified Technology Stack
+`5-Pillar Order Flow Matrix` • `50ms Fast Math Engine` • `7-Gate Validator` • `AIPermissionMap` • `AIValidator` • `ATR Stop Buffers` • `ATR Volatility Windows` • `Anti-Flagging Routing` • `Apple HealthKit` • `Apple Silicon E-Core Affinity` • `Apple Silicon M4 GPU` • `Apple Silicon P/E-Cores` • `Asymmetric Ruin Invariant Enforcement` • `Asynchronous LLM Validator` • `Automated Financial Ceilings` • `Bayesian Regimes` • `Biometric Psychometrics` • `Browser Fingerprint Emulation` • `CCXT` • `Champion vs Challenger Shadow Lab` • `ChampionChallengerLab` • `Cost Guardrails` • `Counterfactual Shadow Auditing` • `CounterfactualTracker` • `Darwin Mach taskpolicy` • `Darwin libdispatch` • `Drawdown Throttling` • `Dual Pricing Feeds` • `Episodic Multi-Modal RAG` • `Few-Shot Optimization` • `Fractal Sweep Detection` • `Fractional Brownian Physics` • `Gemini 1.5 Pro SFT` • `Gemini 1.5 Pro Vision` • `Gemini 2.5 Flash` • `Gemini 2.5 Flash Vision` • `Gemini 2.5 Multi-Modal Vision` • `Gemini API` • `HRV Stress Tracking` • `Hurst Exponent` • `Hurst Exponent Chaos Gate` • `Hybrid Execution Routing` • `In-Context Few-Shot RAG` • `In-Context RAG` • `JSONL SFT` • `JSONL SFT Datasets` • `Judas Reversal Engine` • `LaunchAgent Watchdog` • `LoRA (Rank 8 / Alpha 16)` • `MAE/MFE Telemetry` • `MLX-LM Unified Memory` • `Market Regime Detection` • `Model Weight Calibration` • `Multi-Account Order Dispatch` • `Multi-Broker Mesh` • `MultiAccountFunnelManager` • `Network Resiliency` • `NewsCatalystScanner` • `NewsFilter` • `NumPy` • `Online Beta-Binomial Updating` • `Predictive ML Throttling` • `Prompt Context Compression` • `Prop Guardian` • `Prop Risk Governance` • `Python 3.11` • `QAQuantAgent` • `Qwen2.5-Coder-1.5B 4-bit` • `Real-Time Spending Alerts` • `Recursive Kalman Filters` • `RetrainingLoop` • `Retry Exponential Backoff` • `SMC POI Routing` • `SQLite Signed Ledger` • `SQLite WAL` • `Self-Healing Grammar Parsing` • `Self-Healing Rules` • `Semantic Prompt Leakage Forensics` • `Semantic Vector Embeddings` • `Session VWAP Normalization` • `SetupMemory` • `Shadow Tournament Lab (A/B Testing)` • `ShadowChartMemory` • `Silicon Telemetry HUD` • `Soft/Hard Retraining Loops` • `Spatial Density Tensors` • `Supabase` • `Supabase pgvector RAG` • `Telegram Bot API` • `The Sanctum Fleet Shield` • `Tier-1 USD Volatility Gating` • `Tilt Guard Throttling` • `Token Cost Ledger` • `Token Gating` • `TradeLocker Headless Mesh` • `TradeLocker JWT` • `TradeLocker REST API` • `TradeLocker backend-api` • `V8 Heap Bounds (1024MB)` • `Vector RAG` • `asyncio` • `com.sovereign.supervisor` • `ctypes Mach Bindings` • `macOS Daemonization` • `macOS LaunchAgent Daemons` • `macOS launchd` • `requests` • `taskpolicy QoS` • `yFinance`
 
 ---
+
+## 📑 Complete Engineering Dossiers (Shards 01–19)
 
 ### [01] Executive Policy Alignment & Asymmetric Ruin-Weighted SLMs
-**Discipline:** `Quantitative Engineering & Microstructure` | **Classification:** `technical`  
-**Telemetry:** `validation_loss: 0.059 (-96.9%) // local_inference_latency: 450ms // ram_footprint: 638 MB // disk_swap: 0 bytes // shadow_capital_risk: $0.00`  
-**Shard ID:** `FL-continuous-expectancy-slm-orderflow-matrix`  
+
+> **discipline:** `Quantitative Engineering & Microstructure` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `validation_loss: 0.059 (-96.9%) // local_inference_latency: 450ms // ram_footprint: 638 MB // disk_swap: 0 bytes // shadow_capital_risk: $0.00` &nbsp;|&nbsp; **dossier_id:** [`continuous-expectancy-slm-orderflow-matrix`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. The Core Thesis: Why Naive LLMs Fail at Market Microstructure
 
@@ -329,13 +256,11 @@ In production stress-testing against truncated payloads, this fallback mechanism
 3. **Shadow Mode is Non-Negotiable:** Backtests provide proof of concept; only forward paper tournaments under live, uncurated market feeds provide proof of edge.
 4. **Local SLMs Provide Institutional Independence:** A 1.5B quantized model running on consumer unified memory delivers sub-second inference, deterministic structured outputs, and zero external dependency risk at zero ongoing token cost.
 
-
 ---
 
 ### [02] Sovereign Agentic Runtime Governor
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `technical`  
-**Telemetry:** `swap_debt: -97.6% (142MB) // display_rate: 120 FPS // e_core_sandboxing: 100% // bot_jitter: 0.0ms // ml_guard: <1.0s`  
-**Shard ID:** `FL-sovereign-agentic-runtime-governor`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `swap_debt: -97.6% (142MB) // display_rate: 120 FPS // e_core_sandboxing: 100% // bot_jitter: 0.0ms // ml_guard: <1.0s` &nbsp;|&nbsp; **dossier_id:** [`sovereign-agentic-runtime-governor`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. The Multi-Agent OS Bottleneck
 
@@ -403,13 +328,11 @@ graph TD
 | **Production Bot Starvation** | Vulnerable to agent spikes | **100% Isolated Shield** | **0.0ms Drift** |
 | **Dynamic ML Throttling** | Reactive OS crash / freeze | **Predictive Bayesian Clamp** | **Sub-Second Guard** |
 
-
 ---
 
 ### [03] Deep Darwin Systems Architecture for Real-Time AI Agents
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `technical`  
-**Telemetry:** `execution_latency: <0.2ms // memory_pressure_governor: active // e_core_affinity: 100% // toxic_quarantine_saved: $26,900.00 // net_realized_alpha: +$7,001.61`  
-**Shard ID:** `FL-deep-darwin-systems-architecture-real-time-ai`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `execution_latency: <0.2ms // memory_pressure_governor: active // e_core_affinity: 100% // toxic_quarantine_saved: $26,900.00 // net_realized_alpha: +$7,001.61` &nbsp;|&nbsp; **dossier_id:** [`deep-darwin-systems-architecture-real-time-ai`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. Executive Abstract
 
@@ -458,13 +381,11 @@ source = dispatch.dispatch_source_create(
 - **Execution Lookup Latency:** `< 0.2ms` in-memory matrix evaluation.
 - **Hardware Stability:** 100% background operations sandboxed to E-Cores via `taskpolicy -b`.
 
-
 ---
 
 ### [04] Multi-Modal Vision RAG for Spatial Liquidity
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `technical`  
-**Telemetry:** `scans_evaluated: 35,420 // noise_eliminated: 92.8% // graduated_alpha: +32.0R // win_streak: 6_consecutive // breaches: 0/8`  
-**Shard ID:** `FL-bp-multimodal-vision-rag-shadowchartmemory`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `scans_evaluated: 35,420 // noise_eliminated: 92.8% // graduated_alpha: +32.0R // win_streak: 6_consecutive // breaches: 0/8` &nbsp;|&nbsp; **dossier_id:** [`bp-multimodal-vision-rag-shadowchartmemory`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. Executive Abstract
 
@@ -694,13 +615,11 @@ The integration of **ShadowChartMemory** transforms quantitative strategy execut
 - **Deterministic Risk Armor:** Protected by the Sovereign Execution Firewall and exact 0.50% fractional risk physics.
 - **Continuous Ground-Truth Adaptation:** Reinvests every market outcome directly into future visual vector memory.
 
-
 ---
 
 ### [05] Non-Stationary Bayesian Invariance Mesh
-**Discipline:** `Quantitative Engineering & Microstructure` | **Classification:** `technical`  
-**Telemetry:** `architecture: bayesian_invariance_swarm // online_updating: <0.5ms // kalman_velocity: zero_lag // shadow_lab: 100+_nodes // prop_lockout: 5.0%_hard_ceiling`  
-**Shard ID:** `FL-bp-non-stationary-bayesian-invariance`  
+
+> **discipline:** `Quantitative Engineering & Microstructure` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `architecture: bayesian_invariance_swarm // online_updating: <0.5ms // kalman_velocity: zero_lag // shadow_lab: 100+_nodes // prop_lockout: 5.0%_hard_ceiling` &nbsp;|&nbsp; **dossier_id:** [`bp-non-stationary-bayesian-invariance`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. Executive Summary & Problem Formulation
 
@@ -827,13 +746,11 @@ In the sovereign cryptographic ledger (`signed_ledger`), high-conviction setups 
 *Published by Flocano Labs — Sovereign R&D Forge for Active-State Systems.*  
 *Canonical Blueprint: [flocanolabs/case-studies](https://www.nicholasmacaskill.com/flocanolabs/case-studies)*
 
-
 ---
 
 ### [06] Distributed Multi-Agent Consensus Protocol (DMACP-07)
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `technical`  
-**Telemetry:** `architecture: dmacp_07_mesh // regimes: hurst_adf_conditioned (h=0.423) // conviction: 9.0/10 // fleet_execution: 1.52_btc_short // realized: +$1,755.47_cash`  
-**Shard ID:** `FL-bp-dmacp-07-refractive-consensus`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `architecture: dmacp_07_mesh // regimes: hurst_adf_conditioned (h=0.423) // conviction: 9.0/10 // fleet_execution: 1.52_btc_short // realized: +$1,755.47_cash` &nbsp;|&nbsp; **dossier_id:** [`bp-dmacp-07-refractive-consensus`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. The Industry Standard vs. Sovereign Stack
 
@@ -922,13 +839,11 @@ Every 5 minutes, the engine logs candidate market setups across all active strat
 
 During live production execution under anti-persistent regime conditions (H = 0.423), DMACP-07 deployed a synchronized **1.52 BTC Fleet Short**, hitting full Take-Profit in 18 minutes for a realized gain of **+1,755.47\ CASH$** with zero execution slippage and complete risk governance compliance.
 
-
 ---
 
 ### [07] 3D Archetype-Aligned Forensic Learning Engine
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `technical`  
-**Telemetry:** `archetypes: 4_mandates // metrics: mae_mfe_tracking // memory_vectors: semantic // deployment: verified`  
-**Shard ID:** `FL-bp-forensic-learning-engine`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `archetypes: 4_mandates // metrics: mae_mfe_tracking // memory_vectors: semantic // deployment: verified` &nbsp;|&nbsp; **dossier_id:** [`bp-forensic-learning-engine`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. The Short-Term Context Window Constraint
 Algorithmic trading systems utilizing Large Language Models (LLMs) fundamentally struggle with historical awareness. Because context windows are limited and API calls are expensive, passing an entire database of historical trades to Gemini for every execution decision is computationally inviable. The system lacks a structural memory of *why* past setups succeeded or failed.
@@ -956,13 +871,11 @@ When a setup is flagged for evaluation, the `AIValidator` interrogates the `Setu
 
 These precise historical matches are injected directly into the LLM prompt. The model doesn't just evaluate the live setup; it evaluates it against a curated dataset of its own exact past mistakes and triumphs, achieving continuous, low-latency calibration without requiring daily full-weight fine-tuning.
 
-
 ---
 
 ### [08] Recursive Quant Supervisory Swarm
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `technical`  
-**Telemetry:** `mesh: 8_accounts_concurrent // nav: $204,933 // shadow_tracking: active // drift_governance: automated`  
-**Shard ID:** `FL-bp-recursive-quant-supervisory-swarm`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `mesh: 8_accounts_concurrent // nav: $204,933 // shadow_tracking: active // drift_governance: automated` &nbsp;|&nbsp; **dossier_id:** [`bp-recursive-quant-supervisory-swarm`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. The Death of Static Rule-Sets: Strategy Decay & Survivorship Bias
 Legacy algorithmic trading models suffer from a fundamental epistemic blindspot: they only log the performance of trades they actually execute. If a strategy's filter eliminates 90% of incoming signals, traditional analytics can never determine whether those rejections saved capital from ruin or discarded the system's highest-Sharpe opportunities.
@@ -1003,13 +916,11 @@ Alpha_{Veto} = , sum_{i in Vetoed} (Loss_{Counterfactual} - Win_{Counterfactual}
 
 By turning discarded trade signals into structured telemetry, the system achieves **Recursive Calibration**: the model does not sit passively against changing market physics—it uses the supervisory swarm to continuously refine its own decision boundaries.
 
-
 ---
 
 ### [09] Orchestration Alpha & Regime Physics
-**Discipline:** `Quantitative Engineering & Microstructure` | **Classification:** `strategic`  
-**Telemetry:** `regime_adaptation: active // cognitive_drift: monitored`  
-**Shard ID:** `FL-bp-intent`  
+
+> **discipline:** `Quantitative Engineering & Microstructure` // **type:** `strategic` &nbsp;|&nbsp; **telemetry:** `regime_adaptation: active // cognitive_drift: monitored` &nbsp;|&nbsp; **dossier_id:** [`bp-intent`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### The Intent (Why): The "Orchestration Alpha"
 
@@ -1023,13 +934,11 @@ The core strategic challenge solved by **BayesianPivot** is the orchestration of
 
 Standard software cannot run parallel sync buffers, calculate real-time Hurst regime gates, audit human stress biometrics, and close the loop with automated model retraining. **BayesianPivot** was built to turn this multi-dimensional loop into a unified, resilient system.
 
-
 ---
 
 ### [10] 7-Gate Sovereign Light Funnel
-**Discipline:** `Distributed Systems & High-Throughput State` | **Classification:** `technical`  
-**Telemetry:** `pricing_feed: verified // delta_limit: <0.5%`  
-**Shard ID:** `FL-bp-architecture`  
+
+> **discipline:** `Distributed Systems & High-Throughput State` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `pricing_feed: verified // delta_limit: <0.5%` &nbsp;|&nbsp; **dossier_id:** [`bp-architecture`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### The Structural Density (How): Architectural Resilience
 
@@ -1045,13 +954,11 @@ To capture high-probability sweeps, the system maps 1H swing highs/lows (fractal
 * Sweeps the HTF (High Time Frame) level within a specific ATR window (`0.1x to 1.5x ATR`).
 * Closes back inside the level with a candlestick wick representing **>= 30%** of the total candle range.
 
-
 ---
 
 ### [11] Cognitive Circuit Breaker & Biometrics
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `strategic`  
-**Telemetry:** `tilt_guard: psychology_engine // response_cost: active`  
-**Shard ID:** `FL-bp-biometrics`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `strategic` &nbsp;|&nbsp; **telemetry:** `tilt_guard: psychology_engine // response_cost: active` &nbsp;|&nbsp; **dossier_id:** [`bp-biometrics`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### The Cognitive Circuit Breaker
 
@@ -1061,13 +968,11 @@ Manual discretion introduces emotional tilt, while fully automated execution mis
 * **BiometricEngine**: Monitors physical indicators (heart-rate variability and stress indicators) during active sessions.
 * **Dynamic Sizing Penalty**: If consecutive losses occur or elevated biometric metrics indicate emotional tilt, the system automatically applies a **0.5x** sizing penalty, scaling down position risk dynamically. This protects the account capital until biological metrics return to baseline.
 
-
 ---
 
 ### [12] Context Compression & Token Gating
-**Discipline:** `Distributed Systems & High-Throughput State` | **Classification:** `commit`  
-**Telemetry:** `payload_reduction: 73% // credit_savings: 60%`  
-**Shard ID:** `FL-bp-compression`  
+
+> **discipline:** `Distributed Systems & High-Throughput State` // **type:** `commit` &nbsp;|&nbsp; **telemetry:** `payload_reduction: 73% // credit_savings: 60%` &nbsp;|&nbsp; **dossier_id:** [`bp-compression`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### Context Compression & Token Gating (Gemini API Tuning)
 
@@ -1093,13 +998,11 @@ Applied strict `max_output_tokens` limits across Gemini calls:
 
 **Result**: Reduced Gemini API monthly credit consumption by over **60%**.
 
-
 ---
 
 ### [13] SQLite Token Tracker & Budget Gate
-**Discipline:** `Distributed Systems & High-Throughput State` | **Classification:** `commit`  
-**Telemetry:** `daily_ceiling: $2.00 // alerts: active`  
-**Shard ID:** `FL-bp-tracker`  
+
+> **discipline:** `Distributed Systems & High-Throughput State` // **type:** `commit` &nbsp;|&nbsp; **telemetry:** `daily_ceiling: $2.00 // alerts: active` &nbsp;|&nbsp; **dossier_id:** [`bp-tracker`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### The SQLite Token Usage Tracker & Budget Gate
 
@@ -1125,13 +1028,11 @@ If total token expenditure exceeds a daily ceiling of **$2.00**:
 2. It suspends LLM calls, forcing the trading infrastructure to fallback to local, math-only execution (`Structural Alpha`).
 3. This prevents billing runaways during highly volatile, high-frequency scan sessions.
 
-
 ---
 
 ### [14] Fault-Tolerant Daemon Architecture
-**Discipline:** `Distributed Systems & High-Throughput State` | **Classification:** `technical`  
-**Telemetry:** `error_catch: active // daemon_uptime: 99.9%`  
-**Shard ID:** `FL-bp-daemon`  
+
+> **discipline:** `Distributed Systems & High-Throughput State` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `error_catch: active // daemon_uptime: 99.9%` &nbsp;|&nbsp; **dossier_id:** [`bp-daemon`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### System Resilience: Fault-Tolerant Daemon Architecture
 
@@ -1157,13 +1058,11 @@ async def robust_sync_to_supabase(data, max_retries=3):
 
 **Result**: The daemon handles network disconnects gracefully. If an API socket drops, the system logs the event, holds active states, and automatically resumes on the next cycle, ensuring **99.9% uptime**.
 
-
 ---
 
 ### [15] Two-Tiered Execution Routing
-**Discipline:** `Quantitative Engineering & Microstructure` | **Classification:** `technical`  
-**Telemetry:** `routing_latency: hybrid // execution_speed: <50ms`  
-**Shard ID:** `FL-bp-routing`  
+
+> **discipline:** `Quantitative Engineering & Microstructure` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `routing_latency: hybrid // execution_speed: <50ms` &nbsp;|&nbsp; **dossier_id:** [`bp-routing`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### Technical Constraints & Two-Tiered Routing
 
@@ -1181,13 +1080,11 @@ To run a fully conformed AI audit (DXY intermarket divergence, whale book prints
    * **Stack**: Runs the full AI validation gate utilizing the Gemini model's reasoning capabilities to evaluate complex macro confluences.
    * **Sizing**: Runs with larger position sizes (`1.0%` risk) because it targets long-duration swing moves where immediate entry tick precision is less critical.
 
-
 ---
 
 ### [16] SFT Loops & Feedback Moats
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `feedback`  
-**Telemetry:** `retraining_type: soft_and_hard // sft_acc: high`  
-**Shard ID:** `FL-bp-retraining`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `feedback` &nbsp;|&nbsp; **telemetry:** `retraining_type: soft_and_hard // sft_acc: high` &nbsp;|&nbsp; **dossier_id:** [`bp-retraining`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### The Recursive Loop (Outcome): The Feedback Moat
 
@@ -1209,13 +1106,11 @@ During optimization runs, SFT integration demonstrated a significant performance
 
 Manual discretionary trades labeled `ALPHA` in the ledger showed a dominant win rate when fading liquidity sweeps. That pattern became the math-only Turtle Soup scanner, shifting the system from reactive indicators to proactive liquidity captures.
 
-
 ---
 
 ### [17] Stealth TradeLocker Execution Automation
-**Discipline:** `Distributed Systems & High-Throughput State` | **Classification:** `technical`  
-**Telemetry:** `auto_exec_gate: 9.0+ // validity: IOC // multi_account: A+B`  
-**Shard ID:** `FL-bp-tradelocker-automation`  
+
+> **discipline:** `Distributed Systems & High-Throughput State` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `auto_exec_gate: 9.0+ // validity: IOC // multi_account: A+B` &nbsp;|&nbsp; **dossier_id:** [`bp-tradelocker-automation`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### Headless Prop-Firm Execution
 
@@ -1260,13 +1155,11 @@ Orders post to `/backend-api/trade/accounts/{id}/orders` as IOC market fills wit
 
 `TradeLockerClient` wraps Account A + B helpers, deduplicates `seen_account_ids` when aggregating equity, and normalizes Upcomers' proprietary list-format position responses alongside standard JSON objects. `ordersHistory` pairs BUY/SELL fills by `position_id` to reconstruct closed-trade PnL for the signed ledger audit loop.
 
-
 ---
 
 ### [18] Counterfactual Supervisory Agent & Self-Healing SFT
-**Discipline:** `Cognitive AI & Multi-Agent Swarms` | **Classification:** `technical`  
-**Telemetry:** `daemon: com.sovereign.supervisor // audit_interval: 30m // lookback: 4h`  
-**Shard ID:** `FL-bp-supervisory-agent`  
+
+> **discipline:** `Cognitive AI & Multi-Agent Swarms` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `daemon: com.sovereign.supervisor // audit_interval: 30m // lookback: 4h` &nbsp;|&nbsp; **dossier_id:** [`bp-supervisory-agent`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. The False-Negative Problem
 In autonomous signal validation, AI models often err on the side of caution—vetoing high-probability setups (`score < 5.5`). Without a supervisory loop, these "False Negatives" disappear into database logs without feedback, leaving the model stuck in overly conservative rejection loops.
@@ -1277,13 +1170,11 @@ We engineered a background Supervisory Agent running via a dedicated macOS Launc
 2. **Price Action Reconstruction:** Pulls 5-minute price data 4 hours post-veto to evaluate if the rejected trade would have reached Take Profit (+3.0R) cleanly without hitting Stop Loss.
 3. **Self-Healing SFT Injection:** When an overly cautious veto is confirmed, the supervisor automatically formats the exact setup context into a corrective instruction pair and appends it to `few_shot_examples.json`. On the next scan cycle, the validator reads the corrected rule, preventing the LLM from repeating the rejection.
 
-
 ---
 
 ### [19] Tier-1 Macro News & Judas Reversal Scanner
-**Discipline:** `Quantitative Engineering & Microstructure` | **Classification:** `technical`  
-**Telemetry:** `catalysts: FOMC+CPI+NFP+PCE // protection_window: t-1m to t+2m`  
-**Shard ID:** `FL-bp-news-catalyst-scanner`  
+
+> **discipline:** `Quantitative Engineering & Microstructure` // **type:** `technical` &nbsp;|&nbsp; **telemetry:** `catalysts: FOMC+CPI+NFP+PCE // protection_window: t-1m to t+2m` &nbsp;|&nbsp; **dossier_id:** [`bp-news-catalyst-scanner`](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ### 1. The Spread Spike Window (T-1m to T+2m)
 Traditional news filters halt trading for hours, missing the highest volatility setups of the week. We refined `CRYPTO_CATALYST_WHITELIST` in `src/engines/news_filter.py` to strictly track high-impact USD events (`FOMC`, `CPI`, `NFP`, `PCE`, `PPI`, `Fed Chair`) while shrinking the protection pause strictly to T-1m to T+2m around release times to avoid exchange spread widening.
@@ -1294,15 +1185,21 @@ To actively capitalize on news volatility, we built `NewsCatalystScanner`:
 * **Sweep Verification:** Between T+2m and T+15m, the scanner monitors for aggressive institutional liquidity sweeps beyond the pre-news high/low directly into High Time Frame (1H/4H) Points of Interest (POIs).
 * **Displacement Trigger:** Submits immediate limit entries when 1m/5m Fair Value Gaps (FVGs) displace back inside the pre-news range.
 
+---
+
+## 🏛️ Sovereign Attribution & Portfolio
+
+BayesianPivot is an autonomous quantitative trading infrastructure designed, engineered, and deployed by **Nicholas MacAskill** under **Flocano Labs**.
+
+* **Executive Portfolio & Engineering Practice:**  
+  👉 [https://nicholasmacaskill.com](https://nicholasmacaskill.com)
+
+* **Flocano Labs Applied R&D Forge:**  
+  👉 [https://flocanolabs.com](https://flocanolabs.com)
+
+* **Flocano Labs Dossiers & Whitepapers:**  
+  👉 [https://www.flocanolabs.com/flocanolabs/case-studies](https://www.flocanolabs.com/flocanolabs/case-studies)
 
 ---
 
-## 🏛️ Provenance, Attribution & Canonical Blueprints
-
-BayesianPivot is engineered as sovereign quantitative infrastructure by **Flocano Labs**, an active-state product studio and R&D forge.
-
-- **Flocano Labs Sovereign Forge:** [https://www.flocanolabs.com](https://www.flocanolabs.com)
-- **Nicholas Alexander MacAskill (Architect / Founder & CTO):** [https://www.nicholasmacaskill.com](https://www.nicholasmacaskill.com)
-- **Interactive Engineering Dossiers & Case Studies Registry:** [https://www.flocanolabs.com/flocanolabs/case-studies](https://www.flocanolabs.com/flocanolabs/case-studies)
-
-*All system architectures, state-space estimators, and execution invariants are protected under sovereign active-state design frameworks.*
+*© 2026 Nicholas MacAskill. All rights reserved. BayesianPivot is a sovereign quantitative research system.*
