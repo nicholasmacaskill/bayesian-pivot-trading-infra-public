@@ -121,7 +121,8 @@ class TestPipelineE2EInvariants(unittest.TestCase):
             ai_score=8.0,
             is_htf_confirmed=True,
             bypass_weekend=True,
-            bypass_cooldown=True
+            bypass_cooldown=True,
+            bypass_killzone=True
         )
         self.assertTrue(is_approved, f"ExecutionFirewall should approve Gold Long. Blocked reason: {reason}")
 

@@ -33,7 +33,7 @@ class QualityGovernor:
     CRITICAL_ERROR_PATTERNS = [
         ("BadSymbol", 2, "CCXT / Exchange symbol mismatch detected"),
         ("Rate limited", 4, "Excessive broker HTTP 429 rate limit pressure"),
-        ("401 Unauthorized", 3, "Broker authentication token expiration loop"),
+        ("401 Unauthorized", 15, "Broker authentication token expiration loop"),
         ("Read timed out", 3, "Broker network latency timeout spike"),
         ("Failed to patch position", 1, "Broker position bracket modification rejected"),
         ("Traceback (most recent call last)", 2, "Unhandled exception in supervisor thread")

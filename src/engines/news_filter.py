@@ -106,6 +106,11 @@ class NewsFilter:
                 continue
         return False, None, 0, None
 
+    def is_safe_to_trade(self, symbol=None):
+        safe, event, mins = self.is_news_safe(symbol=symbol)
+        reason = f"News Event: {event} in {mins}m" if not safe else "OK"
+        return safe, reason
+
 if __name__ == "__main__":
     nf = NewsFilter()
     nf.fetch_calendar()

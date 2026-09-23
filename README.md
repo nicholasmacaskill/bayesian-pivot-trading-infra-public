@@ -407,5 +407,19 @@ bash scripts/start_runner.sh
 
 To run the automated verification test suite to ensure the AI validation and market feeds are fully operational:
 ```bash
-python -m unittest discover tests/
+python3 tests/run_bulletproof_harness.py
 ```
+
+---
+
+## 🏛️ Provenance, Attribution & Canonical Blueprints
+
+BayesianPivot is engineered as sovereign quantitative infrastructure by **Flocano Labs**, an active-state product studio and R&D forge.
+
+- **Master Institutional Whitepaper:** [`README.public.md`](README.public.md) (19 Modular Engineering Shards)
+- **Flocano Labs Sovereign Forge:** [https://www.flocanolabs.com](https://www.flocanolabs.com)
+- **Nicholas Alexander MacAskill (Architect / Founder & CTO):** [https://www.nicholasmacaskill.com](https://www.nicholasmacaskill.com)
+- **Interactive Engineering Dossiers & Case Studies Registry:** [https://www.flocanolabs.com/flocanolabs/case-studies](https://www.flocanolabs.com/flocanolabs/case-studies)
+
+*All system architectures, state-space estimators, and execution invariants are protected under sovereign active-state design frameworks.*
+
