@@ -53,19 +53,22 @@
   * **$25k Tier (Accounts 1, 3, 7):**
     * Target Net Profit: **+$2,000.00** (Payout Unlock Balance: **$27,000.00**).
     * Max Single-Day Profit: **$400.00** (20% ceiling; system clamped to **$380.00**).
-    * Current Status & Decoupled Starting Risk (Live Verified Sep 22, 2026):
-      * **Account 1 (`s79qv3xetj`):** Balance **$25,179.07** (+$179.07 buffer above $25,000 locked floor). **Base Risk: $35.00** (**5.1 losses runway** on $179 buffer; scales to $50 at buffer > $600, $70 at buffer > $1,200).
-      * **Account 7 (`875do5esrd`):** Balance **$24,139.00** (-$861 DD; +$389.00 buffer above $23,750 floor). **Base Risk: $35.00** (**11.1 losses runway** on $389 buffer).
-      * **Account 3 (`q20gxm287x`):** Balance **$24,477.57** (-$522.43 DD; +$727.57 buffer above $23,750 floor). **Base Risk: $50.00** (**14.5 losses runway** on $727 buffer).
+    * Drawdown Floor Rules:
+      * **Account 1 (`s79qv3xetj`):** High-Water Mark exceeded $26,000 -> Floor permanently locked at **$25,000.00** Even Equity. Base Risk: **$35.00** (scales to $50 at buffer > $600, $70 at buffer > $1,200).
+      * **Account 7 (`875do5esrd`):** 5% Trailing Floor at **$23,750.00**. Base Risk: **$35.00**.
+      * **Account 3 (`q20gxm287x`):** 5% Trailing Floor at **$23,750.00**. Base Risk: **$50.00**.
   * **$50k Tier (Accounts 2, 6, 9):**
     * Target Net Profit: **+$4,000.00** (Payout Unlock Balance: **$54,000.00**).
     * Max Single-Day Profit: **$800.00** (20% ceiling; system clamped to **$760.00**).
-    * Current Status & Decoupled Starting Risk (Live Verified Sep 22, 2026):
-      * **Account 9 (`jfcuue7er3` - Oracle Lead Striker):** Balance **$49,803.41** (+$2,303.41 buffer above $47,500 floor). **Base Risk: $100.00** (**23.0 losses runway** on $2,303 buffer; scales to $120 after ~2 wins / cushion >= +$350 above $50k).
-      * **Account 2 (`498svcbpfi`):** Balance **$48,500.94** (-$1,499.06 DD; +$1,000.94 buffer above $47,500 floor). **Base Risk: $70.00** (**14.3 losses runway** on $1,000 buffer; scales to $120 at buffer > $1,800).
-      * **Account 6 (`dwundrtxjv`):** Balance **$48,622.13** (-$1,377.87 DD; +$1,122.13 buffer above $47,500 floor). **Base Risk: $80.00** (**14.0 losses runway** on $1,122 buffer; scales to $120 at buffer > $1,800).
+    * Drawdown Floor Rules:
+      * **Account 9 (`jfcuue7er3` - Oracle Lead Striker):** 5% Trailing Floor at **$47,500.00**. Base Risk: **$100.00** (scales to $120 after ~2 wins / cushion >= +$350 above $50k).
+      * **Account 2 (`498svcbpfi`):** 5% Trailing Floor at **$47,500.00**. Base Risk: **$70.00** (scales to $120 at buffer > $1,800).
+      * **Account 6 (`dwundrtxjv`):** 5% Trailing Floor at **$47,500.00**. Base Risk: **$80.00** (scales to $120 at buffer > $1,800).
   * **$10k Tier (Accounts 4, 5, 8):**
-    * **Permanently Decommissioned / Liquidation-Only.** Current Balances: Account 4: $9,636.17, Account 5: $9,631.37, Account 8: $9,627.98. Sizing set to **$0.00** (quarantined).
+    * **Permanently Decommissioned / Liquidation-Only.** Sizing set to **$0.00** (quarantined). Floor: $9,500.00.
+  * **Live Broker Verification Command:**
+    * Real-time balances, true buffers, and loss runways must be queried live via:
+      `python3 scripts/get_fleet_vitals.py` (or `--json` for structured payload).
 
 ### 8. Strict Communication & Output Formatting Protocols (No LaTeX / Clean English)
 * **RULE:** **NEVER** use LaTeX math formatting, dollar sign equation delimiters (`$...$`, `$$...$$`), or raw equation markup (`\ge`, `\le`, `\to`, `\times`, `\text{...}`, `\frac`) in agent responses or documentation.
@@ -84,6 +87,13 @@
   1. **Automated Invariant & Regression Testing:** Run targeted unit tests and the Master Invariant Harness (`tests/run_bulletproof_harness.py` / `PYTHONPATH=. ./venv/bin/pytest`) to mathematically verify all broker, risk, sizing, and firewall constraints pass.
   2. **Production Integrity Check:** Confirm runtime daemon status, log outputs, and invariant sentry health to ensure production stability.
   3. **Immediate Commit & Remote Push:** Once each change passes the adversarial quality verification, immediately commit with a clean, descriptive message and push the updated code to the private repository (`gitlab main`).
+
+### 10. Mandatory Live Broker Query Protocol (Strict Prohibition Against Stale Hardcoded Balances)
+* **RULE:** Agents and runners **MUST NEVER** store, quote, or rely on mutable live account balances, drawdown buffers, or loss runways as static text inside `AGENTS.md` or any documentation file.
+* **MANDATORY EXECUTION:** Whenever account balances, equity, true drawdown buffers, or loss runways are required for decision-making, sizing, or reporting, the agent/runner **MUST** query the live TradeLocker broker API directly:
+  - CLI: `python3 scripts/get_fleet_vitals.py` (or `--json`)
+  - Code: `from scripts.get_fleet_vitals import get_live_fleet_vitals` or `TradeLockerClient.get_account_details()`
+* `AGENTS.md` strictly documents immutable architectural rules, formulas, tiers, and floor logic—NOT decaying snapshot numbers.
 
 ---
 
