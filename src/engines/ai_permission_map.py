@@ -45,7 +45,10 @@ class AIPermissionMap:
                 "LONDON_CLOSE_SILVER_BULLET",
                 "TURTLE_SOUP_LIQUIDITY_SWEEP",
                 "STRAT_5_XAU_GOLD_50PCT_CE_LONG",
-                "FVG_50PCT_CE_REVERSAL_LONG"
+                "FVG_50PCT_CE_REVERSAL_LONG",
+                "FVG_50PCT_CE_REVERSAL",
+                "FVG_CONSEQUENT_ENCROACHMENT",
+                "FVG_50PCT_CE_REVERSAL_SHADOW"
             ],
             "notes": notes
         }
@@ -79,7 +82,10 @@ class AIPermissionMap:
                     "LONDON_CLOSE_SILVER_BULLET",
                     "TURTLE_SOUP_LIQUIDITY_SWEEP",
                     "STRAT_5_XAU_GOLD_50PCT_CE_LONG",
-                    "FVG_50PCT_CE_REVERSAL_LONG"
+                    "FVG_50PCT_CE_REVERSAL_LONG",
+                    "FVG_50PCT_CE_REVERSAL",
+                    "FVG_CONSEQUENT_ENCROACHMENT",
+                    "FVG_50PCT_CE_REVERSAL_SHADOW"
                 ],
                 "notes": "Default baseline permission"
             }
@@ -107,8 +113,16 @@ class AIPermissionMap:
         if perm.get("is_stale"):
             return False, 0.0, "AI Permission is STALE (older than 4 hours). Execution blocked."
 
-        # 1. Archetype Authorization
-        if pattern_type not in auth_archetypes:
+        # 1. Archetype Authorization (exact or normalized alias match)
+        pattern_clean = pattern_type.upper().replace("_SHADOW", "")
+        auth_clean = [a.upper().replace("_SHADOW", "") for a in auth_archetypes]
+        is_auth = (pattern_type in auth_archetypes) or (pattern_clean in auth_clean) or any(
+            ("FVG" in pattern_clean and ("FVG" in a or "50PCT" in a or "STRAT_5" in a)) or
+            ("TURTLE_SOUP" in pattern_clean and "TURTLE_SOUP" in a) or
+            ("JUDAS" in pattern_clean and "JUDAS" in a)
+            for a in auth_clean
+        )
+        if not is_auth:
             return False, 0.0, f"Archetype {pattern_type} not in authorized list {auth_archetypes}"
 
         # 2. Bias Alignment Check

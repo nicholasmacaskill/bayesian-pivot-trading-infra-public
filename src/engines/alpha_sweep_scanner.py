@@ -1125,30 +1125,38 @@ class AlphaSweepScanner(SMCScanner):
             ai_score_val = shadow_score
             verdict_str = "SHADOW_OBSERVATION" if is_shadow_strategy else "CONFIRMED"
             
-            if not passed_ai_validator:
+            if is_symbol_shadow:
+                tag_label = "shadow asset quarantine ($0 live risk)"
+                pattern_str = f"[👻 SHADOW LAB - {symbol}] {base_pattern_str}"
+                ai_reasoning = f"[👻 SHADOW LAB ({symbol} $0 RISK)] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10. Tracking shadow expectancy..."
+            elif setup.get('is_shadow_only', False):
+                tag_label = "shadow session quarantine"
+                pattern_str = f"[👻 SHADOW - SESSION RESTRICTED] {base_pattern_str}"
+                ai_reasoning = f"[👻 SHADOW LAB (SESSION RESTRICTED)] {pattern_type.replace('_', ' ')} on {symbol} is shadow-only during {killzone} (Live execution restricted to London/NY). AI Score: {shadow_score:.1f}/10."
+            elif is_low_density_sweep:
+                tag_label = "shadow trade, low-density noise sweep"
+                pattern_str = f"[👻 SHADOW - LOW DENSITY SWEEP ({liq_density:.1f}/10)] {base_pattern_str}"
+                ai_reasoning = f"[👻 SHADOW LAB (LOW DENSITY SWEEP)] {pattern_type.replace('_', ' ')} of level {setup['level']:.2f} has insufficient stop cluster density ({liq_density:.1f}/10 < 6.0). Not a verified institutional POI. Quarantined to $0 risk."
+            elif is_archetype_shadow:
+                tag_label = "shadow archetype quarantine"
+                pattern_str = f"[👻 SHADOW LAB] {base_pattern_str}"
+                ai_reasoning = f"[👻 SHADOW LAB ($0 RISK)] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10."
+            elif not passed_ai_validator:
                 if is_counter_regime:
                     tag_label = "shadow trade, counter-regime smt quarantine"
                     pattern_str = f"[👻 SHADOW - COUNTER-REGIME SMT] {base_pattern_str}"
                     ai_reasoning = f"[👻 SHADOW LAB (COUNTER-REGIME SMT)] {symbol} {setup['direction']} requires Unicorn score >= 9.0/10 during {regime_msg} (Score: {shadow_score:.1f}/10). Quarantined to $0 risk."
-                else:
+                elif shadow_score < ai_validator_threshold:
                     tag_label = "shadow trade, didn't pass ai validator"
                     pattern_str = f"[👻 SHADOW - DIDN'T PASS AI VALIDATOR] {base_pattern_str}"
                     cvd_detail = shadow_report.get('cvd_absorption', {}).get('details', 'No CVD')
                     vwap_z = shadow_report.get('session_vwap', {}).get('z_score', 0)
                     kalman_st = shadow_report.get('kalman_mss', {}).get('state', 'NEUTRAL')
                     ai_reasoning = f"[👻 SHADOW TRADE - DIDN'T PASS AI VALIDATOR (Score: {shadow_score:.1f}/10 < {ai_validator_threshold})] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Failed confluences: CVD={cvd_detail}, VWAP_Z={vwap_z:.2f}, Kalman={kalman_st}."
-            elif is_low_density_sweep:
-                tag_label = "shadow trade, low-density noise sweep"
-                pattern_str = f"[👻 SHADOW - LOW DENSITY SWEEP ({liq_density:.1f}/10)] {base_pattern_str}"
-                ai_reasoning = f"[👻 SHADOW LAB (LOW DENSITY SWEEP)] {pattern_type.replace('_', ' ')} of level {setup['level']:.2f} has insufficient stop cluster density ({liq_density:.1f}/10 < 6.0). Not a verified institutional POI. Quarantined to $0 risk."
-            elif is_symbol_shadow:
-                tag_label = "shadow asset quarantine ($0 live risk)"
-                pattern_str = f"[👻 SHADOW LAB - {symbol}] {base_pattern_str}"
-                ai_reasoning = f"[👻 SHADOW LAB ({symbol} $0 RISK)] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10. Tracking shadow expectancy..."
-            elif is_archetype_shadow:
-                tag_label = "shadow archetype quarantine"
-                pattern_str = f"[👻 SHADOW LAB] {base_pattern_str}"
-                ai_reasoning = f"[👻 SHADOW LAB ($0 RISK)] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f}. Hurst: {setup['hurst']:.3f} ({setup['regime']}). AI Score: {shadow_score:.1f}/10."
+                else:
+                    tag_label = "shadow trade, ai permission gate"
+                    pattern_str = f"[👻 SHADOW - AI PERMISSION GATE] {base_pattern_str}"
+                    ai_reasoning = f"[👻 SHADOW TRADE - AI PERMISSION GATE ({perm_msg})] {pattern_type.replace('_', ' ')} of HTF level {setup['level']:.2f} (Score: {shadow_score:.1f}/10 >= {ai_validator_threshold})."
             else:
                 tag_label = "live master weapon"
                 pattern_str = base_pattern_str
