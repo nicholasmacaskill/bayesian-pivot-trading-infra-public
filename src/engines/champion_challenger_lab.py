@@ -174,7 +174,7 @@ class ChampionChallengerLab:
                     "symbol": "XAU/USD",
                     "direction": "LONG",
                     "min_htf_trend": "BULLISH",
-                    "sessions": ["LONDON", "NY_AM"],
+                    "sessions": ["LONDON", "NY_AM", "ASIAN"],
                     "min_ce_mitigation_depth": 0.50,
                     "target_rr": 2.5,
                     "stop_buffer_atr": 0.25,

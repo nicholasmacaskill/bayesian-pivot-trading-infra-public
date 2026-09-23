@@ -65,6 +65,7 @@ def main():
         ("tests.test_quant_invariants", "TIER 2: QUANTITATIVE PHYSICS & HURST INVARIANTS"),
         ("tests.test_prop_compliance_invariants", "TIER 3: PROP COMPLIANCE & RETRAINING INVARIANTS"),
         ("tests.test_live_orderflow_feed", "TIER 4: LIVE ORDERFLOW & ICEBERG ABSORPTION FEED"),
+        ("tests.test_pipeline_e2e_invariants", "TIER 5: SIGNAL PIPELINE & GRADUATED ARCHETYPE INVARIANTS"),
     ]
 
     tier_results = []

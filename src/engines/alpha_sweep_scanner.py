@@ -621,7 +621,7 @@ class AlphaSweepScanner(SMCScanner):
             now_utc = datetime.now(timezone.utc)
             is_weekday = now_utc.weekday() < 5
             kz_str = str(killzone or "").upper()
-            is_gold_liquid_session = any(k in kz_str for k in ["LONDON", "NY_AM", "CONTINUOUS", "NEW_YORK"])
+            is_gold_liquid_session = any(k in kz_str for k in ["LONDON", "NY_AM", "CONTINUOUS", "NEW_YORK", "ASIAN"])
             
             # 1H HTF Trend Check (Mandatory Bullish Structure for Longs)
             ema50_1h = df_1h['close'].ewm(span=min(50, len(df_1h))).mean().iloc[-1]
@@ -1098,7 +1098,7 @@ class AlphaSweepScanner(SMCScanner):
             is_strat_5_gold_live = (
                 symbol in ["XAU/USD", "XAUUSD", "GOLD"]
                 and setup.get('direction') == "LONG"
-                and pattern_type in ["STRAT_5_XAU_GOLD_50PCT_CE_LONG", "FVG_50PCT_CE_REVERSAL_LONG", "FVG_50PCT_CE_REVERSAL"]
+                and any(p in pattern_type for p in ["STRAT_5", "FVG", "50PCT", "CE"])
                 and getattr(Config, 'STRATEGY_5_AUTO_EXECUTE', False)
                 and not setup.get('is_shadow_only', False)
             )
@@ -1111,7 +1111,13 @@ class AlphaSweepScanner(SMCScanner):
             if getattr(Config, 'STRATEGY_9_AUTO_EXECUTE', False):
                 authorized_live_patterns.extend(["JUDAS_INDUCEMENT_SNIPER", "STRATEGY_9_JUDAS_INDUCEMENT"])
             if getattr(Config, 'STRATEGY_5_AUTO_EXECUTE', False):
-                authorized_live_patterns.extend(["STRAT_5_XAU_GOLD_50PCT_CE_LONG", "FVG_50PCT_CE_REVERSAL_LONG", "FVG_50PCT_CE_REVERSAL"])
+                authorized_live_patterns.extend([
+                    "STRAT_5_XAU_GOLD_50PCT_CE_LONG",
+                    "FVG_50PCT_CE_REVERSAL_LONG",
+                    "FVG_50PCT_CE_REVERSAL",
+                    "FVG_CONSEQUENT_ENCROACHMENT",
+                    "FVG_50PCT_CE_REVERSAL_SHADOW"
+                ])
 
             is_archetype_shadow = (
                 (pattern_type not in authorized_live_patterns)
