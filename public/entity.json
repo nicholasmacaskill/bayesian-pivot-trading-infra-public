@@ -1,0 +1,49 @@
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "@id": "https://github.com/nicholasmacaskill/bayesian-pivot-trading-infra-public#app",
+  "name": "BayesianPivot",
+  "alternateName": [
+    "Bayesian Pivot Trading Infrastructure",
+    "Bayesian Pivot Trading OS",
+    "BayesianPivot by Flocano Labs"
+  ],
+  "author": {
+    "@type": "Person",
+    "name": "Nicholas Alexander MacAskill",
+    "url": "https://nicholasmacaskill.com",
+    "sameAs": [
+      "https://nicholasmacaskill.com",
+      "https://github.com/nicholasmacaskill",
+      "https://instagram.com/nicholasmacaskill"
+    ]
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Flocano Labs",
+    "url": "https://flocanolabs.com",
+    "sameAs": [
+      "https://flocanolabs.com",
+      "https://www.flocanolabs.com/flocanolabs/case-studies"
+    ]
+  },
+  "isPartOf": {
+    "@type": "Organization",
+    "name": "Flocano Labs"
+  },
+  "description": "Autonomous quantitative trading OS that filters liquidity volatility through a 9-Gate Bayesian funnel, leveraging continuous Apple Silicon GPU fine-tuning (Qwen2.5-Coder LoRA), live multimodal inference (Gemini 2.5), and native Rust cryptographic auditing. Zero cloud cost, <50ms latency.",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "macOS Apple Silicon",
+  "isAccessibleForFree": true,
+  "codeRepository": "https://github.com/nicholasmacaskill/bayesian-pivot-trading-infra-public",
+  "sameAs": [
+    "https://flocanolabs.com",
+    "https://nicholasmacaskill.com",
+    "https://github.com/nicholasmacaskill/bet-bodhi-agent-public",
+    "https://instagram.com/nicholasmacaskill",
+    "https://instagram.com/betbodhi",
+    "https://www.flocanolabs.com/flocanolabs/case-studies"
+  ],
+  "keywords": "quantitative trading, bayesian inference, apple silicon, tradelocker, prop firm, 9-gate validator, machine learning trading, flocano labs",
+  "relatedLink": "https://github.com/nicholasmacaskill/bet-bodhi-agent-public"
+}

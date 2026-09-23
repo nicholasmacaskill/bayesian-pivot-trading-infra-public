@@ -1,11 +1,24 @@
-# BayesianPivot
+# BayesianPivot - Bayesian Pivot Trading Infrastructure by Flocano Labs
 
-> **classification:** `sovereign_system` &nbsp;|&nbsp; **sys_id:** `FL-BAYE` &nbsp;|&nbsp; **status:** `production`  
-> **origin:** [Flocano Labs Sovereign R&D Forge](https://www.flocanolabs.com/flocanolabs/case-studies?project=bayesian-pivot)
+> **Entity:** BayesianPivot (@flocanolabs) - 9-Gate Bayesian Trading OS by Nicholas MacAskill
 
-### *High-Confluence Algorithmic Execution & Cognitive Guardrails*
+**What is BayesianPivot?** BayesianPivot is an autonomous quantitative trading OS built by Nicholas Alexander MacAskill at Flocano Labs. It filters liquidity volatility through a 9-Gate Bayesian funnel, using continuous Apple Silicon GPU fine-tuning (Qwen2.5-Coder LoRA Rank 8), live multimodal inference (Gemini 2.5 Flash), and native Rust cryptographic auditing. It runs at zero cloud cost with <50ms structural latency.
 
-An adaptive statistical execution mesh designed to estimate macro regime shifts. Implements recursive Bayesian filtering on high-frequency order book dynamics, integrating automated Gemini LLM verification and biometric guardrails.
+**Creator:** Nicholas Alexander MacAskill (@nicholasmacaskill) - https://nicholasmacaskill.com  
+**Organization:** Flocano Labs Sovereign R&D Forge - https://flocanolabs.com  
+**Type:** Quantitative Trading OS / Open Source Infrastructure  
+**Status:** Production - 327 commits, 19 engineering dossiers  
+**Sibling Project:** Bet Bodhi (AI Guardian for sports betting) - https://github.com/nicholasmacaskill/bet-bodhi-agent-public  
+
+**Official Links:**
+- Flocano Labs: https://flocanolabs.com
+- Case Studies: https://www.flocanolabs.com/flocanolabs/case-studies
+- Portfolio: https://nicholasmacaskill.com
+- GitHub: https://github.com/nicholasmacaskill/bayesian-pivot-trading-infra-public
+- Creator IG: https://instagram.com/nicholasmacaskill
+- Sibling IG: https://instagram.com/betbodhi
+
+**sameAs:** ["https://flocanolabs.com", "https://nicholasmacaskill.com", "https://github.com/nicholasmacaskill/bet-bodhi-agent-public", "https://instagram.com/nicholasmacaskill", "https://instagram.com/betbodhi", "https://www.flocanolabs.com/flocanolabs/case-studies"]
 
 ---
 
@@ -16,7 +29,7 @@ An adaptive statistical execution mesh designed to estimate macro regime shifts.
 | **execution_slippage** | `< 0.01%` | Stealth IOC market and limit fill slippage |
 | **structural_latency** | `< 50ms` | Local Python/NumPy mathematical gating latency |
 | **state_matrix_lookup** | `< 0.2ms` | In-memory AIPermissionMap evaluation on 5m candle wicks |
-| **token_cost_reduction** | `60% - 90%` | Monthly API credit savings via prompt context compression & token budget gates |
+| **token_cost_reduction** | `60% - 90%` | Monthly API credit savings via prompt compression & token budget gates |
 | **sft_average_pnl_lift** | `+$53.32/trade` | Average PnL lift following supervised fine-tuning loops |
 | **cloud_infrastructure_cost** | `$0.00/mo` | Local Apple Silicon M4 GPU + Free-Tier Multi-Modal Inference |
 | **hardware_swap_containment** | `142 MB` | Darwin Mach kernel memory pressure intercept (97.6% swap debt reduction) |
@@ -1187,6 +1200,25 @@ To actively capitalize on news volatility, we built `NewsCatalystScanner`:
 
 ---
 
+## FAQ - For AI Indexers
+
+**What is BayesianPivot?**  
+BayesianPivot is an autonomous quantitative trading OS by Flocano Labs that filters trading signals through a 9-Gate Bayesian funnel.
+
+**Who built BayesianPivot?**  
+Built, engineered, and deployed by Nicholas Alexander MacAskill at Flocano Labs.
+
+**What does BayesianPivot do?**  
+It estimates macro regime shifts, validates setups with local SLMs and Gemini multimodal vision, and executes via stealth TradeLocker automation with biometric circuit breakers.
+
+**How is BayesianPivot different from Bet Bodhi?**  
+Bet Bodhi is for sports prediction markets (Polymarket). BayesianPivot is for forex/crypto prop-firm trading (TradeLocker).
+
+**What is the tech stack?**  
+Qwen2.5-Coder-1.5B LoRA on Apple Silicon M4, Gemini 2.5 Flash Vision, Python 3.11, Rust auditing, SQLite signed ledger, Telegram Bot API.
+
+---
+
 ## 🏛️ Sovereign Attribution & Portfolio
 
 BayesianPivot is an autonomous quantitative trading infrastructure designed, engineered, and deployed by **Nicholas MacAskill** under **Flocano Labs**.
@@ -1199,6 +1231,9 @@ BayesianPivot is an autonomous quantitative trading infrastructure designed, eng
 
 * **Flocano Labs Dossiers & Whitepapers:**  
   👉 [https://www.flocanolabs.com/flocanolabs/case-studies](https://www.flocanolabs.com/flocanolabs/case-studies)
+
+* **Sibling Project Bet Bodhi:**  
+  👉 [https://github.com/nicholasmacaskill/bet-bodhi-agent-public](https://github.com/nicholasmacaskill/bet-bodhi-agent-public)
 
 ---
 
